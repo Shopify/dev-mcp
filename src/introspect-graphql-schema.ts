@@ -17,16 +17,24 @@ export const SCHEMAS_CONFIG_PATH = path.join(
 );
 
 // Function to get the schema path for a specific API
-export async function getSchemaPath(api: string): Promise<string> {
+export async function getSchemaPath(
+  api: string,
+  version?: string
+): Promise<string> {
   try {
     const schemasConfigContent = await fs.readFile(SCHEMAS_CONFIG_PATH, "utf8");
     const schemasConfig = JSON.parse(schemasConfigContent);
 
     const schemaConfig = schemasConfig.find(
-      (config: any) => config.api === api
+      (config: any) =>
+        config.api === api && (!version || config.version === version)
     );
     if (!schemaConfig) {
-      throw new Error(`Schema configuration for API "${api}" not found`);
+      throw new Error(
+        `Schema configuration for API "${api}"${
+          version ? ` version "${version}"` : ""
+        } not found`
+      );
     }
 
     return path.join(__dirname, "..", "data", schemaConfig.file);
@@ -230,15 +238,17 @@ export async function introspectGraphqlSchema(
   query: string,
   {
     api = "admin",
+    version = "2025-01",
     filter = ["all"],
   }: {
     api?: "admin" | "storefront";
+    version?: "2024-04" | "2024-07" | "2024-10" | "2025-01";
     filter?: Array<"all" | "types" | "queries" | "mutations">;
   } = {}
 ) {
   try {
-    // Get the appropriate schema path based on the API
-    const schemaPath = await getSchemaPath(api);
+    // Get the appropriate schema path based on the API and version
+    const schemaPath = await getSchemaPath(api, version);
 
     // Load the schema content
     const schemaContent = await loadSchemaContent(schemaPath);

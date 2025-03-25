@@ -96,13 +96,6 @@ export function shopifyTools(server: McpServer) {
         .describe(
           "Search term to filter schema elements by name. Only pass simple terms like 'product', 'discountProduct', etc."
         ),
-      filter: z
-        .array(z.enum(["all", "types", "queries", "mutations"]))
-        .optional()
-        .default(["all"])
-        .describe(
-          "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)"
-        ),
       api: z
         .enum(["admin", "storefront"])
         .optional()
@@ -110,9 +103,27 @@ export function shopifyTools(server: McpServer) {
         .describe(
           "The API to introspect. Can be 'admin' or 'storefront'. Default is 'admin'."
         ),
+      version: z
+        .enum(["2024-04", "2024-07", "2024-10", "2025-01"])
+        .optional()
+        .default("2025-01")
+        .describe(
+          "The version of the API to introspect. Default is '2025-01'."
+        ),
+      filter: z
+        .array(z.enum(["all", "types", "queries", "mutations"]))
+        .optional()
+        .default(["all"])
+        .describe(
+          "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)"
+        ),
     },
-    async ({ query, filter, api }, extra) => {
-      const result = await introspectGraphqlSchema(query, { filter, api });
+    async ({ query, filter, api, version }, extra) => {
+      const result = await introspectGraphqlSchema(query, {
+        filter,
+        api,
+        version,
+      });
 
       if (result.success) {
         return {
