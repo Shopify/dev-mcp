@@ -1,0 +1,12 @@
+[
+  {
+    "api": "admin",
+    "file": "admin_schema_2025-01.json.gz",
+    "version": "2025-01"
+  },
+  {
+    "api": "storefront",
+    "file": "storefront_schema_2025-01.json.gz",
+    "version": "2025-01"
+  }
+]

@@ -8,38 +8,68 @@ import { existsSync } from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Path to the schema file in the data folder
-export const SCHEMA_FILE_PATH = path.join(
+// Path to the schemas configuration file
+export const SCHEMAS_CONFIG_PATH = path.join(
   __dirname,
   "..",
   "data",
-  "admin_schema_2025-01.json"
+  "schemas.json"
 );
+
+// Function to get the schema path for a specific API
+export async function getSchemaPath(api: string): Promise<string> {
+  try {
+    const schemasConfigContent = await fs.readFile(SCHEMAS_CONFIG_PATH, "utf8");
+    const schemasConfig = JSON.parse(schemasConfigContent);
+
+    const schemaConfig = schemasConfig.find(
+      (config: any) => config.api === api
+    );
+    if (!schemaConfig) {
+      throw new Error(`Schema configuration for API "${api}" not found`);
+    }
+
+    return path.join(__dirname, "..", "data", schemaConfig.file);
+  } catch (error) {
+    console.error(
+      `[shopify-admin-schema-tool] Error reading schema configuration: ${error}`
+    );
+    throw error;
+  }
+}
 
 // Function to load schema content, handling decompression if needed
 export async function loadSchemaContent(schemaPath: string): Promise<string> {
-  const gzippedSchemaPath = `${schemaPath}.gz`;
+  // Strip .gz extension if present for the uncompressed path check
+  const uncompressedPath = schemaPath.endsWith(".gz")
+    ? schemaPath.slice(0, -3)
+    : schemaPath;
 
   // If uncompressed file doesn't exist but gzipped does, decompress it
-  if (!existsSync(schemaPath) && existsSync(gzippedSchemaPath)) {
+  if (!existsSync(uncompressedPath) && existsSync(schemaPath)) {
     console.error(
-      `[shopify-admin-schema-tool] Decompressing GraphQL schema from ${gzippedSchemaPath}`
+      `[shopify-admin-schema-tool] Decompressing GraphQL schema from ${schemaPath}`
     );
-    const compressedData = await fs.readFile(gzippedSchemaPath);
+    const compressedData = await fs.readFile(schemaPath);
     const schemaContent = zlib.gunzipSync(compressedData).toString("utf-8");
 
     // Save the uncompressed content to disk
-    await fs.writeFile(schemaPath, schemaContent, "utf-8");
+    await fs.writeFile(uncompressedPath, schemaContent, "utf-8");
     console.error(
-      `[shopify-admin-schema-tool] Saved uncompressed schema to ${schemaPath}`
+      `[shopify-admin-schema-tool] Saved uncompressed schema to ${uncompressedPath}`
     );
     return schemaContent;
   }
 
-  console.error(
-    `[shopify-admin-schema-tool] Reading GraphQL schema from ${schemaPath}`
-  );
-  return fs.readFile(schemaPath, "utf8");
+  // If uncompressed file exists, read it directly
+  if (existsSync(uncompressedPath)) {
+    console.error(
+      `[shopify-admin-schema-tool] Reading GraphQL schema from ${uncompressedPath}`
+    );
+    return fs.readFile(uncompressedPath, "utf8");
+  }
+
+  throw new Error(`Schema file not found: ${schemaPath}`);
 }
 
 // Maximum number of fields to extract from an object
@@ -196,14 +226,22 @@ export const formatGraphqlOperation = (query: any): string => {
 };
 
 // Function to search and format schema data
-export async function searchShopifyAdminSchema(
+export async function introspectGraphqlSchema(
   query: string,
   {
+    api = "admin",
     filter = ["all"],
-  }: { filter?: Array<"all" | "types" | "queries" | "mutations"> } = {}
+  }: {
+    api?: "admin" | "storefront";
+    filter?: Array<"all" | "types" | "queries" | "mutations">;
+  } = {}
 ) {
   try {
-    const schemaContent = await loadSchemaContent(SCHEMA_FILE_PATH);
+    // Get the appropriate schema path based on the API
+    const schemaPath = await getSchemaPath(api);
+
+    // Load the schema content
+    const schemaContent = await loadSchemaContent(schemaPath);
 
     // Parse the schema content
     const schemaJson = JSON.parse(schemaContent);

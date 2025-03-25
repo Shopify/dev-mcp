@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+import { introspectGraphqlSchema } from "./introspect-graphql-schema.js";
 
 const SHOPIFY_BASE_URL = "https://shopify.dev";
 
@@ -88,8 +88,8 @@ export async function searchShopifyDocs(prompt: string) {
 
 export function shopifyTools(server: McpServer) {
   server.tool(
-    "introspect-admin-schema",
-    "Introspect the Shopify Admin GraphQL schema. Only use this for the Shopify Admin API, not for other APIs like Storefront API or Functions API.",
+    "introspect-graphql-schema",
+    "Introspect the Shopify GraphQL schema. Only use this for the Shopify Admin API, not for other APIs like Storefront API or Functions API.",
     {
       query: z
         .string()
@@ -103,9 +103,16 @@ export function shopifyTools(server: McpServer) {
         .describe(
           "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)"
         ),
+      api: z
+        .enum(["admin", "storefront"])
+        .optional()
+        .default("admin")
+        .describe(
+          "The API to introspect. Can be 'admin' or 'storefront'. Default is 'admin'."
+        ),
     },
-    async ({ query, filter }, extra) => {
-      const result = await searchShopifyAdminSchema(query, { filter });
+    async ({ query, filter, api }, extra) => {
+      const result = await introspectGraphqlSchema(query, { filter, api });
 
       if (result.success) {
         return {

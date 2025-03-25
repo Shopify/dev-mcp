@@ -1,4 +1,5 @@
 node_modules/
 dist/
 data/**/*.json
+!data/schemas.json
 .DS_Store
