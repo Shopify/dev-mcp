@@ -4,80 +4,86 @@ import { fileURLToPath } from "url";
 import zlib from "zlib";
 import { existsSync } from "fs";
 
+export type Schema = {
+  api: string;
+  id: string;
+  version: string;
+  url: string;
+};
+
 // Get the directory name for the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Path to the schemas configuration file
-export const SCHEMAS_CONFIG_PATH = path.join(
-  __dirname,
-  "..",
-  "data",
-  "schemas.json"
-);
+// Path to the schemas cache directory
+export const SCHEMAS_CACHE_DIR = path.join(__dirname, "..", "data");
 
-// Function to get the schema path for a specific API
-export async function getSchemaPath(
+// Function to get the schema ID for a specific API
+export async function getSchema(
   api: string,
-  version?: string
-): Promise<string> {
-  try {
-    const schemasConfigContent = await fs.readFile(SCHEMAS_CONFIG_PATH, "utf8");
-    const schemasConfig = JSON.parse(schemasConfigContent);
+  version?: string,
+  schemas: Schema[] = []
+): Promise<Schema> {
+  const matchingSchema = schemas.find(
+    (schema) => schema.api === api && (!version || schema.version === version)
+  );
 
-    const schemaConfig = schemasConfig.find(
-      (config: any) =>
-        config.api === api && (!version || config.version === version)
+  if (!matchingSchema) {
+    throw new Error(
+      `Schema configuration for API "${api}"${
+        version ? ` version "${version}"` : ""
+      } not found in provided schemas`
     );
-    if (!schemaConfig) {
-      throw new Error(
-        `Schema configuration for API "${api}"${
-          version ? ` version "${version}"` : ""
-        } not found`
-      );
-    }
-
-    return path.join(__dirname, "..", "data", schemaConfig.file);
-  } catch (error) {
-    console.error(
-      `[shopify-admin-schema-tool] Error reading schema configuration: ${error}`
-    );
-    throw error;
   }
+
+  return matchingSchema;
 }
 
-// Function to load schema content, handling decompression if needed
-export async function loadSchemaContent(schemaPath: string): Promise<string> {
-  // Strip .gz extension if present for the uncompressed path check
-  const uncompressedPath = schemaPath.endsWith(".gz")
-    ? schemaPath.slice(0, -3)
-    : schemaPath;
+// Function to load schema content from the API or cache
+export async function loadSchemaContent(schema: Schema): Promise<string> {
+  // Ensure cache directory exists
+  await fs.mkdir(SCHEMAS_CACHE_DIR, { recursive: true });
 
-  // If uncompressed file doesn't exist but gzipped does, decompress it
-  if (!existsSync(uncompressedPath) && existsSync(schemaPath)) {
-    console.error(
-      `[shopify-admin-schema-tool] Decompressing GraphQL schema from ${schemaPath}`
-    );
-    const compressedData = await fs.readFile(schemaPath);
-    const schemaContent = zlib.gunzipSync(compressedData).toString("utf-8");
+  const cacheFilePath = path.join(SCHEMAS_CACHE_DIR, `${schema.id}.json`);
 
-    // Save the uncompressed content to disk
-    await fs.writeFile(uncompressedPath, schemaContent, "utf-8");
+  try {
+    // Check if we have a cached version
+    if (existsSync(cacheFilePath)) {
+      console.error(
+        `[shopify-admin-schema-tool] Reading cached schema from ${cacheFilePath}`
+      );
+      return fs.readFile(cacheFilePath, "utf-8");
+    }
+
     console.error(
-      `[shopify-admin-schema-tool] Saved uncompressed schema to ${uncompressedPath}`
+      `[shopify-admin-schema-tool] Fetching schema from API for ${schema.id}`
     );
+
+    const response = await fetch(schema.url, {
+      headers: {
+        "Accept-Encoding": "gzip",
+        "X-Shopify-Surface": "mcp",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch schema: ${response.statusText}`);
+    }
+
+    // Get the response content - fetch will handle decompression automatically
+    const schemaContent = await response.text();
+
+    // Cache the schema content
+    await fs.writeFile(cacheFilePath, schemaContent, "utf-8");
+    console.error(
+      `[shopify-admin-schema-tool] Cached schema to ${cacheFilePath}`
+    );
+
     return schemaContent;
+  } catch (error) {
+    console.error(`[shopify-admin-schema-tool] Error loading schema: ${error}`);
+    throw error;
   }
-
-  // If uncompressed file exists, read it directly
-  if (existsSync(uncompressedPath)) {
-    console.error(
-      `[shopify-admin-schema-tool] Reading GraphQL schema from ${uncompressedPath}`
-    );
-    return fs.readFile(uncompressedPath, "utf8");
-  }
-
-  throw new Error(`Schema file not found: ${schemaPath}`);
 }
 
 // Maximum number of fields to extract from an object
@@ -237,21 +243,23 @@ export const formatGraphqlOperation = (query: any): string => {
 export async function introspectGraphqlSchema(
   query: string,
   {
+    schemas = [],
     api = "admin",
     version = "2025-01",
     filter = ["all"],
   }: {
-    api?: "admin" | "storefront";
-    version?: "2024-04" | "2024-07" | "2024-10" | "2025-01";
+    schemas?: Schema[];
+    api?: string;
+    version?: string;
     filter?: Array<"all" | "types" | "queries" | "mutations">;
   } = {}
 ) {
   try {
-    // Get the appropriate schema path based on the API and version
-    const schemaPath = await getSchemaPath(api, version);
+    // Get the schema ID based on the API and version from provided schemas
+    const schema = await getSchema(api, version, schemas);
 
-    // Load the schema content
-    const schemaContent = await loadSchemaContent(schemaPath);
+    // Load the schema content from the API or the cache
+    const schemaContent = await loadSchemaContent(schema);
 
     // Parse the schema content
     const schemaJson = JSON.parse(schemaContent);

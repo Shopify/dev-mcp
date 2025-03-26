@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { introspectGraphqlSchema } from "./introspect-graphql-schema.js";
 
-const SHOPIFY_BASE_URL = "https://shopify.dev";
+const SHOPIFY_BASE_URL = "https://shopify-dev.myshopify.io";
 
 /**
  * Searches Shopify documentation with the given query
@@ -86,7 +86,60 @@ export async function searchShopifyDocs(prompt: string) {
   }
 }
 
-export function shopifyTools(server: McpServer) {
+/**
+ * Fetches available GraphQL schemas from Shopify
+ * @returns Object containing available APIs and versions
+ */
+async function fetchAvailableSchemas(): Promise<{
+  schemas: { api: string; id: string; version: string; url: string }[];
+  apis: string[];
+  versions: string[];
+}> {
+  try {
+    const url = new URL("/mcp/schemas", SHOPIFY_BASE_URL);
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache",
+        "X-Shopify-Surface": "mcp",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const schemas = await response.json();
+
+    // Extract unique APIs and versions
+    const apis = new Set<string>();
+    const versions = new Set<string>();
+
+    schemas.forEach((schema: { api: string; version: string; url: string }) => {
+      apis.add(schema.api);
+      versions.add(schema.version);
+    });
+
+    return {
+      schemas: schemas,
+      apis: Array.from(apis),
+      versions: Array.from(versions),
+    };
+  } catch (error) {
+    console.error(`Error fetching schemas: ${error}`);
+    return {
+      schemas: [],
+      apis: [],
+      versions: [],
+    };
+  }
+}
+
+export async function shopifyTools(server: McpServer) {
+  const { schemas, apis, versions } = await fetchAvailableSchemas();
+
   server.tool(
     "introspect-graphql-schema",
     "Introspect the Shopify GraphQL schema. Only use this for the Shopify Admin API, not for other APIs like Storefront API or Functions API.",
@@ -97,18 +150,22 @@ export function shopifyTools(server: McpServer) {
           "Search term to filter schema elements by name. Only pass simple terms like 'product', 'discountProduct', etc."
         ),
       api: z
-        .enum(["admin", "storefront"])
+        .enum(apis as [string, ...string[]])
         .optional()
         .default("admin")
         .describe(
-          "The API to introspect. Can be 'admin' or 'storefront'. Default is 'admin'."
+          `The API to introspect. Can be ${apis
+            .map((a) => `'${a}'`)
+            .join(" or ")}. Default is 'admin'.`
         ),
       version: z
-        .enum(["2024-04", "2024-07", "2024-10", "2025-01"])
+        .enum(versions as [string, ...string[]])
         .optional()
         .default("2025-01")
         .describe(
-          "The version of the API to introspect. Default is '2025-01'."
+          `The version of the API to introspect. Can be ${versions
+            .map((v) => `'${v}'`)
+            .join(" or ")}. Default is '2025-01'.`
         ),
       filter: z
         .array(z.enum(["all", "types", "queries", "mutations"]))
@@ -120,6 +177,7 @@ export function shopifyTools(server: McpServer) {
     },
     async ({ query, filter, api, version }, extra) => {
       const result = await introspectGraphqlSchema(query, {
+        schemas,
         filter,
         api,
         version,
