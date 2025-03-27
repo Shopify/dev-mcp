@@ -46,6 +46,12 @@ This MCP server provides the following tools:
 | ----------------------- | ---------------------------------------------- |
 | search-dev-docs         | Search shopify.dev documentation               |
 | introspect-admin-schema | Access and search Shopify Admin GraphQL schema |
+| fetch-github-issues     | Retrieve issues from Shopify GitHub repositories |
+
+### GitHub Integration
+
+The `fetch-github-issues` tool retrieves a specific GitHub issue by number from a Shopify repository.
+
 
 ## Available prompts
 
