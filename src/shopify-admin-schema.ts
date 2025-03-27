@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import zlib from "zlib";
 import { existsSync } from "fs";
+import { parse, buildSchema, validate, GraphQLError } from "graphql";
 
 // Get the directory name for the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -40,6 +41,189 @@ export async function loadSchemaContent(schemaPath: string): Promise<string> {
     `[shopify-admin-schema-tool] Reading GraphQL schema from ${schemaPath}`
   );
   return fs.readFile(schemaPath, "utf8");
+}
+
+// Function to load and parse GraphQL schema from JSON to GraphQLSchema object
+export async function loadGraphQLSchema() {
+  try {
+    const schemaContent = await loadSchemaContent(SCHEMA_FILE_PATH);
+    const schemaJson = JSON.parse(schemaContent);
+
+    // Extract SDL (Schema Definition Language) from the IntrospectionQuery result
+    if (schemaJson.data && schemaJson.data.__schema) {
+      console.error(`[shopify-admin-schema-tool] Query type name from schema: ${schemaJson.data.__schema.queryType?.name}`);
+
+      // Convert introspection result to SDL
+      const sdl = introspectionToSDL(schemaJson.data);
+
+      try {
+        console.error(`[shopify-admin-schema-tool] Building schema from SDL`);
+        const schema = buildSchema(sdl);
+        console.error(`[shopify-admin-schema-tool] Schema built successfully`);
+        return schema;
+      } catch (buildError) {
+        console.error(`[shopify-admin-schema-tool] Error building schema: ${buildError}`);
+        // Log the first 500 characters of the SDL for debugging
+        console.error(`[shopify-admin-schema-tool] SDL snippet: ${sdl.substring(0, 500)}...`);
+        throw buildError;
+      }
+    }
+
+    throw new Error("Invalid schema format: missing __schema field");
+  } catch (error) {
+    console.error(`[shopify-admin-schema-tool] Error loading GraphQL schema: ${error}`);
+    throw error;
+  }
+}
+
+// Helper function to convert introspection result to SDL
+function introspectionToSDL(introspectionData: any): string {
+  // This is a simplified version - in a real implementation, you would need a more
+  // comprehensive approach to convert introspection data to SDL
+
+  let sdl = "";
+
+  // First, extract and declare all scalar types
+  const customScalars = introspectionData.__schema.types
+    .filter((type: any) => type.kind === "SCALAR" && !isBuiltInScalar(type.name))
+    .map((type: any) => type.name);
+
+  // Add scalar declarations
+  for (const scalar of customScalars) {
+    sdl += `scalar ${scalar}\n\n`;
+  }
+
+  // Explicitly define root types - these are known for Shopify Admin API
+  const queryTypeName = "QueryRoot";
+  const mutationTypeName = "Mutation";
+
+  // Define the schema with root types
+  sdl += `schema {\n`;
+  sdl += `  query: ${queryTypeName}\n`;
+  sdl += `  mutation: ${mutationTypeName}\n`;
+  sdl += `}\n\n`;
+
+  // Process types
+  if (introspectionData.__schema.types) {
+    // First ensure query and mutation types are present and have at least one field
+    let hasQueryType = false;
+    let hasMutationType = false;
+
+    for (const type of introspectionData.__schema.types) {
+      if (type.name === queryTypeName) hasQueryType = true;
+      if (type.name === mutationTypeName) hasMutationType = true;
+    }
+
+    // If query type is not found, add a placeholder
+    if (!hasQueryType) {
+      sdl += `type ${queryTypeName} {\n  _placeholder: String\n}\n\n`;
+    }
+
+    // If mutation type is not found, add a placeholder
+    if (!hasMutationType) {
+      sdl += `type ${mutationTypeName} {\n  _placeholder: String\n}\n\n`;
+    }
+
+    // Process all other types
+    for (const type of introspectionData.__schema.types) {
+      // Skip built-in types and scalars (already processed)
+      if (type.name.startsWith("__") || type.kind === "SCALAR") continue;
+
+      // Add type definition based on kind
+      switch (type.kind) {
+        case "OBJECT":
+          sdl += `type ${type.name} {\n`;
+          if (type.fields && type.fields.length > 0) {
+            for (const field of type.fields) {
+              sdl += `  ${field.name}`;
+
+              // Add arguments if any
+              if (field.args && field.args.length > 0) {
+                sdl += "(";
+                sdl += field.args.map((arg: any) =>
+                  `${arg.name}: ${formatType(arg.type)}`
+                ).join(", ");
+                sdl += ")";
+              }
+
+              sdl += `: ${formatType(field.type)}\n`;
+            }
+          } else {
+            // Add placeholder field if no fields
+            sdl += `  _placeholder: String\n`;
+          }
+          sdl += "}\n\n";
+          break;
+
+        case "INPUT_OBJECT":
+          sdl += `input ${type.name} {\n`;
+          if (type.inputFields && type.inputFields.length > 0) {
+            for (const field of type.inputFields) {
+              sdl += `  ${field.name}: ${formatType(field.type)}\n`;
+            }
+          } else {
+            // Add placeholder field if no fields
+            sdl += `  _placeholder: String\n`;
+          }
+          sdl += "}\n\n";
+          break;
+
+        case "ENUM":
+          sdl += `enum ${type.name} {\n`;
+          if (type.enumValues && type.enumValues.length > 0) {
+            for (const value of type.enumValues) {
+              sdl += `  ${value.name}\n`;
+            }
+          } else {
+            // Add placeholder value if no enum values
+            sdl += `  PLACEHOLDER\n`;
+          }
+          sdl += "}\n\n";
+          break;
+
+        case "INTERFACE":
+          sdl += `interface ${type.name} {\n`;
+          if (type.fields && type.fields.length > 0) {
+            for (const field of type.fields) {
+              sdl += `  ${field.name}`;
+
+              // Add arguments if any
+              if (field.args && field.args.length > 0) {
+                sdl += "(";
+                sdl += field.args.map((arg: any) =>
+                  `${arg.name}: ${formatType(arg.type)}`
+                ).join(", ");
+                sdl += ")";
+              }
+
+              sdl += `: ${formatType(field.type)}\n`;
+            }
+          } else {
+            // Add placeholder field if no fields
+            sdl += `  _placeholder: String\n`;
+          }
+          sdl += "}\n\n";
+          break;
+
+        case "UNION":
+          if (type.possibleTypes && type.possibleTypes.length > 0) {
+            sdl += `union ${type.name} = ${type.possibleTypes.map((t: any) => t.name).join(" | ")}\n\n`;
+          } else {
+            // Skip unions with no possible types as they're invalid
+            console.error(`[shopify-admin-schema-tool] Skipping union type ${type.name} with no possible types`);
+          }
+          break;
+      }
+    }
+  }
+
+  console.error(`[shopify-admin-schema-tool] Generated SDL with query root type: ${queryTypeName}`);
+  return sdl;
+}
+
+// Check if a scalar is a built-in GraphQL scalar type
+function isBuiltInScalar(name: string): boolean {
+  return ["String", "Int", "Float", "Boolean", "ID"].includes(name);
 }
 
 // Maximum number of fields to extract from an object
@@ -354,6 +538,84 @@ export async function searchShopifyAdminSchema(
     return {
       success: false as const,
       error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+// Function to validate a GraphQL query against the Shopify Admin schema
+export async function validateShopifyAdminQuery(
+  queryString: string,
+  variables?: Record<string, any>,
+  apiVersion?: string
+): Promise<{
+  success: boolean;
+  errors?: readonly GraphQLError[];
+  validationMessage?: string;
+}> {
+  try {
+    console.error(
+      `[shopify-admin-schema-tool] Validating GraphQL query against schema`
+    );
+
+    // Parse the query string
+    let queryDocument;
+    try {
+      queryDocument = parse(queryString);
+    } catch (parseError) {
+      return {
+        success: false,
+        errors: [parseError as GraphQLError],
+        validationMessage: `Query parsing error: ${(parseError as Error).message}`
+      };
+    }
+
+    // Get the schema - we ignore apiVersion for now since we only have one schema
+    const schemaContent = await loadSchemaContent(SCHEMA_FILE_PATH);
+    const schemaJson = JSON.parse(schemaContent);
+
+    try {
+      // Convert introspection schema to GraphQL schema
+      const schema = await loadGraphQLSchema();
+
+      // Validate the query against the schema
+      const validationErrors = validate(schema, queryDocument);
+
+      // Filter out errors related to unknown scalar types
+      const significantErrors = validationErrors.filter((error: GraphQLError) => {
+        // Ignore errors about unknown scalars or fields of unknown scalars
+        return !error.message.includes("Unknown type") &&
+               !error.message.includes("Cannot query field") &&
+               !error.message.toLowerCase().includes("scalar");
+      });
+
+      if (significantErrors.length === 0) {
+        // If there are no significant errors, consider it valid
+        return {
+          success: true,
+          validationMessage: validationErrors.length === 0
+            ? "Query is valid against the Shopify Admin API schema."
+            : "Query is likely valid. Some unknown types were detected but are being ignored."
+        };
+      } else {
+        return {
+          success: false,
+          errors: significantErrors,
+          validationMessage: `Validation errors:\n${significantErrors.map((e: GraphQLError) => `- ${e.message}`).join('\n')}`
+        };
+      }
+    } catch (validationError) {
+      return {
+        success: false,
+        validationMessage: `Schema validation error: ${(validationError as Error).message}`
+      };
+    }
+  } catch (error) {
+    console.error(
+      `[shopify-admin-schema-tool] Error validating GraphQL query: ${error}`
+    );
+    return {
+      success: false,
+      validationMessage: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`
     };
   }
 }

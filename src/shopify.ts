@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+import { searchShopifyAdminSchema, validateShopifyAdminQuery } from "./shopify-admin-schema.js";
 import { execSync } from "child_process";
 
 const SHOPIFY_BASE_URL = "https://shopify.dev";
@@ -158,6 +158,51 @@ export async function executeShopifyAdminQuery(
   }
 }
 
+/**
+ * Validates a GraphQL query against the Shopify Admin API schema
+ * @param query The GraphQL query to validate
+ * @param variables Optional variables for the query
+ * @param apiVersion Optional API version
+ * @returns The validation result or error message
+ */
+export async function validateShopifyAdminGraphQLQuery(
+  query: string,
+  variables: Record<string, any> = {},
+  apiVersion: string = "2025-04"
+) {
+  try {
+    console.error(`[shopify-admin-validate] Validating GraphQL query`);
+    console.error(`[shopify-admin-validate] Query (truncated): ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`);
+
+    const result = await validateShopifyAdminQuery(query, variables, apiVersion);
+
+    if (result.success) {
+      return {
+        success: true,
+        responseText: result.validationMessage || "Query is valid."
+      };
+    } else {
+      return {
+        success: false,
+        responseText: result.validationMessage || "Query validation failed.",
+        errors: result.errors
+      };
+    }
+  } catch (error) {
+    console.error(
+      `[shopify-admin-validate] Error validating GraphQL query: ${error}`
+    );
+
+    return {
+      success: false,
+      responseText: `Error validating Shopify Admin GraphQL query: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export function shopifyTools(server: McpServer) {
   server.tool(
     "introspect-admin-schema",
@@ -254,6 +299,35 @@ export function shopifyTools(server: McpServer) {
           {
             type: "text" as const,
             text: result.formattedText,
+          },
+        ],
+      };
+    }
+  );
+
+  server.tool(
+    "validate-admin-query",
+    `
+    This tool validates a GraphQL query against the Shopify Admin API schema without executing it. Because the admin API is complex, it's recommended to check queries with this tool.
+
+    It takes the following arguments:
+    - query: The GraphQL query string to validate
+    - variables: Optional variables for the GraphQL query (default: {})
+    - apiVersion: Optional API version (default: "2025-04")
+    `,
+    {
+      query: z.string().describe("The GraphQL query to validate against the Shopify Admin API schema"),
+      variables: z.record(z.any()).optional().default({}).describe("Optional variables for the GraphQL query"),
+      apiVersion: z.string().optional().default("2025-04").describe("Optional API version")
+    },
+    async ({ query, variables, apiVersion }, extra) => {
+      const result = await validateShopifyAdminGraphQLQuery(query, variables, apiVersion);
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.responseText,
           },
         ],
       };
