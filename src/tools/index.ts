@@ -1,10 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+import { instrumentationData } from "../instrumentation.js";
 
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
   : "https://shopify.dev/";
+const MCP_VERSION = process.env.npm_package_version ?? "unknown";
 
 /**
  * Searches Shopify documentation with the given query
@@ -13,6 +15,9 @@ const SHOPIFY_BASE_URL = process.env.DEV
  */
 export async function searchShopifyDocs(prompt: string) {
   try {
+    // Get instrumentation information
+    const instrumentation = await instrumentationData();
+
     // Prepare the URL with query parameters
     const url = new URL("/mcp/search", SHOPIFY_BASE_URL);
     url.searchParams.append("query", prompt);
@@ -26,6 +31,11 @@ export async function searchShopifyDocs(prompt: string) {
         Accept: "application/json",
         "Cache-Control": "no-cache",
         "X-Shopify-Surface": "mcp",
+        "X-Shopify-MCP-Version": "1.0.0",
+        "X-Shopify-Installation-ID": instrumentation.installationId,
+        "X-Shopify-Session-ID": instrumentation.sessionId,
+        "X-Shopify-Package-Version": instrumentation.packageVersion,
+        "X-Shopify-Timestamp": instrumentation.timestamp,
       },
     });
 
@@ -33,41 +43,24 @@ export async function searchShopifyDocs(prompt: string) {
       `[shopify-docs] Response status: ${response.status} ${response.statusText}`,
     );
 
-    // Convert headers to object for logging
-    const headersObj: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      headersObj[key] = value;
-    });
-    console.error(
-      `[shopify-docs] Response headers: ${JSON.stringify(headersObj)}`,
-    );
-
     if (!response.ok) {
       console.error(`[shopify-docs] HTTP error status: ${response.status}`);
-      throw new Error(`HTTP error! status: ${response.status}`);
+      return {
+        success: false,
+        formattedText: `HTTP error! status: ${response.status}`,
+      };
     }
 
-    // Read and process the response
-    const responseText = await response.text();
-    console.error(
-      `[shopify-docs] Response text (truncated): ${
-        responseText.substring(0, 200) +
-        (responseText.length > 200 ? "..." : "")
-      }`,
-    );
-
-    // Parse and format the JSON for human readability
+    // Try to parse as JSON first
     try {
-      const jsonData = JSON.parse(responseText);
-      const formattedJson = JSON.stringify(jsonData, null, 2);
-
+      const jsonData = await response.json();
       return {
         success: true,
-        formattedText: formattedJson,
+        formattedText: JSON.stringify(jsonData, null, 2),
       };
     } catch (e) {
-      console.warn(`[shopify-docs] Error parsing JSON response: ${e}`);
-      // If parsing fails, return the raw text
+      // If JSON parsing fails, get the raw text
+      const responseText = await response.text();
       return {
         success: true,
         formattedText: responseText,
@@ -80,10 +73,7 @@ export async function searchShopifyDocs(prompt: string) {
 
     return {
       success: false,
-      formattedText: `Error searching Shopify documentation: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-      error: error instanceof Error ? error.message : String(error),
+      formattedText: error instanceof Error ? error.message : String(error),
     };
   }
 }
