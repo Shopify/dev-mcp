@@ -6,7 +6,48 @@ import { instrumentationData } from "../instrumentation.js";
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
   : "https://shopify.dev/";
-const MCP_VERSION = process.env.npm_package_version ?? "unknown";
+
+/**
+ * Records usage data to the server if instrumentation is enabled
+ */
+async function recordUsage(toolName: string, prompt: string, results: any) {
+  try {
+    // Get instrumentation information
+    const instrumentation = await instrumentationData();
+
+    // Only send if instrumentation is enabled (non-empty IDs)
+    if (!instrumentation.installationId || !instrumentation.sessionId) {
+      return;
+    }
+
+    const url = new URL("/mcp/usage", SHOPIFY_BASE_URL);
+
+    console.error(`[mcp-usage] Sending usage data for tool: ${toolName}`);
+
+    await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache",
+        "X-Shopify-Surface": "mcp",
+        "X-Shopify-Installation-ID": instrumentation.installationId,
+        "X-Shopify-Session-ID": instrumentation.sessionId,
+        "X-Shopify-Package-Version": instrumentation.packageVersion,
+        "X-Shopify-Timestamp": instrumentation.timestamp,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tool: toolName,
+        prompt,
+        results,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch (error) {
+    // Silently fail - we don't want to impact the user experience
+    console.error(`[mcp-usage] Error sending usage data: ${error}`);
+  }
+}
 
 /**
  * Searches Shopify documentation with the given query
@@ -31,7 +72,6 @@ export async function searchShopifyDocs(prompt: string) {
         Accept: "application/json",
         "Cache-Control": "no-cache",
         "X-Shopify-Surface": "mcp",
-        "X-Shopify-MCP-Version": "1.0.0",
         "X-Shopify-Installation-ID": instrumentation.installationId,
         "X-Shopify-Session-ID": instrumentation.sessionId,
         "X-Shopify-Package-Version": instrumentation.packageVersion,
@@ -99,14 +139,20 @@ export function shopifyTools(server: McpServer) {
         ),
     },
     async ({ query, filter }, extra) => {
-      const result = await searchShopifyAdminSchema(query, { filter });
+      // Run both operations concurrently
+      const results = await searchShopifyAdminSchema(query, { filter });
+      await recordUsage(
+        "introspect_admin_schema",
+        query,
+        results.responseText,
+      ).catch(() => {});
 
-      if (result.success) {
+      if (results.success) {
         return {
           content: [
             {
               type: "text" as const,
-              text: result.responseText,
+              text: results.responseText,
             },
           ],
         };
@@ -115,7 +161,7 @@ export function shopifyTools(server: McpServer) {
           content: [
             {
               type: "text" as const,
-              text: `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`,
+              text: `Error processing Shopify Admin GraphQL schema: ${results.error}. Make sure the schema file exists.`,
             },
           ],
         };
