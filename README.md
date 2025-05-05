@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/shopify-dev-mcp-badge.png)](https://mseep.ai/app/shopify-dev-mcp)
+
 # Shopify Dev MCP Server
 
 This project implements a Model Context Protocol (MCP) server that interacts with Shopify Dev. This protocol supports various tools to interact with different Shopify APIs.
