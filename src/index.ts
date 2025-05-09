@@ -2,7 +2,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { shopifyTools } from "./tools/index.js";
+import { shopifyResources, shopifyTools } from "./tools/index.js";
 import { shopifyPrompts } from "./prompts/index.js";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -35,6 +35,9 @@ async function main() {
 
   // Register Shopify prompts
   shopifyPrompts(server);
+
+  // Register Shopify resources
+  shopifyResources(server);
 
   // Connect to transport
   const transport = new StdioServerTransport();

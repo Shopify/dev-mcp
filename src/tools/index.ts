@@ -1,8 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+import { readdirSync, readFileSync } from "fs";
+import path, { dirname } from "path";
+import { fileURLToPath } from "url";
 
 const SHOPIFY_BASE_URL = "https://shopify.dev";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Searches Shopify documentation with the given query
@@ -152,4 +158,77 @@ export function shopifyTools(server: McpServer) {
       };
     }
   );
+  server.tool(
+    "get_recipe_names",
+    "This tool returns a list of Hydrogen cookbook recipe names that showcase Hydrogen usecases. You can load the content of a recipe using the get_recipe_content tool.",
+    {},
+    () => {
+      return {
+        content: [
+          {
+            type: "text",
+            text: listRecipes().join(", "),
+          },
+        ],
+      };
+    }
+  );
+  server.tool(
+    "get_recipe_content",
+    `This tool returns the content of a Hydrogen cookbook recipe.
+    
+    It takes one argument: recipe, which is the name of the recipe to get content for.`,
+    {
+      recipe: z.string().describe("The name of the recipe to get content for"),
+    },
+    ({ recipe }) => {
+      const p = path.join(
+        __dirname,
+        "../..",
+        "data",
+        "recipes",
+        recipe,
+        "recipe.md"
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: readFileSync(p, "utf8"),
+          },
+        ],
+      };
+    }
+  );
+}
+
+export function shopifyResources(server: McpServer) {
+  console.error("registering resources");
+  const recipes = listRecipes();
+  console.error("the recipes:", recipes.join(", "));
+  recipes.forEach((recipe) => {
+    server.resource(recipe, `cookbook://recipe_${recipe}`, async (uri) => {
+      const p = path.join(
+        __dirname,
+        "../..",
+        "data",
+        "recipes",
+        recipe,
+        "recipe.md"
+      );
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: readFileSync(p, "utf8"),
+          },
+        ],
+      };
+    });
+  });
+}
+
+function listRecipes(): string[] {
+  console.log(__dirname);
+  return readdirSync(path.join(__dirname, "../..", "data", "recipes"));
 }
