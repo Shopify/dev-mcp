@@ -159,8 +159,8 @@ export function shopifyTools(server: McpServer) {
     }
   );
   server.tool(
-    "get_recipe_names",
-    "This tool returns a list of Hydrogen cookbook recipe names that showcase Hydrogen usecases. You can load the content of a recipe using the get_recipe_content tool.",
+    "list_hydrogen_feature_guides",
+    "Lists all available Shopify Hydrogen feature guides for implementing core storefront features such as subscriptions, search, cart, wishlist, account, and more. Use this tool for any request about adding, enabling, or implementing a feature in a Hydrogen storefront. Keywords: Hydrogen, add feature, enable feature, implement feature, subscriptions, recurring, search, cart, wishlist, account, collections.",
     {},
     () => {
       return {
@@ -174,20 +174,18 @@ export function shopifyTools(server: McpServer) {
     }
   );
   server.tool(
-    "get_recipe_content",
-    `This tool returns the content of a Hydrogen cookbook recipe.
-    
-    It takes one argument: recipe, which is the name of the recipe to get content for.`,
+    "get_hydrogen_feature_guide_content",
+    "Returns the content of a Hydrogen feature guide, including steps, code, and (if present) diffs/patches. If the guide contains code diffs, use get_hydrogen_template_file_content to retrieve the original file from the Hydrogen starter template for comparison and patching.",
     {
-      recipe: z.string().describe("The name of the recipe to get content for"),
+      guide: z.string().describe("The name of the guide to get content for"),
     },
-    ({ recipe }) => {
+    ({ guide }) => {
       const p = path.join(
         __dirname,
         "../..",
         "data",
         "recipes",
-        recipe,
+        guide,
         "recipe.md"
       );
       return {
@@ -229,6 +227,5 @@ export function shopifyResources(server: McpServer) {
 }
 
 function listRecipes(): string[] {
-  console.log(__dirname);
   return readdirSync(path.join(__dirname, "../..", "data", "recipes"));
 }
