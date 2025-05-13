@@ -79,7 +79,7 @@ describe("searchShopifyDocs", () => {
     const parsedResponse = JSON.parse(result.formattedText);
     expect(parsedResponse).toEqual(sampleDocsResponse);
     expect(parsedResponse[0].filename).toBe(
-      "api/admin/graphql/reference/products.md"
+      "api/admin/graphql/reference/products.md",
     );
     expect(parsedResponse[0].score).toBe(0.85);
   });
@@ -103,7 +103,7 @@ describe("searchShopifyDocs", () => {
     // Check that the error was handled
     expect(result.success).toBe(false);
     expect(result.formattedText).toContain(
-      "Error searching Shopify documentation"
+      "Error searching Shopify documentation",
     );
     expect(result.formattedText).toContain("500");
   });
@@ -118,7 +118,7 @@ describe("searchShopifyDocs", () => {
     // Check that the error was handled
     expect(result.success).toBe(false);
     expect(result.formattedText).toContain(
-      "Error searching Shopify documentation: Network error"
+      "Error searching Shopify documentation: Network error",
     );
   });
 
@@ -149,7 +149,7 @@ describe("searchShopifyDocs", () => {
     // Verify that console.warn was called with the JSON parsing error
     expect(console.warn).toHaveBeenCalledTimes(1);
     expect(vi.mocked(console.warn).mock.calls[0][0]).toContain(
-      "Error parsing JSON response"
+      "Error parsing JSON response",
     );
   });
 });

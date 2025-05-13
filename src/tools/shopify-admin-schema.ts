@@ -14,7 +14,7 @@ export const SCHEMA_FILE_PATH = path.join(
   "..",
   "..",
   "data",
-  "admin_schema_2025-01.json"
+  "admin_schema_2025-01.json",
 );
 
 // Function to load schema content, handling decompression if needed
@@ -24,7 +24,7 @@ export async function loadSchemaContent(schemaPath: string): Promise<string> {
   // If uncompressed file doesn't exist but gzipped does, decompress it
   if (!existsSync(schemaPath) && existsSync(gzippedSchemaPath)) {
     console.error(
-      `[shopify-admin-schema-tool] Decompressing GraphQL schema from ${gzippedSchemaPath}`
+      `[shopify-admin-schema-tool] Decompressing GraphQL schema from ${gzippedSchemaPath}`,
     );
     const compressedData = await fs.readFile(gzippedSchemaPath);
     const schemaContent = zlib.gunzipSync(compressedData).toString("utf-8");
@@ -32,13 +32,13 @@ export async function loadSchemaContent(schemaPath: string): Promise<string> {
     // Save the uncompressed content to disk
     await fs.writeFile(schemaPath, schemaContent, "utf-8");
     console.error(
-      `[shopify-admin-schema-tool] Saved uncompressed schema to ${schemaPath}`
+      `[shopify-admin-schema-tool] Saved uncompressed schema to ${schemaPath}`,
     );
     return schemaContent;
   }
 
   console.error(
-    `[shopify-admin-schema-tool] Reading GraphQL schema from ${schemaPath}`
+    `[shopify-admin-schema-tool] Reading GraphQL schema from ${schemaPath}`,
   );
   return fs.readFile(schemaPath, "utf8");
 }
@@ -50,11 +50,11 @@ export const MAX_FIELDS_TO_SHOW = 50;
 export const filterAndSortItems = (
   items: any[],
   searchTerm: string,
-  maxItems: number
+  maxItems: number,
 ) => {
   // Filter items based on search term
   const filtered = items.filter((item: any) =>
-    item.name?.toLowerCase().includes(searchTerm)
+    item.name?.toLowerCase().includes(searchTerm),
   );
 
   // Sort filtered items by name length (shorter names first)
@@ -201,7 +201,7 @@ export async function searchShopifyAdminSchema(
   query: string,
   {
     filter = ["all"],
-  }: { filter?: Array<"all" | "types" | "queries" | "mutations"> } = {}
+  }: { filter?: Array<"all" | "types" | "queries" | "mutations"> } = {},
 ) {
   try {
     const schemaContent = await loadSchemaContent(SCHEMA_FILE_PATH);
@@ -224,7 +224,7 @@ export async function searchShopifyAdminSchema(
       normalizedQuery = normalizedQuery.replace(/\s+/g, "");
 
       console.error(
-        `[shopify-admin-schema-tool] Filtering schema with query: ${query} (normalized: ${normalizedQuery})`
+        `[shopify-admin-schema-tool] Filtering schema with query: ${query} (normalized: ${normalizedQuery})`,
       );
 
       const searchTerm = normalizedQuery.toLowerCase();
@@ -237,17 +237,17 @@ export async function searchShopifyAdminSchema(
         const processedTypes = filterAndSortItems(
           schemaJson.data.__schema.types,
           searchTerm,
-          MAX_RESULTS
+          MAX_RESULTS,
         );
         wasTruncated = processedTypes.wasTruncated;
         const limitedTypes = processedTypes.items;
 
         // Find the Query and Mutation types
         const queryType = schemaJson.data.__schema.types.find(
-          (type: any) => type.name === "QueryRoot"
+          (type: any) => type.name === "QueryRoot",
         );
         const mutationType = schemaJson.data.__schema.types.find(
-          (type: any) => type.name === "Mutation"
+          (type: any) => type.name === "Mutation",
         );
 
         // Process queries if available
@@ -260,7 +260,7 @@ export async function searchShopifyAdminSchema(
           const processedQueries = filterAndSortItems(
             queryType.fields,
             searchTerm,
-            MAX_RESULTS
+            MAX_RESULTS,
           );
           queriesWereTruncated = processedQueries.wasTruncated;
           matchingQueries = processedQueries.items;
@@ -276,7 +276,7 @@ export async function searchShopifyAdminSchema(
           const processedMutations = filterAndSortItems(
             mutationType.fields,
             searchTerm,
-            MAX_RESULTS
+            MAX_RESULTS,
           );
           mutationsWereTruncated = processedMutations.wasTruncated;
           matchingMutations = processedMutations.items;
@@ -350,7 +350,7 @@ export async function searchShopifyAdminSchema(
     return { success: true as const, responseText };
   } catch (error) {
     console.error(
-      `[shopify-admin-schema-tool] Error processing GraphQL schema: ${error}`
+      `[shopify-admin-schema-tool] Error processing GraphQL schema: ${error}`,
     );
     return {
       success: false as const,

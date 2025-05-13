@@ -28,7 +28,7 @@ export async function searchShopifyDocs(prompt: string) {
     });
 
     console.error(
-      `[shopify-docs] Response status: ${response.status} ${response.statusText}`
+      `[shopify-docs] Response status: ${response.status} ${response.statusText}`,
     );
 
     // Convert headers to object for logging
@@ -37,7 +37,7 @@ export async function searchShopifyDocs(prompt: string) {
       headersObj[key] = value;
     });
     console.error(
-      `[shopify-docs] Response headers: ${JSON.stringify(headersObj)}`
+      `[shopify-docs] Response headers: ${JSON.stringify(headersObj)}`,
     );
 
     if (!response.ok) {
@@ -51,7 +51,7 @@ export async function searchShopifyDocs(prompt: string) {
       `[shopify-docs] Response text (truncated): ${
         responseText.substring(0, 200) +
         (responseText.length > 200 ? "..." : "")
-      }`
+      }`,
     );
 
     // Parse and format the JSON for human readability
@@ -73,7 +73,7 @@ export async function searchShopifyDocs(prompt: string) {
     }
   } catch (error) {
     console.error(
-      `[shopify-docs] Error searching Shopify documentation: ${error}`
+      `[shopify-docs] Error searching Shopify documentation: ${error}`,
     );
 
     return {
@@ -96,14 +96,14 @@ export function shopifyTools(server: McpServer) {
       query: z
         .string()
         .describe(
-          "Search term to filter schema elements by name. Only pass simple terms like 'product', 'discountProduct', etc."
+          "Search term to filter schema elements by name. Only pass simple terms like 'product', 'discountProduct', etc.",
         ),
       filter: z
         .array(z.enum(["all", "types", "queries", "mutations"]))
         .optional()
         .default(["all"])
         .describe(
-          "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)"
+          "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)",
         ),
     },
     async ({ query, filter }, extra) => {
@@ -128,7 +128,7 @@ export function shopifyTools(server: McpServer) {
           ],
         };
       }
-    }
+    },
   );
 
   server.tool(
@@ -150,6 +150,6 @@ export function shopifyTools(server: McpServer) {
           },
         ],
       };
-    }
+    },
   );
 }

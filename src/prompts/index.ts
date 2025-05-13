@@ -37,6 +37,6 @@ The GraphQL operation should be ready to use with minimal modification.`,
           },
         },
       ],
-    })
+    }),
   );
 }
