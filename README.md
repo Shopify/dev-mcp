@@ -61,7 +61,7 @@ The server is built using the MCP SDK and communicates with Shopify Dev.
 
 1. `npm install`
 1. Modify source files
-1. Run `npm run build` to compile
+1. Run `npm run build` to compile or `npm run build:watch` to watch for changes and compile
 1. Run `npm run test` to run tests
 1. Add an MCP server that runs this command: `node <absolute_path_of_project>/dist/index.js`
 
