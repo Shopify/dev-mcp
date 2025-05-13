@@ -160,7 +160,7 @@ export function shopifyTools(server: McpServer) {
   );
   server.tool(
     "list_hydrogen_feature_guides",
-    "Lists all available Shopify Hydrogen feature guides for implementing core storefront features such as subscriptions, search, cart, wishlist, account, and more. Use this tool for any request about adding, enabling, or implementing a feature in a Hydrogen storefront. Keywords: Hydrogen, add feature, enable feature, implement feature, subscriptions, recurring, search, cart, wishlist, account, collections.",
+    "ALWAYS use this tool when implementing any Hydrogen storefront features or functionality. This tool is your FIRST step for ANY feature request (adding, building, implementing, creating, modifying) related to Hydrogen storefronts. Never start coding or planning without first consulting these guides. This tool provides official implementation patterns, best practices, and code examples for all Hydrogen features including cart, subscriptions, collections, localization, search, checkout, and more. Failing to use this tool first may result in non-standard implementations that don't follow Shopify best practices",
     {},
     () => {
       return {
