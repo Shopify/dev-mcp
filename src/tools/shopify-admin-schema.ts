@@ -1,21 +1,12 @@
-import fs from "fs/promises";
-import path from "path";
-import { fileURLToPath } from "url";
-import zlib from "zlib";
-import { existsSync } from "fs";
-
-// Get the directory name for the current module
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
+import zlib from "node:zlib";
 
 // Path to the schema file in the data folder
-export const SCHEMA_FILE_PATH = path.join(
-  __dirname,
-  "..",
-  "..",
-  "data",
-  "admin_schema_2025-01.json",
-);
+export const SCHEMA_FILE_PATH = new URL(
+  "../../data/admin_schema_2025-01.json",
+  import.meta.url,
+).pathname;
 
 // Function to load schema content, handling decompression if needed
 export async function loadSchemaContent(schemaPath: string): Promise<string> {
