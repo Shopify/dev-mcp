@@ -212,7 +212,7 @@ export function shopifyTools(server: McpServer) {
           .enum(surfaces)
           .describe("The Shopify surface you are building for"),
       },
-      async function cb({ surface }, extra) {
+      async function cb({ surface }) {
         if (!surfaces.includes(surface)) {
           const options = surfaces.map((s) => `- ${s}`).join("\n");
           const text = `Please specify which Shopify surface you are building for. Valid options are: ${options}.`;
