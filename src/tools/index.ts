@@ -5,7 +5,9 @@ import { readdirSync, readFileSync } from "fs";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 
-const SHOPIFY_BASE_URL = "https://shopify.dev";
+const SHOPIFY_BASE_URL = process.env.DEV
+  ? "https://shopify-dev.myshopify.io/"
+  : "https://shopify.dev/";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,7 +36,7 @@ export async function searchShopifyDocs(prompt: string) {
     });
 
     console.error(
-      `[shopify-docs] Response status: ${response.status} ${response.statusText}`
+      `[shopify-docs] Response status: ${response.status} ${response.statusText}`,
     );
 
     // Convert headers to object for logging
@@ -43,7 +45,7 @@ export async function searchShopifyDocs(prompt: string) {
       headersObj[key] = value;
     });
     console.error(
-      `[shopify-docs] Response headers: ${JSON.stringify(headersObj)}`
+      `[shopify-docs] Response headers: ${JSON.stringify(headersObj)}`,
     );
 
     if (!response.ok) {
@@ -57,7 +59,7 @@ export async function searchShopifyDocs(prompt: string) {
       `[shopify-docs] Response text (truncated): ${
         responseText.substring(0, 200) +
         (responseText.length > 200 ? "..." : "")
-      }`
+      }`,
     );
 
     // Parse and format the JSON for human readability
@@ -79,7 +81,7 @@ export async function searchShopifyDocs(prompt: string) {
     }
   } catch (error) {
     console.error(
-      `[shopify-docs] Error searching Shopify documentation: ${error}`
+      `[shopify-docs] Error searching Shopify documentation: ${error}`,
     );
 
     return {
@@ -102,14 +104,14 @@ export function shopifyTools(server: McpServer) {
       query: z
         .string()
         .describe(
-          "Search term to filter schema elements by name. Only pass simple terms like 'product', 'discountProduct', etc."
+          "Search term to filter schema elements by name. Only pass simple terms like 'product', 'discountProduct', etc.",
         ),
       filter: z
         .array(z.enum(["all", "types", "queries", "mutations"]))
         .optional()
         .default(["all"])
         .describe(
-          "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)"
+          "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)",
         ),
     },
     async ({ query, filter }, extra) => {
@@ -134,7 +136,7 @@ export function shopifyTools(server: McpServer) {
           ],
         };
       }
-    }
+    },
   );
 
   server.tool(
@@ -156,74 +158,156 @@ export function shopifyTools(server: McpServer) {
           },
         ],
       };
-    }
-  );
-  server.tool(
-    "list_hydrogen_feature_guides",
-    "ALWAYS use this tool when implementing any Hydrogen storefront features or functionality. This tool is your FIRST step for ANY feature request (adding, building, implementing, creating, modifying) related to Hydrogen storefronts. Never start coding or planning without first consulting these guides. This tool provides official implementation patterns, best practices, and code examples for all Hydrogen features including cart, subscriptions, collections, localization, search, checkout, and more. Failing to use this tool first may result in non-standard implementations that don't follow Shopify best practices",
-    {},
-    () => {
-      return {
-        content: [
-          {
-            type: "text",
-            text: listRecipes().join(", "),
-          },
-        ],
-      };
-    }
-  );
-  server.tool(
-    "get_hydrogen_feature_guide_content",
-    "Returns the content of a Hydrogen feature guide, including steps, code, and (if present) diffs/patches. If the guide contains code diffs, use get_hydrogen_template_file_content to retrieve the original file from the Hydrogen starter template for comparison and patching.",
-    {
-      guide: z.string().describe("The name of the guide to get content for"),
     },
-    ({ guide }) => {
-      const p = path.join(
-        __dirname,
-        "../..",
-        "data",
-        "recipes",
-        guide,
-        "recipe.md"
-      );
-      return {
-        content: [
-          {
-            type: "text",
-            text: readFileSync(p, "utf8"),
-          },
-        ],
-      };
-    }
   );
-}
 
-export function shopifyResources(server: McpServer) {
-  console.error("registering resources");
-  const recipes = listRecipes();
-  console.error("the recipes:", recipes.join(", "));
-  recipes.forEach((recipe) => {
-    server.resource(recipe, `cookbook://recipe_${recipe}`, async (uri) => {
-      const p = path.join(
-        __dirname,
-        "../..",
-        "data",
-        "recipes",
-        recipe,
-        "recipe.md"
-      );
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            text: readFileSync(p, "utf8"),
-          },
-        ],
-      };
-    });
-  });
+  if (process.env.POLARIS_UNIFIED) {
+    server.tool(
+      "read_polaris_surface_docs",
+      `Use this tool to retrieve a list of documents from shopify.dev.
+
+      Args:
+      paths: The paths to the documents to read, in a comma separated list.
+      Paths should be relative to the root of the developer documentation site.`,
+      {
+        paths: z
+          .array(z.string())
+          .describe("The paths to the documents to read"),
+      },
+      async ({ paths }) => {
+        async function fetchDocText(path: string): Promise<{
+          text: string;
+          path: string;
+          success: boolean;
+        }> {
+          try {
+            const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
+            const url = new URL(appendedPath, SHOPIFY_BASE_URL);
+            const response = await fetch(url.toString());
+            const text = await response.text();
+            return { text: `## ${path}\n\n${text}\n\n`, path, success: true };
+          } catch (error) {
+            return {
+              text: `Error fetching document at ${path}: ${error}`,
+              path,
+              success: false,
+            };
+          }
+        }
+
+        const fetchDocs = paths.map((path) => fetchDocText(path));
+        const results = await Promise.all(fetchDocs);
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: results.map(({ text }) => text).join("---\n\n"),
+            },
+          ],
+        };
+      },
+    );
+
+    const surfaces = [
+      "app-home",
+      "admin-extensions",
+      "checkout-extensions",
+      "customer-account-extensions",
+    ] as const;
+    server.tool(
+      "get_started",
+      `
+      1. Ask user for the surface they are building for.
+      2. Use read_polaris_surface_docs tool to read the docs for the surface.
+
+      Whenever the user asks about Polaris web components, always use this tool first to provide the most accurate and up-to-date documentation.
+
+      valid arguments for this tool are:
+      - "app-home"
+      - "admin-extensions"
+      - "checkout-extensions"
+      - "customer-account-extensions"
+
+      Once you determine the surface, you should then use the read_polaris_surface_docs tool to learn about more specific details. Overviews are not comprehensive, so this is important.
+
+      DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE. ONLY USE THE read_polaris_surface_docs TOOLS TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
+    `,
+      {
+        surface: z
+          .enum(surfaces)
+          .describe("The Shopify surface you are building for"),
+      },
+      async function cb({ surface }) {
+        if (!surfaces.includes(surface)) {
+          const options = surfaces.map((s) => `- ${s}`).join("\n");
+          const text = `Please specify which Shopify surface you are building for. Valid options are: ${options}.`;
+
+          return {
+            content: [{ type: "text" as const, text }],
+          };
+        }
+
+        const docEntrypointsBySurface: Record<string, string> = {
+          "app-home": "/docs/api/app-home/using-polaris-components",
+          "admin-extensions": "/docs/api/admin-extensions",
+          "checkout-extensions": "/docs/api/checkout-ui-extensions",
+          "customer-account-extensions":
+            "/docs/api/customer-account-ui-extensions",
+        };
+
+        const docPath = docEntrypointsBySurface[surface];
+        const text = await fetchDocText(docPath);
+
+        return {
+          content: [{ type: "text" as const, text }],
+        };
+      },
+    );
+  }
+
+  if (process.env.HYDROGEN_GUIDES) {
+    server.tool(
+      "list_hydrogen_feature_guides",
+      "ALWAYS use this tool when implementing any Hydrogen storefront features or functionality. This tool is your FIRST step for ANY feature request (adding, building, implementing, creating, modifying) related to Hydrogen storefronts. Never start coding or planning without first consulting these guides. This tool provides official implementation patterns, best practices, and code examples for all Hydrogen features including cart, subscriptions, collections, localization, search, checkout, and more. Failing to use this tool first may result in non-standard implementations that don't follow Shopify best practices",
+      {},
+      () => {
+        return {
+          content: [
+            {
+              type: "text",
+              text: listRecipes().join(", "),
+            },
+          ],
+        };
+      }
+    );
+    server.tool(
+      "get_hydrogen_feature_guide_content",
+      "Returns the content of a Hydrogen feature guide, including steps, code, and (if present) diffs/patches.",
+      {
+        guide: z.string().describe("The name of the guide to get content for"),
+      },
+      ({ guide }) => {
+        const p = path.join(
+          __dirname,
+          "../..",
+          "data",
+          "recipes",
+          guide,
+          "recipe.md"
+        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: readFileSync(p, "utf8"),
+            },
+          ],
+        };
+      }
+    );
+  } 
 }
 
 function listRecipes(): string[] {

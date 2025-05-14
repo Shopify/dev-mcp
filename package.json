@@ -4,8 +4,11 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+    "build:watch": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "lint:fix": "prettier --write --ignore-unknown .",
+    "lint": "prettier --check --cache --ignore-unknown .",
     "inspector": "npm run build && npm exec @modelcontextprotocol/inspector dist/index.js"
   },
   "author": "",
@@ -20,6 +23,7 @@
     "@types/node": "^22.13.10",
     "@vitest/coverage-v8": "^3.0.9",
     "memfs": "^4.17.0",
+    "prettier": "^3.5.3",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
   },
@@ -39,5 +43,8 @@
     "mcp",
     "modelcontextprotocol",
     "shopify"
-  ]
+  ],
+  "prettier": {
+    "endOfLine": "auto"
+  }
 }

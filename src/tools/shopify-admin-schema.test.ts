@@ -143,7 +143,7 @@ describe("formatField", () => {
       deprecationReason: "Use newField instead",
     };
     expect(formatField(field)).toBe(
-      "  legacyField: String @deprecated (Use newField instead)"
+      "  legacyField: String @deprecated (Use newField instead)",
     );
   });
 });
@@ -237,7 +237,7 @@ describe("formatSchemaType", () => {
     expect(result).toContain(`... and 10 more fields`);
     // Should include MAX_FIELDS_TO_SHOW fields
     expect((result.match(/field\d+: String/g) || []).length).toBe(
-      MAX_FIELDS_TO_SHOW
+      MAX_FIELDS_TO_SHOW,
     );
   });
 
@@ -264,7 +264,7 @@ describe("formatSchemaType", () => {
     expect(result).toContain(`... and 10 more input fields`);
     // Should include MAX_FIELDS_TO_SHOW fields
     expect((result.match(/inputField\d+: String/g) || []).length).toBe(
-      MAX_FIELDS_TO_SHOW
+      MAX_FIELDS_TO_SHOW,
     );
   });
 });
@@ -501,13 +501,13 @@ describe("searchShopifyAdminSchema", () => {
 
     // Check that console.error was called with the normalized search term
     const logCalls = (console.error as any).mock.calls.map(
-      (call: any[]) => call[0]
+      (call: any[]) => call[0],
     );
     const hasNormalizedMessage = logCalls.some(
       (msg: any) =>
         typeof msg === "string" &&
         msg.includes("products") &&
-        msg.includes("(normalized: product)")
+        msg.includes("(normalized: product)"),
     );
     expect(hasNormalizedMessage).toBe(true);
   });
@@ -517,13 +517,13 @@ describe("searchShopifyAdminSchema", () => {
 
     // Check that console.error was called with the normalized search term
     const logCalls = (console.error as any).mock.calls.map(
-      (call: any[]) => call[0]
+      (call: any[]) => call[0],
     );
     const hasNormalizedMessage = logCalls.some(
       (msg: any) =>
         typeof msg === "string" &&
         msg.includes("product input") &&
-        msg.includes("(normalized: productinput)")
+        msg.includes("(normalized: productinput)"),
     );
     expect(hasNormalizedMessage).toBe(true);
   });
