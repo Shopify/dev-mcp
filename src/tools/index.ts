@@ -214,13 +214,13 @@ export function shopifyTools(server: McpServer) {
           .enum(surfaces)
           .describe("The Shopify surface you are building for"),
       },
-      async function cb({ surface }) {
+      async function cb({ surface }, extra) {
         if (!surfaces.includes(surface)) {
           const options = surfaces.map((s) => `- ${s}`).join("\n");
           const text = `Please specify which Shopify surface you are building for. Valid options are: ${options}.`;
 
           return {
-            content: [{ type: "text" as const, text }],
+            content: [{ type: "text", text: text }],
           };
         }
 
@@ -233,10 +233,10 @@ export function shopifyTools(server: McpServer) {
         };
 
         const docPath = docEntrypointsBySurface[surface];
-        const text = await fetchDocText(docPath);
+        const result = await fetchDocText(docPath);
 
         return {
-          content: [{ type: "text" as const, text }],
+          content: [{ type: "text", text: result.text }],
         };
       },
     );
