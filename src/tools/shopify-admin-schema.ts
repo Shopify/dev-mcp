@@ -1,12 +1,12 @@
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 
 // Path to the schema file in the data folder
-export const SCHEMA_FILE_PATH = new URL(
-  "../../data/admin_schema_2025-01.json",
-  import.meta.url,
-).pathname;
+export const SCHEMA_FILE_PATH = fileURLToPath(
+  new URL("../../data/admin_schema_2025-01.json", import.meta.url),
+);
 
 // Function to load schema content, handling decompression if needed
 export async function loadSchemaContent(schemaPath: string): Promise<string> {
