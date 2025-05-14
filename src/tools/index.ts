@@ -169,8 +169,6 @@ export function shopifyTools(server: McpServer) {
           .describe("The paths to the documents to read"),
       },
       async ({ paths }) => {
-
-
         const fetchDocs = paths.map((path) => fetchDocText(path));
         const results = await Promise.all(fetchDocs);
 
