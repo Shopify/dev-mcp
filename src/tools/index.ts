@@ -169,25 +169,7 @@ export function shopifyTools(server: McpServer) {
           .describe("The paths to the documents to read"),
       },
       async ({ paths }) => {
-        async function fetchDocText(path: string): Promise<{
-          text: string;
-          path: string;
-          success: boolean;
-        }> {
-          try {
-            const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
-            const url = new URL(appendedPath, SHOPIFY_BASE_URL);
-            const response = await fetch(url.toString());
-            const text = await response.text();
-            return { text: `## ${path}\n\n${text}\n\n`, path, success: true };
-          } catch (error) {
-            return {
-              text: `Error fetching document at ${path}: ${error}`,
-              path,
-              success: false,
-            };
-          }
-        }
+
 
         const fetchDocs = paths.map((path) => fetchDocText(path));
         const results = await Promise.all(fetchDocs);
@@ -258,5 +240,25 @@ export function shopifyTools(server: McpServer) {
         };
       },
     );
+  }
+}
+
+async function fetchDocText(path: string): Promise<{
+  text: string;
+  path: string;
+  success: boolean;
+}> {
+  try {
+    const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
+    const url = new URL(appendedPath, SHOPIFY_BASE_URL);
+    const response = await fetch(url.toString());
+    const text = await response.text();
+    return { text: `## ${path}\n\n${text}\n\n`, path, success: true };
+  } catch (error) {
+    return {
+      text: `Error fetching document at ${path}: ${error}`,
+      path,
+      success: false,
+    };
   }
 }
