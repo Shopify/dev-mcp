@@ -169,26 +169,6 @@ export function shopifyTools(server: McpServer) {
           .describe("The paths to the documents to read"),
       },
       async ({ paths }) => {
-        async function fetchDocText(path: string): Promise<{
-          text: string;
-          path: string;
-          success: boolean;
-        }> {
-          try {
-            const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
-            const url = new URL(appendedPath, SHOPIFY_BASE_URL);
-            const response = await fetch(url.toString());
-            const text = await response.text();
-            return { text: `## ${path}\n\n${text}\n\n`, path, success: true };
-          } catch (error) {
-            return {
-              text: `Error fetching document at ${path}: ${error}`,
-              path,
-              success: false,
-            };
-          }
-        }
-
         const fetchDocs = paths.map((path) => fetchDocText(path));
         const results = await Promise.all(fetchDocs);
 
@@ -238,7 +218,7 @@ export function shopifyTools(server: McpServer) {
           const text = `Please specify which Shopify surface you are building for. Valid options are: ${options}.`;
 
           return {
-            content: [{ type: "text" as const, text }],
+            content: [{ type: "text", text: text }],
           };
         }
 
@@ -251,12 +231,32 @@ export function shopifyTools(server: McpServer) {
         };
 
         const docPath = docEntrypointsBySurface[surface];
-        const text = await fetchDocText(docPath);
+        const result = await fetchDocText(docPath);
 
         return {
-          content: [{ type: "text" as const, text }],
+          content: [{ type: "text", text: result.text }],
         };
       },
     );
+  }
+}
+
+async function fetchDocText(path: string): Promise<{
+  text: string;
+  path: string;
+  success: boolean;
+}> {
+  try {
+    const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
+    const url = new URL(appendedPath, SHOPIFY_BASE_URL);
+    const response = await fetch(url.toString());
+    const text = await response.text();
+    return { text: `## ${path}\n\n${text}\n\n`, path, success: true };
+  } catch (error) {
+    return {
+      text: `Error fetching document at ${path}: ${error}`,
+      path,
+      success: false,
+    };
   }
 }
