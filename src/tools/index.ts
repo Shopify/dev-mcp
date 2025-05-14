@@ -155,90 +155,84 @@ export function shopifyTools(server: McpServer) {
     },
   );
 
-  if (process.env.POLARIS_UNIFIED) {
-    server.tool(
-      "read_polaris_surface_docs",
-      `Use this tool to retrieve a list of documents from shopify.dev.
+  server.tool(
+    "fetch_docs_by_path",
+    `Use this tool to retrieve a list of documents from shopify.dev.
 
-      Args:
-      paths: The paths to the documents to read, in a comma separated list.
-      Paths should be relative to the root of the developer documentation site.`,
-      {
-        paths: z
-          .array(z.string())
-          .describe("The paths to the documents to read"),
-      },
-      async ({ paths }) => {
-        const fetchDocs = paths.map((path) => fetchDocText(path));
-        const results = await Promise.all(fetchDocs);
+    Args:
+    paths: The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"].
+    Paths should be relative to the root of the developer documentation site.`,
+    {
+      paths: z
+        .array(z.string())
+        .describe("The paths to the documents to read"),
+    },
+    async ({ paths }) => {
+      const fetchDocs = paths.map((path) => fetchDocText(path));
+      const results = await Promise.all(fetchDocs);
 
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: results.map(({ text }) => text).join("---\n\n"),
-            },
-          ],
-        };
-      },
-    );
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: results.map(({ text }) => text).join("---\n\n"),
+          },
+        ],
+      };
+    },
+  );
 
-    const surfaces = [
-      "app-home",
-      "admin-extensions",
-      "checkout-extensions",
-      "customer-account-extensions",
-    ] as const;
-    server.tool(
-      "get_started",
-      `
-      1. Ask user for the surface they are building for.
-      2. Use read_polaris_surface_docs tool to read the docs for the surface.
+  const apis = [
+    ...(process.env.POLARIS_UNIFIED ? ["app-ui"] : []),
+    "admin",
+    "functions",
+  ]
 
-      Whenever the user asks about Polaris web components, always use this tool first to provide the most accurate and up-to-date documentation.
+  const apiDescriptions: Record<string, string> = {
+    "app-ui": "App Home, Admin Extensions, Checkout Extensions, Customer Account Extensions, Polaris Web Components",
+    "admin": "Admin API, Admin API GraphQL Schema, Admin API REST Schema",
+    "functions": "Shopify Functions, Shopify Functions API",
+  };
 
-      valid arguments for this tool are:
-      - "app-home"
-      - "admin-extensions"
-      - "checkout-extensions"
-      - "customer-account-extensions"
+  server.tool(
+    "get_started",
+    `
+    Use this tool first whenever you're interacting with any of these Shopify APIs.
 
-      Once you determine the surface, you should then use the read_polaris_surface_docs tool to learn about more specific details. Overviews are not comprehensive, so this is important.
+    Valid arguments for \`api\` are:
+${apis.map(api => `    - ${api}: ${apiDescriptions[api]}`).join('\n')}
 
-      DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE. ONLY USE THE read_polaris_surface_docs TOOLS TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
-    `,
-      {
-        surface: z
-          .enum(surfaces)
-          .describe("The Shopify surface you are building for"),
-      },
-      async function cb({ surface }) {
-        if (!surfaces.includes(surface)) {
-          const options = surfaces.map((s) => `- ${s}`).join("\n");
-          const text = `Please specify which Shopify surface you are building for. Valid options are: ${options}.`;
+    1. Look at the getting started guide for the selected API.
+    2. Use the fetch_docs_by_path tool to read additional docs for the API.
 
-          return {
-            content: [{ type: "text", text: text }],
-          };
-        }
-
-        const docEntrypointsBySurface: Record<string, string> = {
-          "app-home": "/docs/api/app-home/using-polaris-components",
-          "admin-extensions": "/docs/api/admin-extensions",
-          "checkout-extensions": "/docs/api/checkout-ui-extensions",
-          "customer-account-extensions":
-            "/docs/api/customer-account-ui-extensions",
-        };
-
-        const docPath = docEntrypointsBySurface[surface];
-        const result = await fetchDocText(docPath);
+    DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE.
+    ONLY USE THE fetch_docs_by_path TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
+  `,
+    {
+      api: z
+        .enum(apis as any)
+        .describe("The Shopify API you are building for"),
+    },
+    async function cb({ api }) {
+      if (!apis.includes(api)) {
+        const options = apis.map((s) => `- ${s}`).join("\n");
+        const text = `Please specify which Shopify API you are building for. Valid options are: ${options}.`;
 
         return {
-          content: [{ type: "text", text: result.text }],
+          content: [{ type: "text", text }],
         };
-      },
-    );
-  }
+      }
+
+      const response = await fetch(
+        `${SHOPIFY_BASE_URL}/mcp/getting_started?api=${api}`,
+      );
+      const text = await response.text();
+
+      return {
+        content: [{ type: "text" as const, text }],
+      };
+    },
+  );
 }
 
 async function fetchDocText(path: string): Promise<{
