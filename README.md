@@ -42,10 +42,12 @@ On Windows, you might need to use this alternative configuration:
 
 This MCP server provides the following tools:
 
-| Tool Name               | Description                                    |
-| ----------------------- | ---------------------------------------------- |
-| search_dev_docs         | Search shopify.dev documentation               |
-| introspect_admin_schema | Access and search Shopify Admin GraphQL schema |
+| Tool Name                 | Description                                      |
+| ------------------------- | ------------------------------------------------ |
+| search_dev_docs           | Search shopify.dev documentation                 |
+| introspect_admin_schema   | Access and search Shopify Admin GraphQL schema   |
+| read_polaris_surface_docs | Read Docs to gain Polaris Web Components context |
+| get_started               | Gets started with the user's preferred surface   |
 
 ## Available prompts
 
