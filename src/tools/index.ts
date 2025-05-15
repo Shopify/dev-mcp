@@ -6,6 +6,13 @@ const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
   : "https://shopify.dev/";
 
+const GettingStartedAPISchema = z.object({
+  name: z.string(),
+  description: z.string(),
+});
+
+type GettingStartedAPI = z.infer<typeof GettingStartedAPISchema>;
+
 /**
  * Searches Shopify documentation with the given query
  * @param prompt The search query for Shopify documentation
@@ -88,7 +95,7 @@ export async function searchShopifyDocs(prompt: string) {
   }
 }
 
-export function shopifyTools(server: McpServer) {
+export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "introspect_admin_schema",
     `This tool introspects and returns the portion of the Shopify Admin API GraphQL schema relevant to the user prompt. Only use this for the Shopify Admin API, and not any other APIs like the Shopify Storefront API or the Shopify Functions API.
@@ -108,28 +115,19 @@ export function shopifyTools(server: McpServer) {
           "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)",
         ),
     },
-    async ({ query, filter }, extra) => {
+    async ({ query, filter }) => {
       const result = await searchShopifyAdminSchema(query, { filter });
 
-      if (result.success) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: result.responseText,
-            },
-          ],
-        };
-      } else {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`,
-            },
-          ],
-        };
-      }
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.success
+              ? result.responseText
+              : `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`
+          },
+        ],
+      };
     },
   );
 
@@ -141,7 +139,7 @@ export function shopifyTools(server: McpServer) {
     {
       prompt: z.string().describe("The search query for Shopify documentation"),
     },
-    async ({ prompt }, extra) => {
+    async ({ prompt }) => {
       const result = await searchShopifyDocs(prompt);
 
       return {
@@ -168,28 +166,35 @@ export function shopifyTools(server: McpServer) {
         .describe("The paths to the documents to read"),
     },
     async ({ paths }) => {
-      async function fetchDocText(path: string): Promise<{
+      type DocResult = {
         text: string;
         path: string;
         success: boolean;
-      }> {
+      };
+
+      async function fetchDocText(path: string): Promise<DocResult> {
         try {
           const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
           const url = new URL(appendedPath, SHOPIFY_BASE_URL);
           const response = await fetch(url.toString());
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
           const text = await response.text();
           return { text: `## ${path}\n\n${text}\n\n`, path, success: true };
         } catch (error) {
+          console.error(`Error fetching document at ${path}: ${error}`);
           return {
-            text: `Error fetching document at ${path}: ${error}`,
+            text: `Error fetching document at ${path}: ${error instanceof Error ? error.message : String(error)}`,
             path,
             success: false,
           };
         }
       }
 
-      const fetchDocs = paths.map((path) => fetchDocText(path));
-      const results = await Promise.all(fetchDocs);
+      const results = await Promise.all(paths.map(fetchDocText));
 
       return {
         content: [
@@ -202,54 +207,120 @@ export function shopifyTools(server: McpServer) {
     },
   );
 
-  const surfaces = [
-    ...(process.env.POLARIS_UNIFIED ? ["app-ui"] : []),
-    "admin",
-    "functions",
-  ]
+  const gettingStartedApis = await fetchGettingStartedApis();
+  const filteredApis = !process.env.POLARIS_UNIFIED
+    ? gettingStartedApis.filter((api) => api.name !== "app-ui")
+    : gettingStartedApis;
 
-  const surfaceDescriptions: Record<string, string> = {
-    "app-ui": "App Home, Admin Extensions, Checkout Extensions, Customer Account Extensions, Polaris Web Components",
-    "admin": "Admin API, Admin API GraphQL Schema, Admin API REST Schema",
-    "functions": "Shopify Functions, Shopify Functions API",
-  };
+  const gettingStartedApiNames = filteredApis.map((api) => api.name);
 
   server.tool(
     "get_started",
     `
-    Use this tool first whenever you're interacting with any of these Shopify surfaces.
+    Use this tool first whenever you're interacting with any of these Shopify APIs.
 
-    Valid arguments for \`surface\` are:
-${surfaces.map(surface => `    - ${surface}: ${surfaceDescriptions[surface]}`).join('\n')}
+    Valid arguments for \`api\` are:
+${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join('\n')}
 
-    1. Look at the getting started guide for the surface.
-    2. Use read_docs tool to read additional docs for the surface.
+    1. Look at the getting started guide for the API.
+    2. Use read_docs tool to read additional docs for the API.
 
     DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE. ONLY USE THE read_docs TOOLS TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
   `,
     {
-      surface: z
-        .enum(surfaces as any)
-        .describe("The Shopify surface you are building for"),
+      api: z
+        .enum(gettingStartedApiNames as [string, ...string[]])
+        .describe("The Shopify API you are building for"),
     },
-    async function cb({ surface }) {
-      if (!surfaces.includes(surface)) {
-        const options = surfaces.map((s) => `- ${s}`).join("\n");
-        const text = `Please specify which Shopify surface you are building for. Valid options are: ${options}.`;
+    async ({ api }) => {
+      if (!gettingStartedApiNames.includes(api)) {
+        const options = gettingStartedApiNames.map(s => `- ${s}`).join("\n");
+        const text = `Please specify which Shopify API you are building for. Valid options are: ${options}.`;
 
         return {
           content: [{ type: "text" as const, text }],
         };
       }
 
-      const response = await fetch(
-        `${SHOPIFY_BASE_URL}/mcp/getting_started?surface=${surface}`,
-      );
-      const text = await response.text();
+      try {
+        const response = await fetch(
+          `${SHOPIFY_BASE_URL}/mcp/getting_started?api=${api}`,
+        );
 
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const text = await response.text();
+
+        return {
+          content: [{ type: "text" as const, text }],
+        };
+      } catch (error) {
+        console.error(`Error fetching getting started information for ${api}: ${error}`);
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Error fetching getting started information for ${api}: ${error instanceof Error ? error.message : String(error)}`
+          }],
+        };
+      }
     },
   );
 }
+
+/**
+ * Fetches and validates information about available APIs from the getting_started_apis endpoint
+ * @returns An array of validated API information objects with name and description properties, or an empty array on error
+ */
+async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
+  try {
+    const url = new URL("/mcp/getting_started_apis", SHOPIFY_BASE_URL);
+
+    console.error(`[api-information] Making GET request to: ${url.toString()}`);
+
+    // Make the GET request
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache",
+        "X-Shopify-Surface": "mcp",
+      },
+    });
+
+    console.error(
+      `[api-information] Response status: ${response.status} ${response.statusText}`,
+    );
+
+    if (!response.ok) {
+      console.error(`[api-information] HTTP error status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Read and process the response
+    const responseText = await response.text();
+    console.error(
+      `[api-information] Response text (truncated): ${
+        responseText.substring(0, 200) +
+        (responseText.length > 200 ? "..." : "")
+      }`,
+    );
+
+    try {
+      const jsonData = JSON.parse(responseText);
+      // Parse and validate with Zod schema
+      const validatedData = z.array(GettingStartedAPISchema).parse(jsonData);
+      return validatedData;
+    } catch (e) {
+      console.warn(`[api-information] Error parsing JSON response: ${e}`);
+      return [];
+    }
+  } catch (error) {
+    console.error(
+      `[api-information] Error fetching API information: ${error}`,
+    );
+    return [];
+  }
+}
+
