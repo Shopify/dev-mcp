@@ -154,11 +154,11 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   );
 
   server.tool(
-    "read_docs",
+    "fetch_docs_by_path",
     `Use this tool to retrieve a list of documents from shopify.dev.
 
     Args:
-    paths: The paths to the documents to read, in a comma separated list.
+    paths: The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"].
     Paths should be relative to the root of the developer documentation site.`,
     {
       paths: z
@@ -222,10 +222,11 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     Valid arguments for \`api\` are:
 ${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join('\n')}
 
-    1. Look at the getting started guide for the API.
-    2. Use read_docs tool to read additional docs for the API.
+    1. Look at the getting started guide for the selected API.
+    2. Use the fetch_docs_by_path tool to read additional docs for the API.
 
-    DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE. ONLY USE THE read_docs TOOLS TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
+    DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE.
+    ONLY USE THE fetch_docs_by_path TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
   `,
     {
       api: z
