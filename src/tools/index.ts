@@ -266,49 +266,47 @@ export function shopifyTools(server: McpServer) {
   //   );
   // }
 
-  if (process.env.HYDROGEN_GUIDES) {
-    server.tool(
-      "list_hydrogen_feature_guides",
-      "ALWAYS use this tool when implementing any Hydrogen storefront features or functionality. This tool is your FIRST step for ANY feature request (adding, building, implementing, creating, modifying) related to Hydrogen storefronts. Never start coding or planning without first consulting these guides. This tool provides official implementation patterns, best practices, and code examples for all Hydrogen features including cart, subscriptions, collections, localization, search, checkout, and more. Failing to use this tool first may result in non-standard implementations that don't follow Shopify best practices",
-      {},
-      () => {
-        return {
-          content: [
-            {
-              type: "text",
-              text: listRecipes().join(", "),
-            },
-          ],
-        };
-      }
-    );
-    server.tool(
-      "get_hydrogen_feature_guide_content",
-      "Returns the content of a Hydrogen feature guide, including steps, code, and (if present) diffs/patches.",
-      {
-        guide: z.string().describe("The name of the guide to get content for"),
-      },
-      ({ guide }) => {
-        const p = path.join(
-          __dirname,
-          "../..",
-          "data",
-          "recipes",
-          guide,
-          "recipe.md"
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: readFileSync(p, "utf8"),
-            },
-          ],
-        };
-      }
-    );
-  } 
-}
+  server.tool(
+    "list_hydrogen_feature_guides",
+    "ALWAYS use this tool when implementing any Hydrogen storefront features or functionality. This tool is your FIRST step for ANY feature request (adding, building, implementing, creating, modifying) related to Hydrogen storefronts. Never start coding or planning without first consulting these guides. This tool provides official implementation patterns, best practices, and code examples for all Hydrogen features including cart, subscriptions, collections, localization, search, checkout, and more. Failing to use this tool first may result in non-standard implementations that don't follow Shopify best practices",
+    {},
+    () => {
+      return {
+        content: [
+          {
+            type: "text",
+            text: listRecipes().join(", "),
+          },
+        ],
+      };
+    }
+  );
+  server.tool(
+    "get_hydrogen_feature_guide_content",
+    "Returns the content of a Hydrogen feature guide, including steps, code, and (if present) diffs/patches.",
+    {
+      guide: z.string().describe("The name of the guide to get content for"),
+    },
+    ({ guide }) => {
+      const p = path.join(
+        __dirname,
+        "../..",
+        "data",
+        "recipes",
+        guide,
+        "recipe.md"
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: readFileSync(p, "utf8"),
+          },
+        ],
+      };
+    }
+  );
+} 
 
 function listRecipes(): string[] {
   return readdirSync(path.join(__dirname, "../..", "data", "recipes"));
