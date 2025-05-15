@@ -5,7 +5,7 @@ import { describe, test, expect, beforeEach, vi, afterAll } from "vitest";
 global.fetch = vi.fn();
 
 // Now import the modules to test
-import { searchShopifyDocs } from "./index.js";
+import { searchShopifyDocs, validateShopifyGraphQL } from "./index.js";
 
 // Mock console.error and console.warn
 const originalConsoleError = console.error;
@@ -60,6 +60,25 @@ Learn how to authenticate your app with OAuth.
 
 ## Making API Calls
 Examples of common API calls with the Admin API.`;
+
+// Sample GraphQL validation responses
+const sampleValidGraphQLResponse = {
+  is_valid: true
+};
+
+const sampleInvalidGraphQLResponse = {
+  is_valid: false,
+  errors: [
+    {
+      message: "Cannot query field 'invalid' on type 'Product'",
+      locations: [{ line: 3, column: 5 }]
+    },
+    {
+      message: "Unknown type 'NonExistentType'",
+      locations: [{ line: 7, column: 10 }]
+    }
+  ]
+};
 
 describe("searchShopifyDocs", () => {
   let fetchMock: any;
@@ -171,6 +190,184 @@ describe("searchShopifyDocs", () => {
     // Check that the error was handled and raw text is returned
     expect(result.success).toBe(true);
     expect(result.formattedText).toBe("This is not valid JSON");
+
+    // Verify that console.warn was called with the JSON parsing error
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(console.warn).mock.calls[0][0]).toContain(
+      "Error parsing JSON response",
+    );
+  });
+});
+
+describe("validateShopifyGraphQL", () => {
+  let fetchMock: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchMock = global.fetch as any;
+
+    // By default, mock a successful validation response
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        forEach: (callback: (value: string, key: string) => void) => {
+          callback("application/json", "content-type");
+        },
+      },
+      text: async () => JSON.stringify(sampleValidGraphQLResponse),
+    });
+  });
+
+  test("validates valid GraphQL code successfully", async () => {
+    const validGraphQL = `
+      query GetProduct {
+        product(id: "gid://shopify/Product/123") {
+          title
+          description
+          variants {
+            edges {
+              node {
+                id
+                price
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    // Call the function directly
+    const result = await validateShopifyGraphQL("admin", validGraphQL);
+
+    // Verify the fetch was called with correct URL and method
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const fetchCall = fetchMock.mock.calls[0];
+    const [url, options] = fetchCall;
+
+    expect(url).toContain("/mcp/validate_graphql");
+    expect(url).toContain("api=admin");
+    expect(options.method).toBe("POST");
+    expect(options.body).toBe(JSON.stringify({ code: validGraphQL }));
+    expect(options.headers["Content-Type"]).toBe("application/json");
+
+    // Check the response
+    expect(result.success).toBe(true);
+    expect(result.isValid).toBe(true);
+    expect(result.formattedText).toContain("## GraphQL Validation Results");
+    expect(result.formattedText).toContain("**Valid:** ✅ Yes");
+    expect(result.rawResponse).toEqual(sampleValidGraphQLResponse);
+  });
+
+  test("reports errors for invalid GraphQL code", async () => {
+    // Mock an invalid GraphQL response
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        forEach: (callback: (value: string, key: string) => void) => {
+          callback("application/json", "content-type");
+        },
+      },
+      text: async () => JSON.stringify(sampleInvalidGraphQLResponse),
+    });
+
+    const invalidGraphQL = `
+      query GetProduct {
+        product(id: "gid://shopify/Product/123") {
+          invalid
+          title
+          someType {
+            field: NonExistentType
+          }
+        }
+      }
+    `;
+
+    // Call the function
+    const result = await validateShopifyGraphQL("admin", invalidGraphQL);
+
+    // Verify the fetch was called correctly
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const fetchUrl = fetchMock.mock.calls[0][0];
+    expect(fetchUrl).toContain("/mcp/validate_graphql");
+    expect(fetchUrl).toContain("api=admin");
+
+    // Check the response
+    expect(result.success).toBe(true);
+    expect(result.isValid).toBe(false);
+    expect(result.formattedText).toContain("**Valid:** ❌ No");
+    expect(result.formattedText).toContain("**Errors:**");
+    expect(result.formattedText).toContain("Cannot query field 'invalid' on type 'Product'");
+    expect(result.formattedText).toContain("Line 3, Column 5");
+    expect(result.formattedText).toContain("Unknown type 'NonExistentType'");
+    expect(result.formattedText).toContain("Line 7, Column 10");
+    expect(result.rawResponse).toEqual(sampleInvalidGraphQLResponse);
+  });
+
+  test("handles HTTP error", async () => {
+    // Mock an error response
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      headers: {
+        forEach: (callback: (value: string, key: string) => void) => {
+          callback("text/plain", "content-type");
+        },
+      },
+    });
+
+    // Call the function
+    const result = await validateShopifyGraphQL("admin", "query { something }");
+
+    // Check that the error was handled
+    expect(result.success).toBe(false);
+    expect(result.isValid).toBe(false);
+    expect(result.formattedText).toContain("Error validating GraphQL");
+    expect(result.formattedText).toContain("500");
+  });
+
+  test("handles fetch error", async () => {
+    // Mock a network error
+    fetchMock.mockRejectedValue(new Error("Network error"));
+
+    // Call the function
+    const result = await validateShopifyGraphQL("admin", "query { products { edges { node { id } } } }");
+
+    // Check that the error was handled
+    expect(result.success).toBe(false);
+    expect(result.isValid).toBe(false);
+    expect(result.formattedText).toContain("Error validating GraphQL: Network error");
+  });
+
+  test("handles non-JSON response gracefully", async () => {
+    // Mock a non-JSON response
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        forEach: (callback: (value: string, key: string) => void) => {
+          callback("text/plain", "content-type");
+        },
+      },
+      text: async () => "This is not valid JSON",
+    });
+
+    // Clear the mocks before the test
+    vi.mocked(console.warn).mockClear();
+
+    // Call the function
+    const result = await validateShopifyGraphQL("admin", "query { something }");
+
+    // Check that the error was handled and raw text is returned
+    expect(result.success).toBe(true);
+    expect(result.isValid).toBe(false);
+    expect(result.formattedText).toContain("Unable to parse validation response");
+    expect(result.formattedText).toContain("This is not valid JSON");
 
     // Verify that console.warn was called with the JSON parsing error
     expect(console.warn).toHaveBeenCalledTimes(1);
@@ -368,5 +565,154 @@ describe("get_started tool behavior", () => {
     // Verify error handling
     expect(result.content[0].text).toContain("Error fetching getting started information");
     expect(result.content[0].text).toContain("Network failure");
+  });
+});
+
+describe("validate_graphql tool behavior", () => {
+  let fetchMock: any;
+  let mockServer: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchMock = global.fetch as any;
+
+    // Mock the fetch implementations for APIs list and validate_graphql endpoint
+    fetchMock.mockImplementation((url: string, options: any) => {
+      if (url.includes("/mcp/getting_started_apis")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: {
+            forEach: (callback: (value: string, key: string) => void) => {
+              callback("application/json", "content-type");
+            },
+          },
+          text: async () => JSON.stringify(sampleGettingStartedApisResponse),
+        });
+      } else if (url.includes("/mcp/validate_graphql")) {
+        // Check if the GraphQL code contains errors to determine mock response
+        const hasErrors = options.body.includes("invalid") || options.body.includes("NonExistentType");
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: {
+            forEach: (callback: (value: string, key: string) => void) => {
+              callback("application/json", "content-type");
+            },
+          },
+          text: async () => JSON.stringify(
+            hasErrors ? sampleInvalidGraphQLResponse : sampleValidGraphQLResponse
+          ),
+        });
+      }
+      return Promise.reject(new Error("Unexpected URL"));
+    });
+
+    // Create a mock server that captures the registered tools
+    mockServer = {
+      tool: vi.fn((name, description, schema, handler) => {
+        // Store the handler for testing
+        if (name === "validate_graphql") {
+          mockServer.validateGraphQLHandler = handler;
+        }
+      }),
+      validateGraphQLHandler: null,
+    };
+  });
+
+  test("registers validate_graphql tool correctly", async () => {
+    // Import the function and register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Verify the tool was registered with correct parameters
+    expect(mockServer.tool).toHaveBeenCalledWith(
+      "validate_graphql",
+      expect.stringContaining("validates GraphQL code"),
+      expect.objectContaining({
+        api: expect.any(Object),
+        code: expect.any(Object),
+      }),
+      expect.any(Function)
+    );
+
+    // Ensure the handler was registered
+    expect(mockServer.validateGraphQLHandler).not.toBeNull();
+  });
+
+  test("validates valid GraphQL code successfully via tool", async () => {
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Valid GraphQL code
+    const validGraphQL = `
+      query GetProduct {
+        product(id: "gid://shopify/Product/123") {
+          title
+          description
+        }
+      }
+    `;
+
+    // Test the handler
+    const result = await mockServer.validateGraphQLHandler({
+      api: "admin",
+      code: validGraphQL,
+    });
+
+    // Check that the fetch was called with the correct URL and data
+    const validateCalls = fetchMock.mock.calls.filter((call: [string, any]) =>
+      call[0].includes("/mcp/validate_graphql?api=admin")
+    );
+    expect(validateCalls.length).toBe(1);
+    expect(JSON.parse(validateCalls[0][1].body)).toEqual({ code: validGraphQL });
+    expect(validateCalls[0][1].headers["Content-Type"]).toBe("application/json");
+
+    // Verify the response content
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toContain("GraphQL Validation Results");
+    expect(result.content[0].text).toContain("**Valid:** ✅ Yes");
+  });
+
+  test("reports validation errors in invalid GraphQL code", async () => {
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Invalid GraphQL code with errors
+    const invalidGraphQL = `
+      query GetProduct {
+        product(id: "gid://shopify/Product/123") {
+          invalid
+          title
+          someType {
+            field: NonExistentType
+          }
+        }
+      }
+    `;
+
+    // Test the handler
+    const result = await mockServer.validateGraphQLHandler({
+      api: "admin",
+      code: invalidGraphQL,
+    });
+
+    // Check that the fetch was called with the correct URL and data
+    const validateCalls = fetchMock.mock.calls.filter((call: [string, any]) =>
+      call[0].includes("/mcp/validate_graphql?api=admin")
+    );
+    expect(validateCalls.length).toBe(1);
+    expect(JSON.parse(validateCalls[0][1].body)).toEqual({ code: invalidGraphQL });
+
+    // Verify the response content shows errors
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toContain("**Valid:** ❌ No");
+    expect(result.content[0].text).toContain("**Errors:**");
+    expect(result.content[0].text).toContain("Cannot query field 'invalid' on type 'Product'");
+    expect(result.content[0].text).toContain("Unknown type 'NonExistentType'");
   });
 });
