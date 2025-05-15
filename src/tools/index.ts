@@ -161,110 +161,110 @@ export function shopifyTools(server: McpServer) {
     },
   );
 
-  if (process.env.POLARIS_UNIFIED) {
-    server.tool(
-      "read_polaris_surface_docs",
-      `Use this tool to retrieve a list of documents from shopify.dev.
+  // if (process.env.POLARIS_UNIFIED) {
+  //   server.tool(
+  //     "read_polaris_surface_docs",
+  //     `Use this tool to retrieve a list of documents from shopify.dev.
 
-      Args:
-      paths: The paths to the documents to read, in a comma separated list.
-      Paths should be relative to the root of the developer documentation site.`,
-      {
-        paths: z
-          .array(z.string())
-          .describe("The paths to the documents to read"),
-      },
-      async ({ paths }) => {
-        async function fetchDocText(path: string): Promise<{
-          text: string;
-          path: string;
-          success: boolean;
-        }> {
-          try {
-            const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
-            const url = new URL(appendedPath, SHOPIFY_BASE_URL);
-            const response = await fetch(url.toString());
-            const text = await response.text();
-            return { text: `## ${path}\n\n${text}\n\n`, path, success: true };
-          } catch (error) {
-            return {
-              text: `Error fetching document at ${path}: ${error}`,
-              path,
-              success: false,
-            };
-          }
-        }
+  //     Args:
+  //     paths: The paths to the documents to read, in a comma separated list.
+  //     Paths should be relative to the root of the developer documentation site.`,
+  //     {
+  //       paths: z
+  //         .array(z.string())
+  //         .describe("The paths to the documents to read"),
+  //     },
+  //     async ({ paths }) => {
+  //       async function fetchDocText(path: string): Promise<{
+  //         text: string;
+  //         path: string;
+  //         success: boolean;
+  //       }> {
+  //         try {
+  //           const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
+  //           const url = new URL(appendedPath, SHOPIFY_BASE_URL);
+  //           const response = await fetch(url.toString());
+  //           const text = await response.text();
+  //           return { text: `## ${path}\n\n${text}\n\n`, path, success: true };
+  //         } catch (error) {
+  //           return {
+  //             text: `Error fetching document at ${path}: ${error}`,
+  //             path,
+  //             success: false,
+  //           };
+  //         }
+  //       }
 
-        const fetchDocs = paths.map((path) => fetchDocText(path));
-        const results = await Promise.all(fetchDocs);
+  //       const fetchDocs = paths.map((path) => fetchDocText(path));
+  //       const results = await Promise.all(fetchDocs);
 
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: results.map(({ text }) => text).join("---\n\n"),
-            },
-          ],
-        };
-      },
-    );
+  //       return {
+  //         content: [
+  //           {
+  //             type: "text" as const,
+  //             text: results.map(({ text }) => text).join("---\n\n"),
+  //           },
+  //         ],
+  //       };
+  //     },
+  //   );
 
-    const surfaces = [
-      "app-home",
-      "admin-extensions",
-      "checkout-extensions",
-      "customer-account-extensions",
-    ] as const;
-    server.tool(
-      "get_started",
-      `
-      1. Ask user for the surface they are building for.
-      2. Use read_polaris_surface_docs tool to read the docs for the surface.
+  //   const surfaces = [
+  //     "app-home",
+  //     "admin-extensions",
+  //     "checkout-extensions",
+  //     "customer-account-extensions",
+  //   ] as const;
+  //   server.tool(
+  //     "get_started",
+  //     `
+  //     1. Ask user for the surface they are building for.
+  //     2. Use read_polaris_surface_docs tool to read the docs for the surface.
 
-      Whenever the user asks about Polaris web components, always use this tool first to provide the most accurate and up-to-date documentation.
+  //     Whenever the user asks about Polaris web components, always use this tool first to provide the most accurate and up-to-date documentation.
 
-      valid arguments for this tool are:
-      - "app-home"
-      - "admin-extensions"
-      - "checkout-extensions"
-      - "customer-account-extensions"
+  //     valid arguments for this tool are:
+  //     - "app-home"
+  //     - "admin-extensions"
+  //     - "checkout-extensions"
+  //     - "customer-account-extensions"
 
-      Once you determine the surface, you should then use the read_polaris_surface_docs tool to learn about more specific details. Overviews are not comprehensive, so this is important.
+  //     Once you determine the surface, you should then use the read_polaris_surface_docs tool to learn about more specific details. Overviews are not comprehensive, so this is important.
 
-      DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE. ONLY USE THE read_polaris_surface_docs TOOLS TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
-    `,
-      {
-        surface: z
-          .enum(surfaces)
-          .describe("The Shopify surface you are building for"),
-      },
-      async function cb({ surface }) {
-        if (!surfaces.includes(surface)) {
-          const options = surfaces.map((s) => `- ${s}`).join("\n");
-          const text = `Please specify which Shopify surface you are building for. Valid options are: ${options}.`;
+  //     DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE. ONLY USE THE read_polaris_surface_docs TOOLS TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
+  //   `,
+  //     {
+  //       surface: z
+  //         .enum(surfaces)
+  //         .describe("The Shopify surface you are building for"),
+  //     },
+  //     async function cb({ surface }) {
+  //       if (!surfaces.includes(surface)) {
+  //         const options = surfaces.map((s) => `- ${s}`).join("\n");
+  //         const text = `Please specify which Shopify surface you are building for. Valid options are: ${options}.`;
 
-          return {
-            content: [{ type: "text" as const, text }],
-          };
-        }
+  //         return {
+  //           content: [{ type: "text" as const, text }],
+  //         };
+  //       }
 
-        const docEntrypointsBySurface: Record<string, string> = {
-          "app-home": "/docs/api/app-home/using-polaris-components",
-          "admin-extensions": "/docs/api/admin-extensions",
-          "checkout-extensions": "/docs/api/checkout-ui-extensions",
-          "customer-account-extensions":
-            "/docs/api/customer-account-ui-extensions",
-        };
+  //       const docEntrypointsBySurface: Record<string, string> = {
+  //         "app-home": "/docs/api/app-home/using-polaris-components",
+  //         "admin-extensions": "/docs/api/admin-extensions",
+  //         "checkout-extensions": "/docs/api/checkout-ui-extensions",
+  //         "customer-account-extensions":
+  //           "/docs/api/customer-account-ui-extensions",
+  //       };
 
-        const docPath = docEntrypointsBySurface[surface];
-        const text = await fetchDocText(docPath);
+  //       const docPath = docEntrypointsBySurface[surface];
+  //       const text = await fetchDocText(docPath);
 
-        return {
-          content: [{ type: "text" as const, text }],
-        };
-      },
-    );
-  }
+  //       return {
+  //         content: [{ type: "text" as const, text }],
+  //       };
+  //     },
+  //   );
+  // }
 
   if (process.env.HYDROGEN_GUIDES) {
     server.tool(
