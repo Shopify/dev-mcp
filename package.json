@@ -50,5 +50,10 @@
   ],
   "prettier": {
     "endOfLine": "auto"
+  },
+  "private": false,
+  "publishConfig": {
+    "access": "public",
+    "@shopify:registry": "https://registry.npmjs.org"
   }
 }
