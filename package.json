@@ -5,6 +5,7 @@
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
     "build:watch": "tsc --watch",
+    "changeset": "changeset",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:fix": "prettier --write --ignore-unknown .",
