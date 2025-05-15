@@ -15,7 +15,7 @@
     "lint": "prettier --check --cache --ignore-unknown .",
     "inspector": "npm run build && npm exec @modelcontextprotocol/inspector dist/index.js",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node -e \"import('./dist/instrumentation.js').then(m => m.getInstallationId())\""
+    "postinstall": "node -e \"try { if (require('fs').existsSync('./dist/instrumentation.js')) { import('./dist/instrumentation.js').then(m => m.getInstallationId()).catch(e => console.error(e)) } else { console.log('Run npm run build first for complete setup') } } catch(e) { console.error(e) }\""
   },
   "author": "",
   "license": "ISC",
