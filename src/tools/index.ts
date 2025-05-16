@@ -1,6 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+import {
+  validateGraphQL,
+  formatValidationErrors,
+} from "./shopify-graphql-validation.js";
 
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
@@ -95,6 +99,54 @@ export async function searchShopifyDocs(prompt: string) {
   }
 }
 
+/**
+ * Validates GraphQL code against the Shopify Admin API schema
+ * @param code The GraphQL code to validate
+ * @returns Validation results including whether the code is valid and any errors
+ */
+export async function validateShopifyGraphQL(code: string) {
+  try {
+    // Use the local validation function
+    const validationResult = await validateGraphQL(code);
+
+    // Format the response
+    let formattedResponse = `## GraphQL Validation Results\n\n`;
+    formattedResponse += `**Valid:** ${validationResult.isValid ? "✅ Yes" : "❌ No"}\n\n`;
+
+    // Add errors if any
+    if (
+      !validationResult.isValid &&
+      validationResult.errors &&
+      validationResult.errors.length > 0
+    ) {
+      formattedResponse += `**Errors:**\n\n`;
+      formattedResponse += formatValidationErrors(validationResult.errors);
+    }
+
+    return {
+      success: true,
+      isValid: validationResult.isValid,
+      formattedText: formattedResponse,
+      rawResponse: {
+        is_valid: validationResult.isValid,
+        errors: validationResult.errors,
+      },
+    };
+  } catch (error) {
+    // Log the error once
+    console.error(`[validate-graphql] Error validating GraphQL: ${error}`);
+
+    return {
+      success: false,
+      isValid: false,
+      formattedText: `Error validating GraphQL: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "introspect_admin_schema",
@@ -124,7 +176,31 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             type: "text" as const,
             text: result.success
               ? result.responseText
-              : `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`
+              : `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "validate_graphql",
+    `This tool validates GraphQL code against the Shopify Admin API GraphQL schema and returns validation results including any errors.
+    ALWAYS MAKE SURE THAT THE GRAPHQL CODE YOU GENERATE IS VALID WITH THIS TOOL.
+
+    It takes one argument:
+    - code: The GraphQL code to validate`,
+    {
+      code: z.string().describe("The GraphQL code to validate"),
+    },
+    async ({ code }) => {
+      const result = await validateShopifyGraphQL(code);
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.formattedText,
           },
         ],
       };
@@ -161,9 +237,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     paths: The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"].
     Paths should be relative to the root of the developer documentation site.`,
     {
-      paths: z
-        .array(z.string())
-        .describe("The paths to the documents to read"),
+      paths: z.array(z.string()).describe("The paths to the documents to read"),
     },
     async ({ paths }) => {
       type DocResult = {
@@ -220,7 +294,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     Use this tool first whenever you're interacting with any of these Shopify APIs.
 
     Valid arguments for \`api\` are:
-${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join('\n')}
+${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
 
     1. Look at the getting started guide for the selected API.
     2. Use the fetch_docs_by_path tool to read additional docs for the API.
@@ -235,11 +309,11 @@ ${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join('\n')}
     },
     async ({ api }) => {
       if (!gettingStartedApiNames.includes(api)) {
-        const options = gettingStartedApiNames.map(s => `- ${s}`).join("\n");
+        const options = gettingStartedApiNames.map((s) => `- ${s}`).join("\n");
         const text = `Please specify which Shopify API you are building for. Valid options are: ${options}.`;
 
         return {
-          content: [{ type: "text", text }],
+          content: [{ type: "text" as const, text }],
         };
       }
 
@@ -258,12 +332,16 @@ ${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join('\n')}
           content: [{ type: "text" as const, text }],
         };
       } catch (error) {
-        console.error(`Error fetching getting started information for ${api}: ${error}`);
+        console.error(
+          `Error fetching getting started information for ${api}: ${error}`,
+        );
         return {
-          content: [{
-            type: "text" as const,
-            text: `Error fetching getting started information for ${api}: ${error instanceof Error ? error.message : String(error)}`
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error fetching getting started information for ${api}: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
         };
       }
     },
@@ -318,9 +396,7 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
       return [];
     }
   } catch (error) {
-    console.error(
-      `[api-information] Error fetching API information: ${error}`,
-    );
+    console.error(`[api-information] Error fetching API information: ${error}`);
     return [];
   }
 }

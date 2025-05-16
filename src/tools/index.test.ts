@@ -1,11 +1,28 @@
 // Import vitest first
 import { describe, test, expect, beforeEach, vi, afterAll } from "vitest";
+import { GraphQLError } from "graphql";
 
 // Mock fetch globally
 global.fetch = vi.fn();
 
+// Mock the graphql validation
+vi.mock("./shopify-graphql-validation.js", () => {
+  return {
+    validateGraphQL: vi.fn(),
+    formatValidationErrors: vi.fn((errors: Array<{ message: string }>) => {
+      return errors
+        .map((error, index: number) => `${index + 1}. ${error.message}`)
+        .join("\n");
+    }),
+  };
+});
+
 // Now import the modules to test
-import { searchShopifyDocs } from "./index.js";
+import { searchShopifyDocs, validateShopifyGraphQL } from "./index.js";
+import {
+  validateGraphQL,
+  formatValidationErrors,
+} from "./shopify-graphql-validation.js";
 
 // Mock console.error and console.warn
 const originalConsoleError = console.error;
@@ -39,16 +56,17 @@ const sampleDocsResponse = [
 const sampleGettingStartedApisResponse = [
   {
     name: "app-ui",
-    description: "App Home, Admin Extensions, Checkout Extensions, Customer Account Extensions, Polaris Web Components"
+    description:
+      "App Home, Admin Extensions, Checkout Extensions, Customer Account Extensions, Polaris Web Components",
   },
   {
     name: "admin",
-    description: "Admin API, Admin API GraphQL Schema, Admin API REST Schema"
+    description: "Admin API, Admin API GraphQL Schema, Admin API REST Schema",
   },
   {
     name: "functions",
-    description: "Shopify Functions, Shopify Functions API"
-  }
+    description: "Shopify Functions, Shopify Functions API",
+  },
 ];
 
 // Sample getting started guide response
@@ -60,6 +78,69 @@ Learn how to authenticate your app with OAuth.
 
 ## Making API Calls
 Examples of common API calls with the Admin API.`;
+
+// Sample search responses
+const sampleSearchResponse = `{
+  "totalResults": 5,
+  "results": [
+    {
+      "title": "Admin API overview",
+      "url": "/docs/api/admin",
+      "description": "Learn about the Admin API and how to build apps with it.",
+      "score": 0.95
+    },
+    {
+      "title": "Authentication with Admin API",
+      "url": "/docs/api/admin/auth",
+      "description": "Learn how to authenticate with the Shopify Admin API.",
+      "score": 0.85
+    }
+  ]
+}`;
+
+const sampleParsedSearchResponse = {
+  totalResults: 5,
+  results: [
+    {
+      title: "Admin API overview",
+      url: "/docs/api/admin",
+      description: "Learn about the Admin API and how to build apps with it.",
+      score: 0.95,
+    },
+    {
+      title: "Authentication with Admin API",
+      url: "/docs/api/admin/auth",
+      description: "Learn how to authenticate with the Shopify Admin API.",
+      score: 0.85,
+    },
+  ],
+};
+
+// Prepare mock validation results
+const validResult = {
+  isValid: true,
+  errors: undefined,
+};
+
+// Create actual GraphQLError instances for the invalid result
+const graphqlError1 = new GraphQLError(
+  "Cannot query field 'invalid' on type 'Product'",
+);
+const graphqlError2 = new GraphQLError("Unknown type 'NonExistentType'");
+
+// Add locations manually
+Object.defineProperty(graphqlError1, "locations", {
+  value: [{ line: 3, column: 5 }],
+});
+
+Object.defineProperty(graphqlError2, "locations", {
+  value: [{ line: 7, column: 10 }],
+});
+
+const invalidResult = {
+  isValid: false,
+  errors: [graphqlError1, graphqlError2],
+};
 
 describe("searchShopifyDocs", () => {
   let fetchMock: any;
@@ -80,7 +161,7 @@ describe("searchShopifyDocs", () => {
           callback("application/json", "content-type");
         },
       },
-      text: async () => JSON.stringify(sampleDocsResponse),
+      text: async () => sampleSearchResponse,
     });
   });
 
@@ -99,15 +180,13 @@ describe("searchShopifyDocs", () => {
 
     // The response should be properly formatted with indentation
     expect(result.formattedText).toContain("{\n");
-    expect(result.formattedText).toContain('  "filename":');
+    expect(result.formattedText).toContain('  "totalResults":');
 
     // Parse the response and verify it matches our sample data
     const parsedResponse = JSON.parse(result.formattedText);
-    expect(parsedResponse).toEqual(sampleDocsResponse);
-    expect(parsedResponse[0].filename).toBe(
-      "api/admin/graphql/reference/products.md",
-    );
-    expect(parsedResponse[0].score).toBe(0.85);
+    expect(parsedResponse).toEqual(sampleParsedSearchResponse);
+    expect(parsedResponse.results[0].title).toBe("Admin API overview");
+    expect(parsedResponse.results[0].url).toBe("/docs/api/admin");
   });
 
   test("handles HTTP error", async () => {
@@ -180,6 +259,110 @@ describe("searchShopifyDocs", () => {
   });
 });
 
+describe("validateShopifyGraphQL", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Default mock for validateGraphQL
+    vi.mocked(validateGraphQL).mockResolvedValue(validResult);
+    vi.mocked(console.error).mockClear();
+  });
+
+  test("calls local validateGraphQL function with correct code", async () => {
+    const graphqlCode = `
+      query GetProduct {
+        product(id: "gid://shopify/Product/123") {
+          title
+          description
+        }
+      }
+    `;
+
+    await validateShopifyGraphQL(graphqlCode);
+
+    // Verify validateGraphQL was called with the code
+    expect(validateGraphQL).toHaveBeenCalledTimes(1);
+    expect(validateGraphQL).toHaveBeenCalledWith(graphqlCode);
+  });
+
+  test("returns properly formatted result for valid GraphQL", async () => {
+    const graphqlCode = `query { product(id: "123") { title } }`;
+
+    const result = await validateShopifyGraphQL(graphqlCode);
+
+    expect(result.success).toBe(true);
+    expect(result.isValid).toBe(true);
+    expect(result.formattedText).toContain("## GraphQL Validation Results");
+    expect(result.formattedText).toContain("**Valid:** ✅ Yes");
+    expect(result.rawResponse).toEqual({ is_valid: true, errors: undefined });
+  });
+
+  test("returns properly formatted result for invalid GraphQL with errors", async () => {
+    // Mock an invalid validation result
+    vi.mocked(validateGraphQL).mockResolvedValue(invalidResult);
+
+    // Mock formatValidationErrors to return formatted errors
+    vi.mocked(formatValidationErrors).mockReturnValue(
+      "1. Cannot query field 'invalid' on type 'Product' (Line 3, Column 5)\n" +
+        "2. Unknown type 'NonExistentType' (Line 7, Column 10)",
+    );
+
+    const graphqlCode = `
+      query GetProduct {
+        product(id: "gid://shopify/Product/123") {
+          invalid
+          title
+          someType {
+            field: NonExistentType
+          }
+        }
+      }
+    `;
+
+    const result = await validateShopifyGraphQL(graphqlCode);
+
+    expect(result.success).toBe(true);
+    expect(result.isValid).toBe(false);
+    expect(result.formattedText).toContain("## GraphQL Validation Results");
+    expect(result.formattedText).toContain("**Valid:** ❌ No");
+    expect(result.formattedText).toContain("**Errors:**");
+    expect(result.formattedText).toContain(
+      "Cannot query field 'invalid' on type 'Product'",
+    );
+    expect(result.formattedText).toContain("Unknown type 'NonExistentType'");
+
+    // Verify formatValidationErrors was called with the errors
+    expect(formatValidationErrors).toHaveBeenCalledTimes(1);
+    expect(formatValidationErrors).toHaveBeenCalledWith(invalidResult.errors);
+  });
+
+  test("handles validation errors gracefully", async () => {
+    // Clear mocks before this specific test
+    vi.clearAllMocks();
+
+    // Mock a validation function error
+    vi.mocked(validateGraphQL).mockRejectedValue(
+      new Error("Validation function failed"),
+    );
+
+    const graphqlCode = "query { invalid syntax }";
+
+    const result = await validateShopifyGraphQL(graphqlCode);
+
+    expect(result.success).toBe(false);
+    expect(result.isValid).toBe(false);
+    expect(result.formattedText).toContain(
+      "Error validating GraphQL: Validation function failed",
+    );
+
+    // Verify error was logged once
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(console.error).mock.calls[0][0]).toContain(
+      "Error validating GraphQL",
+    );
+  });
+});
+
 describe("fetchGettingStartedApis", () => {
   let fetchMock: any;
 
@@ -221,7 +404,7 @@ describe("fetchGettingStartedApis", () => {
     // Verify fetch was called to get the APIs
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/mcp/getting_started_apis"),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 });
@@ -290,7 +473,7 @@ describe("get_started tool behavior", () => {
 
     // Check that the fetch was called with the correct URL
     const getStartedCalls = fetchMock.mock.calls.filter((call: [string, any]) =>
-      call[0].includes("/mcp/getting_started?api=admin")
+      call[0].includes("/mcp/getting_started?api=admin"),
     );
     expect(getStartedCalls.length).toBe(1);
 
@@ -334,7 +517,9 @@ describe("get_started tool behavior", () => {
     const result = await mockServer.getStartedHandler({ api: "admin" });
 
     // Verify error handling
-    expect(result.content[0].text).toContain("Error fetching getting started information");
+    expect(result.content[0].text).toContain(
+      "Error fetching getting started information",
+    );
     expect(result.content[0].text).toContain("500");
   });
 
@@ -366,7 +551,9 @@ describe("get_started tool behavior", () => {
     const result = await mockServer.getStartedHandler({ api: "admin" });
 
     // Verify error handling
-    expect(result.content[0].text).toContain("Error fetching getting started information");
+    expect(result.content[0].text).toContain(
+      "Error fetching getting started information",
+    );
     expect(result.content[0].text).toContain("Network failure");
   });
 });
