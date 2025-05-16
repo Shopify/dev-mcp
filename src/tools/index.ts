@@ -24,6 +24,10 @@ export async function searchShopifyDocs(prompt: string) {
     const url = new URL("/mcp/search", SHOPIFY_BASE_URL);
     url.searchParams.append("query", prompt);
 
+    if (process.env.POLARIS_UNIFIED) {
+      url.searchParams.append("polaris_unified", "true");
+    }
+
     console.error(`[shopify-docs] Making GET request to: ${url.toString()}`);
 
     // Make the GET request
