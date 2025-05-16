@@ -39,16 +39,17 @@ const sampleDocsResponse = [
 const sampleGettingStartedApisResponse = [
   {
     name: "app-ui",
-    description: "App Home, Admin Extensions, Checkout Extensions, Customer Account Extensions, Polaris Web Components"
+    description:
+      "App Home, Admin Extensions, Checkout Extensions, Customer Account Extensions, Polaris Web Components",
   },
   {
     name: "admin",
-    description: "Admin API, Admin API GraphQL Schema, Admin API REST Schema"
+    description: "Admin API, Admin API GraphQL Schema, Admin API REST Schema",
   },
   {
     name: "functions",
-    description: "Shopify Functions, Shopify Functions API"
-  }
+    description: "Shopify Functions, Shopify Functions API",
+  },
 ];
 
 // Sample getting started guide response
@@ -221,7 +222,7 @@ describe("fetchGettingStartedApis", () => {
     // Verify fetch was called to get the APIs
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/mcp/getting_started_apis"),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 });
@@ -290,7 +291,7 @@ describe("get_started tool behavior", () => {
 
     // Check that the fetch was called with the correct URL
     const getStartedCalls = fetchMock.mock.calls.filter((call: [string, any]) =>
-      call[0].includes("/mcp/getting_started?api=admin")
+      call[0].includes("/mcp/getting_started?api=admin"),
     );
     expect(getStartedCalls.length).toBe(1);
 
@@ -334,7 +335,9 @@ describe("get_started tool behavior", () => {
     const result = await mockServer.getStartedHandler({ api: "admin" });
 
     // Verify error handling
-    expect(result.content[0].text).toContain("Error fetching getting started information");
+    expect(result.content[0].text).toContain(
+      "Error fetching getting started information",
+    );
     expect(result.content[0].text).toContain("500");
   });
 
@@ -366,7 +369,9 @@ describe("get_started tool behavior", () => {
     const result = await mockServer.getStartedHandler({ api: "admin" });
 
     // Verify error handling
-    expect(result.content[0].text).toContain("Error fetching getting started information");
+    expect(result.content[0].text).toContain(
+      "Error fetching getting started information",
+    );
     expect(result.content[0].text).toContain("Network failure");
   });
 });

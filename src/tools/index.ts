@@ -124,7 +124,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             type: "text" as const,
             text: result.success
               ? result.responseText
-              : `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`
+              : `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`,
           },
         ],
       };
@@ -161,9 +161,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     paths: The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"].
     Paths should be relative to the root of the developer documentation site.`,
     {
-      paths: z
-        .array(z.string())
-        .describe("The paths to the documents to read"),
+      paths: z.array(z.string()).describe("The paths to the documents to read"),
     },
     async ({ paths }) => {
       type DocResult = {
@@ -220,7 +218,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     Use this tool first whenever you're interacting with any of these Shopify APIs.
 
     Valid arguments for \`api\` are:
-${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join('\n')}
+${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
 
     1. Look at the getting started guide for the selected API.
     2. Use the fetch_docs_by_path tool to read additional docs for the API.
@@ -235,7 +233,7 @@ ${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join('\n')}
     },
     async ({ api }) => {
       if (!gettingStartedApiNames.includes(api)) {
-        const options = gettingStartedApiNames.map(s => `- ${s}`).join("\n");
+        const options = gettingStartedApiNames.map((s) => `- ${s}`).join("\n");
         const text = `Please specify which Shopify API you are building for. Valid options are: ${options}.`;
 
         return {
@@ -258,12 +256,16 @@ ${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join('\n')}
           content: [{ type: "text" as const, text }],
         };
       } catch (error) {
-        console.error(`Error fetching getting started information for ${api}: ${error}`);
+        console.error(
+          `Error fetching getting started information for ${api}: ${error}`,
+        );
         return {
-          content: [{
-            type: "text" as const,
-            text: `Error fetching getting started information for ${api}: ${error instanceof Error ? error.message : String(error)}`
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error fetching getting started information for ${api}: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
         };
       }
     },
@@ -318,9 +320,7 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
       return [];
     }
   } catch (error) {
-    console.error(
-      `[api-information] Error fetching API information: ${error}`,
-    );
+    console.error(`[api-information] Error fetching API information: ${error}`);
     return [];
   }
 }

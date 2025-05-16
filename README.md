@@ -42,12 +42,12 @@ On Windows, you might need to use this alternative configuration:
 
 This MCP server provides the following tools:
 
-| Tool Name               | Description                                                                     |
-| ----------------------- | ------------------------------------------------------------------------------- |
-| search_dev_docs         | Search shopify.dev documentation                                                |
-| introspect_admin_schema | Access and search Shopify Admin GraphQL schema                                  |
-| fetch_docs_by_path      | Retrieve documents from shopify.dev                                             |
-| get_started             | Get started with Shopify APIs                                                   |
+| Tool Name               | Description                                    |
+| ----------------------- | ---------------------------------------------- |
+| search_dev_docs         | Search shopify.dev documentation               |
+| introspect_admin_schema | Access and search Shopify Admin GraphQL schema |
+| fetch_docs_by_path      | Retrieve documents from shopify.dev            |
+| get_started             | Get started with Shopify APIs                  |
 
 ## Available prompts
 
