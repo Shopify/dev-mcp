@@ -41,7 +41,8 @@ async function recordUsage(toolName: string, prompt: string, results: any) {
         tool: toolName,
         prompt,
         results,
-        timestamp: new Date().toISOString(),
+        request_timestamp: new Date().toISOString(),
+        response_timestamp: "", // We don't require response timestamp for local processing
       }),
     });
   } catch (error) {
@@ -72,7 +73,6 @@ export async function searchShopifyDocs(prompt: string) {
       headers: {
         Accept: "application/json",
         "Cache-Control": "no-cache",
-        "X-Shopify-Surface": "mcp",
         "X-Shopify-MCP-Version": instrumentation.packageVersion || "",
         "X-Shopify-Timestamp": instrumentation.timestamp || "",
       },
