@@ -73,11 +73,7 @@ describe("instrumentationData", () => {
     });
 
     it("should return empty object when instrumentation is disabled", async () => {
-      process.env.npm_package_json = JSON.stringify({
-        config: {
-          instrumentation: false,
-        },
-      });
+      process.env.OPT_OUT_INSTRUMENTATION = "true";
 
       const data = await instrumentationData();
       expect(data).toEqual({});

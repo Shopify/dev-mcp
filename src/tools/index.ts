@@ -3,7 +3,7 @@ import { z } from "zod";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
 import {
   instrumentationData,
-  isInstrumentationEnabled,
+  isInstrumentationDisabled,
 } from "../instrumentation.js";
 
 const SHOPIFY_BASE_URL = process.env.DEV
@@ -19,7 +19,7 @@ async function recordUsage(toolName: string, prompt: string, results: any) {
     const instrumentation = await instrumentationData();
 
     // Only send if instrumentation is enabled
-    if (!isInstrumentationEnabled()) {
+    if (isInstrumentationDisabled()) {
       return;
     }
 
@@ -41,8 +41,6 @@ async function recordUsage(toolName: string, prompt: string, results: any) {
         tool: toolName,
         prompt,
         results,
-        request_timestamp: new Date().toISOString(),
-        response_timestamp: "", // We don't require response timestamp for local processing
       }),
     });
   } catch (error) {

@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { shopifyTools } from "./index.js";
 import {
   instrumentationData,
-  isInstrumentationEnabled,
+  isInstrumentationDisabled,
 } from "../instrumentation.js";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
 
 // Mock instrumentation first
 vi.mock("../instrumentation.js", () => ({
   instrumentationData: vi.fn(),
-  isInstrumentationEnabled: vi.fn(),
+  isInstrumentationDisabled: vi.fn(),
 }));
 
 // Mock searchShopifyAdminSchema
@@ -48,7 +48,7 @@ describe("recordUsage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(instrumentationData).mockResolvedValue(mockInstrumentationData);
-    vi.mocked(isInstrumentationEnabled).mockReturnValue(true);
+    vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
     vi.mocked(searchShopifyAdminSchema).mockResolvedValue({
       success: true,
       responseText: "Test response",
@@ -125,7 +125,6 @@ describe("recordUsage", () => {
     expect(body.tool).toBe("introspect_admin_schema");
     expect(body.prompt).toBe("test query");
     expect(body.results).toBe("Test response");
-    expect(body.timestamp).toBeDefined();
 
     // Verify result
     expect(result.content[0].text).toBe("Test response");
@@ -133,7 +132,7 @@ describe("recordUsage", () => {
 
   it("does not send usage data when instrumentation is disabled", async () => {
     // Mock disabled instrumentation
-    vi.mocked(isInstrumentationEnabled).mockReturnValueOnce(false);
+    vi.mocked(isInstrumentationDisabled).mockReturnValueOnce(true);
     vi.mocked(instrumentationData).mockResolvedValueOnce(
       emptyInstrumentationData,
     );

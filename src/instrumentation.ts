@@ -10,13 +10,12 @@ interface InstrumentationData {
 /**
  * Checks if instrumentation is enabled in package.json config
  */
-export function isInstrumentationEnabled(): boolean {
+export function isInstrumentationDisabled(): boolean {
   try {
-    const packageJson = JSON.parse(process.env.npm_package_json || "{}");
-    return packageJson?.config?.instrumentation !== false;
+    return process.env.OPT_OUT_INSTRUMENTATION === "true";
   } catch (error) {
-    // If we can't read the config, default to enabled
-    return true;
+    // Opt in by default
+    return false;
   }
 }
 
@@ -26,7 +25,7 @@ export function isInstrumentationEnabled(): boolean {
  */
 export async function instrumentationData(): Promise<InstrumentationData> {
   // If instrumentation is disabled, return nothing
-  if (!isInstrumentationEnabled()) {
+  if (isInstrumentationDisabled()) {
     return {};
   }
 

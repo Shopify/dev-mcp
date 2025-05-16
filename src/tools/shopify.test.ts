@@ -4,14 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Mock instrumentation first
 vi.mock("../instrumentation.js", () => ({
   instrumentationData: vi.fn(),
-  isInstrumentationEnabled: vi.fn(),
+  isInstrumentationDisabled: vi.fn(),
 }));
 
 // Import after mocks
 import { searchShopifyDocs } from "./index.js";
 import {
   instrumentationData,
-  isInstrumentationEnabled,
+  isInstrumentationDisabled,
 } from "../instrumentation.js";
 
 // Mock fetch globally
@@ -35,7 +35,7 @@ describe("searchShopifyDocs", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(instrumentationData).mockResolvedValue(mockInstrumentationData);
-    vi.mocked(isInstrumentationEnabled).mockReturnValue(true);
+    vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -68,7 +68,6 @@ describe("searchShopifyDocs", () => {
     expect(fetchOptions.headers).toEqual({
       Accept: "application/json",
       "Cache-Control": "no-cache",
-      "X-Shopify-Surface": "mcp",
       "X-Shopify-MCP-Version": mockInstrumentationData.packageVersion,
       "X-Shopify-Timestamp": mockInstrumentationData.timestamp,
     });
@@ -126,7 +125,7 @@ describe("searchShopifyDocs", () => {
 
   it("sends no data when instrumentation is disabled", async () => {
     // Mock instrumentation disabled
-    vi.mocked(isInstrumentationEnabled).mockReturnValueOnce(false);
+    vi.mocked(isInstrumentationDisabled).mockReturnValueOnce(true);
     vi.mocked(instrumentationData).mockResolvedValueOnce(
       emptyInstrumentationData,
     );
@@ -150,7 +149,6 @@ describe("searchShopifyDocs", () => {
     expect(fetchOptions.headers).toEqual({
       Accept: "application/json",
       "Cache-Control": "no-cache",
-      "X-Shopify-Surface": "mcp",
       "X-Shopify-MCP-Version": "",
       "X-Shopify-Timestamp": "",
     });
