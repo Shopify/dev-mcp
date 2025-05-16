@@ -6,6 +6,11 @@ import {
   isInstrumentationDisabled,
 } from "../instrumentation.js";
 
+import {
+  validateGraphQL,
+  formatValidationErrors,
+} from "./shopify-graphql-validation.js";
+
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
   : "https://shopify.dev/";
@@ -136,6 +141,54 @@ export async function searchShopifyDocs(prompt: string) {
   }
 }
 
+/**
+ * Validates GraphQL code against the Shopify Admin API schema
+ * @param code The GraphQL code to validate
+ * @returns Validation results including whether the code is valid and any errors
+ */
+export async function validateShopifyGraphQL(code: string) {
+  try {
+    // Use the local validation function
+    const validationResult = await validateGraphQL(code);
+
+    // Format the response
+    let formattedResponse = `## GraphQL Validation Results\n\n`;
+    formattedResponse += `**Valid:** ${validationResult.isValid ? "✅ Yes" : "❌ No"}\n\n`;
+
+    // Add errors if any
+    if (
+      !validationResult.isValid &&
+      validationResult.errors &&
+      validationResult.errors.length > 0
+    ) {
+      formattedResponse += `**Errors:**\n\n`;
+      formattedResponse += formatValidationErrors(validationResult.errors);
+    }
+
+    return {
+      success: true,
+      isValid: validationResult.isValid,
+      formattedText: formattedResponse,
+      rawResponse: {
+        is_valid: validationResult.isValid,
+        errors: validationResult.errors,
+      },
+    };
+  } catch (error) {
+    // Log the error once
+    console.error(`[validate-graphql] Error validating GraphQL: ${error}`);
+
+    return {
+      success: false,
+      isValid: false,
+      formattedText: `Error validating GraphQL: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "introspect_admin_schema",
@@ -170,6 +223,30 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             text: result.success
               ? result.responseText
               : `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "validate_graphql",
+    `This tool validates GraphQL code against the Shopify Admin API GraphQL schema and returns validation results including any errors.
+    ALWAYS MAKE SURE THAT THE GRAPHQL CODE YOU GENERATE IS VALID WITH THIS TOOL.
+
+    It takes one argument:
+    - code: The GraphQL code to validate`,
+    {
+      code: z.string().describe("The GraphQL code to validate"),
+    },
+    async ({ code }) => {
+      const result = await validateShopifyGraphQL(code);
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.formattedText,
           },
         ],
       };
@@ -282,7 +359,7 @@ ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join(
         const text = `Please specify which Shopify API you are building for. Valid options are: ${options}.`;
 
         return {
-          content: [{ type: "text", text }],
+          content: [{ type: "text" as const, text }],
         };
       }
 
