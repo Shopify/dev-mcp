@@ -206,6 +206,11 @@ export function shopifyTools(server: McpServer) {
       async ({ paths }) => {
         const fetchDocs = paths.map((path) => fetchDocText(path));
         const results = await Promise.all(fetchDocs);
+        await recordUsage(
+          "read_polaris_surface_docs",
+          paths.join(","),
+          results.map(({ text }) => text).join("---\n\n"),
+        ).catch(() => {});
 
         return {
           content: [
@@ -267,6 +272,8 @@ export function shopifyTools(server: McpServer) {
 
         const docPath = docEntrypointsBySurface[surface];
         const result = await fetchDocText(docPath);
+
+        await recordUsage("get_started", docPath, result.text).catch(() => {});
 
         return {
           content: [{ type: "text", text: result.text }],
