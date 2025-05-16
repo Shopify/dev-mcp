@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { shopifyTools } from "./index.js";
-import { instrumentationData } from "../instrumentation.js";
+import {
+  instrumentationData,
+  isInstrumentationEnabled,
+} from "../instrumentation.js";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
 
 // Mock instrumentation first
 vi.mock("../instrumentation.js", () => ({
   instrumentationData: vi.fn(),
+  isInstrumentationEnabled: vi.fn(),
 }));
 
 // Mock searchShopifyAdminSchema
@@ -27,18 +31,16 @@ const consoleWarn = console.warn;
 
 describe("recordUsage", () => {
   const mockInstrumentationData = {
-    installationId: "test-installation-id",
-    sessionId: "test-session-id",
     packageVersion: "1.0.0",
     timestamp: "2024-01-01T00:00:00.000Z",
   };
 
   const disabledInstrumentationData = {
-    installationId: "",
-    sessionId: "",
     packageVersion: "1.0.0",
     timestamp: "2024-01-01T00:00:00.000Z",
   };
+
+  const emptyInstrumentationData = {};
 
   let registeredHandler: any;
   let server: any;
@@ -46,6 +48,7 @@ describe("recordUsage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(instrumentationData).mockResolvedValue(mockInstrumentationData);
+    vi.mocked(isInstrumentationEnabled).mockReturnValue(true);
     vi.mocked(searchShopifyAdminSchema).mockResolvedValue({
       success: true,
       responseText: "Test response",
@@ -112,8 +115,6 @@ describe("recordUsage", () => {
       Accept: "application/json",
       "Cache-Control": "no-cache",
       "X-Shopify-Surface": "mcp",
-      "X-Shopify-Installation-ID": mockInstrumentationData.installationId,
-      "X-Shopify-Session-ID": mockInstrumentationData.sessionId,
       "X-Shopify-MCP-Version": "1.0.0",
       "X-Shopify-Timestamp": mockInstrumentationData.timestamp,
       "Content-Type": "application/json",
@@ -131,9 +132,10 @@ describe("recordUsage", () => {
   });
 
   it("does not send usage data when instrumentation is disabled", async () => {
-    // Mock disabled instrumentation (empty IDs)
+    // Mock disabled instrumentation
+    vi.mocked(isInstrumentationEnabled).mockReturnValueOnce(false);
     vi.mocked(instrumentationData).mockResolvedValueOnce(
-      disabledInstrumentationData,
+      emptyInstrumentationData,
     );
 
     // Register tools

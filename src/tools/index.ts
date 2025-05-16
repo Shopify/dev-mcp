@@ -1,7 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
-import { instrumentationData } from "../instrumentation.js";
+import {
+  instrumentationData,
+  isInstrumentationEnabled,
+} from "../instrumentation.js";
 
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
@@ -15,8 +18,8 @@ async function recordUsage(toolName: string, prompt: string, results: any) {
     // Get instrumentation information
     const instrumentation = await instrumentationData();
 
-    // Only send if instrumentation is enabled (non-empty IDs)
-    if (!instrumentation.installationId || !instrumentation.sessionId) {
+    // Only send if instrumentation is enabled
+    if (!isInstrumentationEnabled()) {
       return;
     }
 
@@ -30,10 +33,8 @@ async function recordUsage(toolName: string, prompt: string, results: any) {
         Accept: "application/json",
         "Cache-Control": "no-cache",
         "X-Shopify-Surface": "mcp",
-        "X-Shopify-Installation-ID": instrumentation.installationId,
-        "X-Shopify-Session-ID": instrumentation.sessionId,
-        "X-Shopify-MCP-Version": instrumentation.packageVersion,
-        "X-Shopify-Timestamp": instrumentation.timestamp,
+        "X-Shopify-MCP-Version": instrumentation.packageVersion || "",
+        "X-Shopify-Timestamp": instrumentation.timestamp || "",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -72,10 +73,8 @@ export async function searchShopifyDocs(prompt: string) {
         Accept: "application/json",
         "Cache-Control": "no-cache",
         "X-Shopify-Surface": "mcp",
-        "X-Shopify-Installation-ID": instrumentation.installationId,
-        "X-Shopify-Session-ID": instrumentation.sessionId,
-        "X-Shopify-MCP-Version": instrumentation.packageVersion,
-        "X-Shopify-Timestamp": instrumentation.timestamp,
+        "X-Shopify-MCP-Version": instrumentation.packageVersion || "",
+        "X-Shopify-Timestamp": instrumentation.timestamp || "",
       },
     });
 

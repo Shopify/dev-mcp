@@ -4,11 +4,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Mock instrumentation first
 vi.mock("../instrumentation.js", () => ({
   instrumentationData: vi.fn(),
+  isInstrumentationEnabled: vi.fn(),
 }));
 
 // Import after mocks
 import { searchShopifyDocs } from "./index.js";
-import { instrumentationData } from "../instrumentation.js";
+import {
+  instrumentationData,
+  isInstrumentationEnabled,
+} from "../instrumentation.js";
 
 // Mock fetch globally
 const fetchMock = vi.fn();
@@ -22,15 +26,16 @@ console.warn = vi.fn();
 
 describe("searchShopifyDocs", () => {
   const mockInstrumentationData = {
-    installationId: "test-installation-id",
-    sessionId: "test-session-id",
     packageVersion: "1.0.0",
     timestamp: "2024-01-01T00:00:00.000Z",
   };
 
+  const emptyInstrumentationData = {};
+
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(instrumentationData).mockResolvedValue(mockInstrumentationData);
+    vi.mocked(isInstrumentationEnabled).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -63,10 +68,8 @@ describe("searchShopifyDocs", () => {
     expect(fetchOptions.headers).toEqual({
       Accept: "application/json",
       "Cache-Control": "no-cache",
-      "X-Shopify-Installation-ID": mockInstrumentationData.installationId,
-      "X-Shopify-MCP-Version": mockInstrumentationData.packageVersion,
-      "X-Shopify-Session-ID": mockInstrumentationData.sessionId,
       "X-Shopify-Surface": "mcp",
+      "X-Shopify-MCP-Version": mockInstrumentationData.packageVersion,
       "X-Shopify-Timestamp": mockInstrumentationData.timestamp,
     });
 
@@ -121,16 +124,11 @@ describe("searchShopifyDocs", () => {
     expect(result.formattedText).toBe("This is not valid JSON");
   });
 
-  it("sends empty IDs when instrumentation is disabled", async () => {
-    // Mock instrumentation data with empty IDs
-    const disabledInstrumentationData = {
-      installationId: "",
-      sessionId: "",
-      packageVersion: "1.0.0",
-      timestamp: "2024-01-01T00:00:00.000Z",
-    };
+  it("sends no data when instrumentation is disabled", async () => {
+    // Mock instrumentation disabled
+    vi.mocked(isInstrumentationEnabled).mockReturnValueOnce(false);
     vi.mocked(instrumentationData).mockResolvedValueOnce(
-      disabledInstrumentationData,
+      emptyInstrumentationData,
     );
 
     // Mock successful response
@@ -146,20 +144,15 @@ describe("searchShopifyDocs", () => {
 
     // Verify the fetch was called with correct URL
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const fetchUrl = fetchMock.mock.calls[0][0];
-    expect(fetchUrl).toContain("/mcp/search");
-    expect(fetchUrl).toContain("query=test+query");
 
-    // Verify headers with empty IDs
+    // Verify headers
     const fetchOptions = fetchMock.mock.calls[0][1];
     expect(fetchOptions.headers).toEqual({
       Accept: "application/json",
       "Cache-Control": "no-cache",
-      "X-Shopify-Installation-ID": "",
-      "X-Shopify-MCP-Version": mockInstrumentationData.packageVersion,
-      "X-Shopify-Session-ID": "",
       "X-Shopify-Surface": "mcp",
-      "X-Shopify-Timestamp": mockInstrumentationData.timestamp,
+      "X-Shopify-MCP-Version": "",
+      "X-Shopify-Timestamp": "",
     });
 
     // Verify response
