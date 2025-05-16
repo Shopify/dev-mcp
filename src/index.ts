@@ -31,7 +31,7 @@ async function main() {
   );
 
   // Register Shopify tools
-  shopifyTools(server);
+  await shopifyTools(server);
 
   // Register Shopify prompts
   shopifyPrompts(server);
