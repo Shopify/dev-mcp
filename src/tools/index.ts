@@ -224,11 +224,8 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     Valid arguments for \`api\` are:
 ${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
 
-    1. Look at the getting started guide for the selected API.
-    2. Use the fetch_docs_by_path tool to read additional docs for the API.
-
     DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE.
-    ONLY USE THE fetch_docs_by_path TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
+    PREFER THE USE OF THE fetch_docs_by_path TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
   `,
     {
       api: z
