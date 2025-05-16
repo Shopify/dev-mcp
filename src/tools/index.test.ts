@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { shopifyTools } from "./index.js";
-import { instrumentationData } from '../instrumentation.js';
+import { instrumentationData } from "../instrumentation.js";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
 
 // Mock instrumentation first
-vi.mock('../instrumentation.js', () => ({
-  instrumentationData: vi.fn()
+vi.mock("../instrumentation.js", () => ({
+  instrumentationData: vi.fn(),
 }));
 
 // Mock searchShopifyAdminSchema
-vi.mock('./shopify-admin-schema.js', () => ({
-  searchShopifyAdminSchema: vi.fn()
+vi.mock("./shopify-admin-schema.js", () => ({
+  searchShopifyAdminSchema: vi.fn(),
 }));
 
 // Mock fetch globally
@@ -23,17 +23,17 @@ const consoleWarn = console.warn;
 
 describe("recordUsage", () => {
   const mockInstrumentationData = {
-    installationId: 'test-installation-id',
-    sessionId: 'test-session-id',
-    packageVersion: '1.0.0',
-    timestamp: '2024-01-01T00:00:00.000Z'
+    installationId: "test-installation-id",
+    sessionId: "test-session-id",
+    packageVersion: "1.0.0",
+    timestamp: "2024-01-01T00:00:00.000Z",
   };
-  
+
   const disabledInstrumentationData = {
-    installationId: '',
-    sessionId: '',
-    packageVersion: '1.0.0',
-    timestamp: '2024-01-01T00:00:00.000Z'
+    installationId: "",
+    sessionId: "",
+    packageVersion: "1.0.0",
+    timestamp: "2024-01-01T00:00:00.000Z",
   };
 
   let registeredHandler: any;
@@ -44,14 +44,14 @@ describe("recordUsage", () => {
     vi.mocked(instrumentationData).mockResolvedValue(mockInstrumentationData);
     vi.mocked(searchShopifyAdminSchema).mockResolvedValue({
       success: true,
-      responseText: "Test response"
+      responseText: "Test response",
     });
 
     // Create a mock server with just the tool method
     server = {
       tool: vi.fn().mockImplementation((name, description, schema, handler) => {
         registeredHandler = handler;
-      })
+      }),
     };
 
     // Mock console methods
@@ -71,7 +71,7 @@ describe("recordUsage", () => {
     const mockResponse = {
       ok: true,
       status: 200,
-      statusText: 'OK'
+      statusText: "OK",
     };
     fetchMock.mockResolvedValueOnce(mockResponse);
 
@@ -79,7 +79,10 @@ describe("recordUsage", () => {
     shopifyTools(server);
 
     // Call the handler
-    const result = await registeredHandler({ query: "test query", filter: ["all"] }, { signal: new AbortController().signal });
+    const result = await registeredHandler(
+      { query: "test query", filter: ["all"] },
+      { signal: new AbortController().signal },
+    );
 
     // Verify the fetch was called with correct URL and headers
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -96,7 +99,7 @@ describe("recordUsage", () => {
       "X-Shopify-Session-ID": mockInstrumentationData.sessionId,
       "X-Shopify-Package-Version": mockInstrumentationData.packageVersion,
       "X-Shopify-Timestamp": mockInstrumentationData.timestamp,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     });
 
     // Verify body
@@ -109,16 +112,21 @@ describe("recordUsage", () => {
     // Verify result
     expect(result.content[0].text).toBe("Test response");
   });
-  
+
   it("does not send usage data when instrumentation is disabled", async () => {
     // Mock disabled instrumentation (empty IDs)
-    vi.mocked(instrumentationData).mockResolvedValueOnce(disabledInstrumentationData);
+    vi.mocked(instrumentationData).mockResolvedValueOnce(
+      disabledInstrumentationData,
+    );
 
     // Register tools
     shopifyTools(server);
 
     // Call the handler
-    const result = await registeredHandler({ query: "test query", filter: ["all"] }, { signal: new AbortController().signal });
+    const result = await registeredHandler(
+      { query: "test query", filter: ["all"] },
+      { signal: new AbortController().signal },
+    );
 
     // Verify fetch was not called
     expect(fetchMock).not.toHaveBeenCalled();
@@ -129,19 +137,22 @@ describe("recordUsage", () => {
 
   it("handles fetch errors gracefully", async () => {
     // Mock fetch error
-    const networkError = new Error('Network error');
+    const networkError = new Error("Network error");
     fetchMock.mockRejectedValueOnce(networkError);
 
     // Register tools
     shopifyTools(server);
 
     // Call the handler
-    const result = await registeredHandler({ query: "test query", filter: ["all"] }, { signal: new AbortController().signal });
+    const result = await registeredHandler(
+      { query: "test query", filter: ["all"] },
+      { signal: new AbortController().signal },
+    );
 
     // Verify fetch was called but error was caught
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(vi.mocked(console.error)).toHaveBeenCalledWith(
-      expect.stringContaining('[mcp-usage] Error sending usage data')
+      expect.stringContaining("[mcp-usage] Error sending usage data"),
     );
 
     // Verify result
@@ -153,7 +164,7 @@ describe("recordUsage", () => {
     const mockUsageResponse = {
       ok: true,
       status: 200,
-      statusText: 'OK'
+      statusText: "OK",
     };
     fetchMock.mockResolvedValueOnce(mockUsageResponse);
 
@@ -161,15 +172,18 @@ describe("recordUsage", () => {
     shopifyTools(server);
 
     // Call the handler
-    const result = await registeredHandler({ query: "test query", filter: ["all"] }, { signal: new AbortController().signal });
+    const result = await registeredHandler(
+      { query: "test query", filter: ["all"] },
+      { signal: new AbortController().signal },
+    );
 
     // Verify both operations completed
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    
+
     // Verify body includes results
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.results).toBe("Test response");
-    
+
     expect(result.content[0].text).toBe("Test response");
   });
-}); 
+});

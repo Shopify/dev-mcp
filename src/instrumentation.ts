@@ -1,18 +1,16 @@
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
-import { homedir } from 'os';
-import { randomUUID } from 'crypto';
-import { constants } from 'fs';
-import { access } from 'fs/promises';
-import { v4 } from 'uuid';
-import path from 'path';
+import { mkdir, readFile, writeFile } from "fs/promises";
+import { homedir } from "os";
+import { constants } from "fs";
+import { access } from "fs/promises";
+import { v4 } from "uuid";
+import path from "path";
 
-const CONFIG_DIR_NAME = '.shopify-dev-mcp';
+const CONFIG_DIR_NAME = ".shopify-dev-mcp";
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const configDir = path.join(homedir(), CONFIG_DIR_NAME);
-const installationIdPath = path.join(configDir, 'installation-id');
-const sessionPath = path.join(configDir, 'session.json');
-const mockPackageVersion = '1.0.0'; // Fixed version for tests
+const installationIdPath = path.join(configDir, "installation-id");
+const sessionPath = path.join(configDir, "session.json");
+const mockPackageVersion = "1.0.0"; // Fixed version for tests
 
 interface InstrumentationData {
   installationId: string;
@@ -31,7 +29,7 @@ interface SessionData {
  */
 function isInstrumentationEnabled(): boolean {
   try {
-    const packageJson = JSON.parse(process.env.npm_package_json || '{}');
+    const packageJson = JSON.parse(process.env.npm_package_json || "{}");
     return packageJson?.config?.instrumentation !== false;
   } catch (error) {
     // If we can't read the config, default to enabled
@@ -49,7 +47,9 @@ async function ensureConfigDirectory(): Promise<boolean> {
     await access(configDir, constants.W_OK);
     return true;
   } catch (error) {
-    console.error(`Config directory error: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `Config directory error: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return false;
   }
 }
@@ -60,12 +60,12 @@ async function ensureConfigDirectory(): Promise<boolean> {
  */
 async function getInstallationId(): Promise<string> {
   try {
-    if (!await ensureConfigDirectory()) {
+    if (!(await ensureConfigDirectory())) {
       return v4();
     }
 
     try {
-      const existingId = await readFile(installationIdPath, 'utf-8');
+      const existingId = await readFile(installationIdPath, "utf-8");
       if (existingId) {
         return existingId;
       }
@@ -75,7 +75,7 @@ async function getInstallationId(): Promise<string> {
 
     const newId = v4();
     try {
-      await writeFile(installationIdPath, newId, 'utf-8');
+      await writeFile(installationIdPath, newId, "utf-8");
       return newId;
     } catch (error) {
       return v4();
@@ -91,12 +91,12 @@ async function getInstallationId(): Promise<string> {
  */
 async function getSessionId(): Promise<string> {
   try {
-    if (!await ensureConfigDirectory()) {
+    if (!(await ensureConfigDirectory())) {
       return v4();
     }
 
     try {
-      const sessionData = JSON.parse(await readFile(sessionPath, 'utf-8'));
+      const sessionData = JSON.parse(await readFile(sessionPath, "utf-8"));
       if (sessionData?.sessionId && sessionData?.lastRefreshed) {
         const lastRefreshed = new Date(sessionData.lastRefreshed);
         if (Date.now() - lastRefreshed.getTime() < SESSION_DURATION_MS) {
@@ -121,7 +121,7 @@ async function getSessionId(): Promise<string> {
  */
 async function createNewSession(): Promise<string> {
   try {
-    if (!await ensureConfigDirectory()) {
+    if (!(await ensureConfigDirectory())) {
       return v4();
     }
 
@@ -135,7 +135,7 @@ async function createNewSession(): Promise<string> {
       await writeFile(
         sessionPath,
         JSON.stringify(sessionData, null, 2),
-        'utf-8',
+        "utf-8",
       );
       return newSessionId;
     } catch (error) {
@@ -152,13 +152,15 @@ async function createNewSession(): Promise<string> {
  */
 async function refreshSession(): Promise<void> {
   try {
-    const sessionData = JSON.parse(await readFile(sessionPath, 'utf-8')) as SessionData;
+    const sessionData = JSON.parse(
+      await readFile(sessionPath, "utf-8"),
+    ) as SessionData;
     if (!sessionData?.sessionId) {
-      throw new Error('Invalid session data');
+      throw new Error("Invalid session data");
     }
 
     sessionData.lastRefreshed = new Date().toISOString();
-    await writeFile(sessionPath, JSON.stringify(sessionData, null, 2), 'utf-8');
+    await writeFile(sessionPath, JSON.stringify(sessionData, null, 2), "utf-8");
   } catch (error) {
     // Silently create new session on any error
     await createNewSession();
@@ -173,8 +175,8 @@ export async function instrumentationData(): Promise<InstrumentationData> {
   // If instrumentation is disabled, return empty strings
   if (!isInstrumentationEnabled()) {
     return {
-      installationId: '',
-      sessionId: '',
+      installationId: "",
+      sessionId: "",
       packageVersion: mockPackageVersion,
       timestamp: new Date().toISOString(),
     };
