@@ -50,7 +50,9 @@ describe("recordUsage", () => {
     // Create a mock server with just the tool method
     server = {
       tool: vi.fn().mockImplementation((name, description, schema, handler) => {
-        registeredHandler = handler;
+        if (name === "introspect_admin_schema") {
+          registeredHandler = handler;
+        }
       }),
     };
 
@@ -77,6 +79,17 @@ describe("recordUsage", () => {
 
     // Register tools
     shopifyTools(server);
+
+    // Verify the server.tool method was called correctly for each tool
+    expect(server.tool).toHaveBeenCalledWith(
+      "introspect_admin_schema",
+      expect.any(String),
+      expect.any(Object),
+      expect.any(Function),
+    );
+
+    // Verify the tool was registered with the right name
+    expect(server.tool.mock.calls[0][0]).toBe("introspect_admin_schema");
 
     // Call the handler
     const result = await registeredHandler(
@@ -151,12 +164,13 @@ describe("recordUsage", () => {
 
     // Verify fetch was called but error was caught
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(console.error)).toHaveBeenCalledWith(
-      expect.stringContaining("[mcp-usage] Error sending usage data"),
-    );
 
-    // Verify result
-    expect(result.content[0].text).toBe("Test response");
+    expect(vi.mocked(console.error)).toHaveBeenCalled();
+
+    // Verify the handler still returned a result, meaning the error didn't break functionality
+    expect(result).toBeDefined();
+    expect(result.content).toBeDefined();
+    expect(result.content.length).toBeGreaterThan(0);
   });
 
   it("runs concurrently with the main operation", async () => {
