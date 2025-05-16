@@ -4,13 +4,14 @@ import { constants } from "fs";
 import { access } from "fs/promises";
 import { v4 } from "uuid";
 import path from "path";
+import pkg from "../package.json" with { type: "json" };
 
 const CONFIG_DIR_NAME = ".shopify-dev-mcp";
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const configDir = path.join(homedir(), CONFIG_DIR_NAME);
 const installationIdPath = path.join(configDir, "installation-id");
 const sessionPath = path.join(configDir, "session.json");
-const mockPackageVersion = "1.0.0"; // Fixed version for tests
+const packageVersion = pkg.version;
 
 interface InstrumentationData {
   installationId: string;
@@ -177,7 +178,7 @@ export async function instrumentationData(): Promise<InstrumentationData> {
     return {
       installationId: "",
       sessionId: "",
-      packageVersion: mockPackageVersion,
+      packageVersion: packageVersion,
       timestamp: new Date().toISOString(),
     };
   }
@@ -190,7 +191,7 @@ export async function instrumentationData(): Promise<InstrumentationData> {
   return {
     installationId,
     sessionId,
-    packageVersion: mockPackageVersion,
+    packageVersion: packageVersion,
     timestamp: new Date().toISOString(),
   };
 }

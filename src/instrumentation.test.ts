@@ -50,6 +50,10 @@ vi.mock("os", () => ({
   homedir: vi.fn().mockReturnValue("/mock-home"),
 }));
 
+vi.mock("../package.json", () => ({
+  default: { version: "1.0.0" },
+}));
+
 describe("instrumentationData", () => {
   const mockUuid = "mock-uuid";
   const mockPackageVersion = "1.0.0";

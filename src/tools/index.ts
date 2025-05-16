@@ -32,7 +32,7 @@ async function recordUsage(toolName: string, prompt: string, results: any) {
         "X-Shopify-Surface": "mcp",
         "X-Shopify-Installation-ID": instrumentation.installationId,
         "X-Shopify-Session-ID": instrumentation.sessionId,
-        "X-Shopify-Package-Version": instrumentation.packageVersion,
+        "X-Shopify-MCP-Version": instrumentation.packageVersion,
         "X-Shopify-Timestamp": instrumentation.timestamp,
         "Content-Type": "application/json",
       },
@@ -74,7 +74,7 @@ export async function searchShopifyDocs(prompt: string) {
         "X-Shopify-Surface": "mcp",
         "X-Shopify-Installation-ID": instrumentation.installationId,
         "X-Shopify-Session-ID": instrumentation.sessionId,
-        "X-Shopify-Package-Version": instrumentation.packageVersion,
+        "X-Shopify-MCP-Version": instrumentation.packageVersion,
         "X-Shopify-Timestamp": instrumentation.timestamp,
       },
     });

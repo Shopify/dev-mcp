@@ -13,6 +13,10 @@ vi.mock("./shopify-admin-schema.js", () => ({
   searchShopifyAdminSchema: vi.fn(),
 }));
 
+vi.mock("../../package.json", () => ({
+  default: { version: "1.0.0" },
+}));
+
 // Mock fetch globally
 const fetchMock = vi.fn();
 global.fetch = fetchMock;
@@ -110,7 +114,7 @@ describe("recordUsage", () => {
       "X-Shopify-Surface": "mcp",
       "X-Shopify-Installation-ID": mockInstrumentationData.installationId,
       "X-Shopify-Session-ID": mockInstrumentationData.sessionId,
-      "X-Shopify-Package-Version": mockInstrumentationData.packageVersion,
+      "X-Shopify-MCP-Version": "1.0.0",
       "X-Shopify-Timestamp": mockInstrumentationData.timestamp,
       "Content-Type": "application/json",
     });
