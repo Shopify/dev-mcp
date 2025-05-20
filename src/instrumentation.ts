@@ -23,7 +23,7 @@ export function isInstrumentationDisabled(): boolean {
  * Gets instrumentation information including package version
  * Never throws. Always returns valid instrumentation data.
  */
-export async function instrumentationData(): Promise<InstrumentationData> {
+export function instrumentationData(): InstrumentationData {
   // If instrumentation is disabled, return nothing
   if (isInstrumentationDisabled()) {
     return {};

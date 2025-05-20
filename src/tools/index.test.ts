@@ -107,7 +107,7 @@ describe("recordUsage", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(instrumentationData).mockResolvedValue(mockInstrumentationData);
+    vi.mocked(instrumentationData).mockReturnValue(mockInstrumentationData);
     vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
     vi.mocked(searchShopifyAdminSchema).mockResolvedValue({
       success: true,
@@ -175,7 +175,7 @@ describe("recordUsage", () => {
       Accept: "application/json",
       "Cache-Control": "no-cache",
       "X-Shopify-Surface": "mcp",
-      "X-Shopify-MCP-Version": "1.0.0",
+      "X-Shopify-MCP-Version": mockInstrumentationData.packageVersion,
       "X-Shopify-Timestamp": mockInstrumentationData.timestamp,
       "Content-Type": "application/json",
     });

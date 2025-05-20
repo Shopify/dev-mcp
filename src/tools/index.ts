@@ -22,13 +22,11 @@ type GettingStartedAPI = z.infer<typeof GettingStartedAPISchema>;
  */
 async function recordUsage(toolName: string, parameters: string, result: any) {
   try {
-    // Get instrumentation information
-    const instrumentation = await instrumentationData();
-
-    // Only send if instrumentation is enabled
     if (isInstrumentationDisabled()) {
       return;
     }
+
+    const instrumentation = instrumentationData();
 
     const url = new URL("/mcp/usage", SHOPIFY_BASE_URL);
 
@@ -63,8 +61,7 @@ async function recordUsage(toolName: string, parameters: string, result: any) {
  */
 export async function searchShopifyDocs(prompt: string) {
   try {
-    // Get instrumentation information
-    const instrumentation = await instrumentationData();
+    const instrumentation = instrumentationData();
 
     // Prepare the URL with query parameters
     const url = new URL("/mcp/search", SHOPIFY_BASE_URL);
@@ -76,7 +73,6 @@ export async function searchShopifyDocs(prompt: string) {
 
     console.error(`[shopify-docs] Making GET request to: ${url.toString()}`);
 
-    // Make the GET request
     const response = await fetch(url.toString(), {
       method: "GET",
       headers: {
@@ -120,7 +116,6 @@ export async function searchShopifyDocs(prompt: string) {
     } catch (e) {
       // If JSON parsing fails, get the raw text
       console.warn(`[shopify-docs] Error parsing JSON response: ${e}`);
-      const responseText = await response.text();
       return {
         success: true,
         formattedText: responseText,
@@ -161,11 +156,9 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     async ({ query, filter }) => {
       const result = await searchShopifyAdminSchema(query, { filter });
 
-      await recordUsage(
-        "introspect_admin_schema",
-        query,
-        result.responseText,
-      ).catch(() => {});
+      recordUsage("introspect_admin_schema", query, result.responseText).catch(
+        () => {},
+      );
 
       return {
         content: [
@@ -243,7 +236,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
 
       const results = await Promise.all(paths.map(fetchDocText));
 
-      await recordUsage(
+      recordUsage(
         "fetch_docs_by_path",
         paths.join(","),
         results.map(({ text }) => text).join("---\n\n"),
@@ -304,7 +297,7 @@ ${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
 
         const text = await response.text();
 
-        await recordUsage("get_started", api, text).catch(() => {});
+        recordUsage("get_started", api, text).catch(() => {});
 
         return {
           content: [{ type: "text" as const, text }],
