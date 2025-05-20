@@ -99,12 +99,23 @@ export async function searchShopifyDocs(prompt: string) {
       };
     }
 
-    // Try to parse as JSON first
+    // Read and process the response
+    const responseText = await response.text();
+    console.error(
+      `[shopify-docs] Response text (truncated): ${
+        responseText.substring(0, 200) +
+        (responseText.length > 200 ? "..." : "")
+      }`,
+    );
+
+    // Parse and format the JSON for human readability
     try {
-      const jsonData = await response.json();
+      const jsonData = JSON.parse(responseText);
+      const formattedJson = JSON.stringify(jsonData, null, 2);
+
       return {
         success: true,
-        formattedText: JSON.stringify(jsonData, null, 2),
+        formattedText: formattedJson,
       };
     } catch (e) {
       // If JSON parsing fails, get the raw text

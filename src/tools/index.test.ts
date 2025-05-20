@@ -170,7 +170,7 @@ describe("recordUsage", () => {
     expect(fetchUrl).toContain("/mcp/usage");
 
     // Verify headers
-    const fetchOptions = fetchMock.mock.calls[0][1];
+    const fetchOptions = fetchMock.mock.calls[1][1];
     expect(fetchOptions.headers).toEqual({
       Accept: "application/json",
       "Cache-Control": "no-cache",
@@ -183,8 +183,8 @@ describe("recordUsage", () => {
     // Verify body
     const body = JSON.parse(fetchOptions.body);
     expect(body.tool).toBe("introspect_admin_schema");
-    expect(body.prompt).toBe("test query");
-    expect(body.results).toBe("Test response");
+    expect(body.parameters).toBe("test query");
+    expect(body.result).toBe("Test response");
 
     // Verify result
     expect(result.content[0].text).toBe("Test response");
@@ -261,7 +261,8 @@ describe("recordUsage", () => {
 
     // Verify body includes results
     const body = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(body.results).toBe("Test response");
+    expect(body.parameters).toBe("test query");
+    expect(body.result).toBe("Test response");
 
     expect(result.content[0].text).toBe("Test response");
   });
@@ -393,7 +394,7 @@ describe("searchShopifyDocs", () => {
       ok: true,
       status: 200,
       statusText: "OK",
-      json: async () => ({ data: "test" }),
+      text: async () => JSON.stringify({ data: "test" }),
     };
     fetchMock.mockResolvedValueOnce(mockResponse);
 
