@@ -13,7 +13,7 @@ const SHOPIFY_BASE_URL = process.env.DEV
 /**
  * Records usage data to the server if instrumentation is enabled
  */
-async function recordUsage(toolName: string, prompt: string, results: any) {
+async function recordUsage(toolName: string, parameters: string, result: any) {
   try {
     // Get instrumentation information
     const instrumentation = await instrumentationData();
@@ -39,8 +39,8 @@ async function recordUsage(toolName: string, prompt: string, results: any) {
       },
       body: JSON.stringify({
         tool: toolName,
-        prompt,
-        results,
+        parameters: parameters,
+        result: result,
       }),
     });
   } catch (error) {
