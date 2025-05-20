@@ -1,6 +1,10 @@
 # Shopify Dev MCP Server
 
-This project implements a Model Context Protocol (MCP) server that interacts with Shopify Dev. This protocol supports various tools to interact with different Shopify APIs.
+This project implements a Model Context Protocol (MCP) server that interacts with Shopify Dev. This protocol supports various tools to interact with different Shopify APIs. At the moment the following APIs are supported:
+
+- Admin GraphQL API
+- Functions
+- (Optional) Polaris Web Components
 
 ## Setup
 
@@ -38,14 +42,34 @@ On Windows, you might need to use this alternative configuration:
 }
 ```
 
+### Opt-in Polaris support (experimental)
+
+If you want Cursor or Claude Desktop to surface Polaris Web Components documentation, include an `env` block with the `POLARIS_UNIFIED` flag in your MCP server configuration:
+
+```json
+{
+  "mcpServers": {
+    "shopify-dev-mcp": {
+      "command": "npx",
+      "args": ["-y", "@shopify/dev-mcp@latest"],
+      "env": {
+        "POLARIS_UNIFIED": "true"
+      }
+    }
+  }
+}
+```
+
 ## Available tools
 
 This MCP server provides the following tools:
 
-| Tool Name               | Description                                    |
-| ----------------------- | ---------------------------------------------- |
-| search_dev_docs         | Search shopify.dev documentation               |
-| introspect_admin_schema | Access and search Shopify Admin GraphQL schema |
+| Tool Name               | Description                                            |
+| ----------------------- | ------------------------------------------------------ |
+| search_dev_docs         | Search shopify.dev documentation                       |
+| introspect_admin_schema | Access and search Shopify Admin GraphQL schema         |
+| fetch_docs_by_path      | Retrieve documents from shopify.dev                    |
+| get_started             | Get started with Shopify APIs (Admin, Functions, etc.) |
 
 ## Available prompts
 
