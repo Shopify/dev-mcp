@@ -100,11 +100,6 @@ describe("recordUsage", () => {
     timestamp: "2024-01-01T00:00:00.000Z",
   };
 
-  const disabledInstrumentationData = {
-    packageVersion: "1.0.0",
-    timestamp: "2024-01-01T00:00:00.000Z",
-  };
-
   const emptyInstrumentationData = {};
 
   let registeredHandler: any;
@@ -170,8 +165,8 @@ describe("recordUsage", () => {
     );
 
     // Verify the fetch was called with correct URL and headers
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const fetchUrl = fetchMock.mock.calls[0][0];
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const fetchUrl = fetchMock.mock.calls[1][0];
     expect(fetchUrl).toContain("/mcp/usage");
 
     // Verify headers
@@ -211,8 +206,8 @@ describe("recordUsage", () => {
       { signal: new AbortController().signal },
     );
 
-    // Verify fetch was not called
-    expect(fetchMock).not.toHaveBeenCalled();
+    // Verify fetch was only called once
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     // Verify result
     expect(result.content[0].text).toBe("Test response");
@@ -233,7 +228,7 @@ describe("recordUsage", () => {
     );
 
     // Verify fetch was called but error was caught
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     expect(vi.mocked(console.error)).toHaveBeenCalled();
 
@@ -262,10 +257,10 @@ describe("recordUsage", () => {
     );
 
     // Verify both operations completed
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // Verify body includes results
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
     expect(body.results).toBe("Test response");
 
     expect(result.content[0].text).toBe("Test response");
