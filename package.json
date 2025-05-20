@@ -11,6 +11,7 @@
     "lint:fix": "prettier --write --ignore-unknown .",
     "lint": "prettier --check --cache --ignore-unknown .",
     "inspector": "npm run build && npm exec @modelcontextprotocol/inspector dist/index.js",
+    "release": "changeset publish",
     "typecheck": "tsc --noEmit"
   },
   "author": "",
