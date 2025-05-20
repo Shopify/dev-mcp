@@ -210,11 +210,8 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   );
 
   const gettingStartedApis = await fetchGettingStartedApis();
-  const filteredApis = !process.env.POLARIS_UNIFIED
-    ? gettingStartedApis.filter((api) => api.name !== "app-ui")
-    : gettingStartedApis;
 
-  const gettingStartedApiNames = filteredApis.map((api) => api.name);
+  const gettingStartedApiNames = gettingStartedApis.map((api) => api.name);
 
   server.tool(
     "get_started",
@@ -222,7 +219,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     YOU MUST CALL THIS TOOL FIRST WHENEVER YOU ARE IN A SHOPIFY APP AND THE USER WANTS TO LEARN OR INTERACT WITH ANY OF THESE APIS:
 
     Valid arguments for \`api\` are:
-${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
+${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
 
     DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE.
     PREFER THE USE OF THE fetch_docs_by_path TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
@@ -280,6 +277,9 @@ ${filteredApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
 async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
   try {
     const url = new URL("/mcp/getting_started_apis", SHOPIFY_BASE_URL);
+    if (process.env.POLARIS_UNIFIED) {
+      url.searchParams.append("polaris_unified", "true");
+    }
 
     console.error(`[api-information] Making GET request to: ${url.toString()}`);
 
