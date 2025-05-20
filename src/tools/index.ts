@@ -216,6 +216,8 @@ export async function shopifyTools(server: McpServer): Promise<void> {
 
   const gettingStartedApiNames = filteredApis.map((api) => api.name);
 
+  console.log(gettingStartedApiNames);
+
   server.tool(
     "get_started",
     `
