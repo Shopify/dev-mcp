@@ -42,6 +42,24 @@ On Windows, you might need to use this alternative configuration:
 }
 ```
 
+### Disable instrumentation
+
+In order to better understand how to improve the MCP server, this package makes instrumentation calls. In order to disable them you can set the `OPT_OUT_INSTRUMENTATION` environment variable. In Cursor or Claude Desktop the configuration would look like this:
+
+```json
+{
+  "mcpServers": {
+    "shopify-dev-mcp": {
+      "command": "npx",
+      "args": ["-y", "@shopify/dev-mcp@latest"],
+      "env": {
+        "OPT_OUT_INSTRUMENTATION": "true"
+      }
+    }
+  }
+}
+```
+
 ### Opt-in Polaris support (experimental)
 
 If you want Cursor or Claude Desktop to surface Polaris Web Components documentation, include an `env` block with the `POLARIS_UNIFIED` flag in your MCP server configuration:
