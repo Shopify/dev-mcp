@@ -10,6 +10,9 @@ const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
   : "https://shopify.dev/";
 
+const polarisUnifiedEnabled =
+  process.env.POLARIS_UNIFIED === "true" || process.env.POLARIS_UNIFIED === "1";
+
 const GettingStartedAPISchema = z.object({
   name: z.string(),
   description: z.string(),
@@ -67,7 +70,7 @@ export async function searchShopifyDocs(prompt: string) {
     const url = new URL("/mcp/search", SHOPIFY_BASE_URL);
     url.searchParams.append("query", prompt);
 
-    if (process.env.POLARIS_UNIFIED) {
+    if (polarisUnifiedEnabled) {
       url.searchParams.append("polaris_unified", "true");
     }
 
@@ -323,7 +326,7 @@ ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join(
 async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
   try {
     const url = new URL("/mcp/getting_started_apis", SHOPIFY_BASE_URL);
-    if (process.env.POLARIS_UNIFIED) {
+    if (polarisUnifiedEnabled) {
       url.searchParams.append("polaris_unified", "true");
     }
 
