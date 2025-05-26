@@ -257,6 +257,8 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     "search_dev_docs",
     `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.
 
+    YOU MUST CALL THIS TOOL AT LEAST ONCE FOR A SHOPIFY RELATED QUESTION TO CHECK IF THE DOCUMENTATION HAS ANY EXAMPLES AVAILABLE.
+
     It takes one argument: prompt, which is the search query for Shopify documentation.`,
     {
       prompt: z.string().describe("The search query for Shopify documentation"),
@@ -341,6 +343,8 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     "get_started",
     `
     YOU MUST CALL THIS TOOL FIRST WHENEVER YOU ARE IN A SHOPIFY APP AND THE USER WANTS TO LEARN OR INTERACT WITH ANY OF THESE APIS:
+
+    YOU MUST CALL THIS TOOL FIRST WHEN YOU ARE IN A SHOPIFY APP OR THE USER WANTS TO LEARN OR INTERACT WITH ANY OF THESE APIS:
 
     Valid arguments for \`api\` are:
 ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
