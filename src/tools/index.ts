@@ -6,12 +6,15 @@ import {
   isInstrumentationDisabled,
 } from "../instrumentation.js";
 
-const SHOPIFY_BASE_URL = process.env.DEV
-  ? "https://shopify-dev.myshopify.io/"
-  : "https://shopify.dev/";
+const SHOPIFY_BASE_URL =
+  process.env.DEV || process.argv.includes("--dev")
+    ? "https://shopify-dev.myshopify.io/"
+    : "https://shopify.dev/";
 
 const polarisUnifiedEnabled =
-  process.env.POLARIS_UNIFIED === "true" || process.env.POLARIS_UNIFIED === "1";
+  process.env.POLARIS_UNIFIED === "true" ||
+  process.env.POLARIS_UNIFIED === "1" ||
+  process.argv.includes("--polaris-unified");
 
 const GettingStartedAPISchema = z.object({
   name: z.string(),
