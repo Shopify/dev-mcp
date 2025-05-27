@@ -141,6 +141,23 @@ export const formatSchemaType = (item: any): string => {
       } more input fields`;
     }
   }
+  // For ENUM types, list enum values
+  else if (
+    item.kind === "ENUM" &&
+    item.enumValues &&
+    item.enumValues.length > 0
+  ) {
+    result += "\n  Enum Values:";
+    for (const value of item.enumValues) {
+      result += `\n    ${value.name}`;
+      if (value.isDeprecated) {
+        result += ` @deprecated`;
+        if (value.deprecationReason) {
+          result += ` (${value.deprecationReason})`;
+        }
+      }
+    }
+  }
   // For regular object types, use fields
   else if (item.fields && item.fields.length > 0) {
     result += "\n  Fields:";
