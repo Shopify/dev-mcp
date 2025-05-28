@@ -5,6 +5,7 @@ import {
   instrumentationData,
   isInstrumentationDisabled,
 } from "../instrumentation.js";
+import { addCliTools } from "./shopify-cli.js";
 
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
@@ -317,6 +318,8 @@ ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join(
       }
     },
   );
+
+  addCliTools(server);
 }
 
 /**
