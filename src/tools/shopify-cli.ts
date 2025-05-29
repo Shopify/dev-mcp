@@ -1,35 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { request, gql } from "graphql-request";
-import { execa } from "execa";
 import path from "node:path";
 import fs from "node:fs/promises";
-
-function fakeAppStatus() {
-  return {
-    cursor: "234567865",
-    logs: [
-      [
-        "2025-05-28T11:00:00.000Z",
-        "function",
-        "<something about the function building>",
-      ],
-      ["2025-05-28T12:00:00.000Z", "dev-session", "App configuration is valid"],
-    ],
-    status: "READY",
-    graphiqlUrl: "https://shopify-dev.myshopify.io/admin/graphiql",
-    previewUrl: "https://shopify-dev.myshopify.io/admin/graphiql",
-    manifest: {
-      "shopify-extensions": [
-        {
-          name: "Shopify CLI",
-          version: "1.0.0",
-          status: "READY",
-        },
-      ],
-    },
-  };
-}
 
 export function addCliTools(server: McpServer) {
   server.tool(

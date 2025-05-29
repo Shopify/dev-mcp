@@ -1,6 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+import {
+  searchShopifyAdminSchema,
+  validateShopifyAdminGraphQLQuery,
+} from "./shopify-admin-schema.js";
 import {
   instrumentationData,
   isInstrumentationDisabled,
@@ -171,6 +174,37 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             text: result.success
               ? result.responseText
               : `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "validate_admin_graphql",
+    "This tool validates a GraphQL query against the Shopify Admin API schema, ensuring its total accuracy. Use this to ensure ALL graphql Admin API queries you construct are valid prior to running them.",
+    {
+      query: z.string().describe("The GraphQL query to validate"),
+    },
+    async ({ query }) => {
+      const result = await validateShopifyAdminGraphQLQuery(query);
+
+      if (result.success) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: result.responseText,
+            },
+          ],
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.responseText,
           },
         ],
       };
