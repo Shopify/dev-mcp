@@ -242,6 +242,10 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     async ({ code }) => {
       const result = await validateShopifyGraphQL(code);
 
+      recordUsage("validate_graphql", code, result.formattedText).catch(
+        () => {},
+      );
+
       return {
         content: [
           {
