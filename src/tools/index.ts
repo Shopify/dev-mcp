@@ -346,9 +346,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "get_started",
     `
-    YOU MUST CALL THIS TOOL FIRST WHENEVER YOU ARE IN A SHOPIFY APP AND THE USER WANTS TO LEARN OR INTERACT WITH ANY OF THESE APIS:
-
-    YOU MUST CALL THIS TOOL FIRST WHEN YOU ARE IN A SHOPIFY APP OR THE USER WANTS TO LEARN OR INTERACT WITH ANY OF THESE APIS:
+    YOU MUST CALL THIS TOOL FIRST WHENEVER YOU ARE IN A SHOPIFY APP AND/OR THE USER WANTS TO LEARN OR INTERACT WITH ANY OF THESE APIS:
 
     Valid arguments for \`api\` are:
 ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
