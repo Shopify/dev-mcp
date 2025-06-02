@@ -4,105 +4,8 @@ import {
   formatValidationErrors,
 } from "./shopify-graphql-validation.js";
 import { GraphQLError } from "graphql";
-import * as adminSchema from "./shopify-admin-schema.js";
-
-// Mock the schema loading function
-vi.mock("./shopify-admin-schema.js", () => {
-  return {
-    SCHEMA_FILE_PATH: "mock-path",
-    loadSchemaContent: vi.fn(),
-  };
-});
-
-// Mock the graphql module
-vi.mock("graphql", async () => {
-  const actual = await vi.importActual("graphql");
-  return {
-    ...actual,
-    buildClientSchema: vi.fn(),
-    parse: vi.fn(),
-    validate: vi.fn(),
-  };
-});
-
-import { buildClientSchema, parse, validate } from "graphql";
 
 describe("GraphQL validation", () => {
-  // Sample schema with basic types for testing
-  const mockSchema = JSON.stringify({
-    data: {
-      __schema: {
-        queryType: {
-          name: "QueryRoot",
-        },
-        types: [
-          {
-            kind: "OBJECT",
-            name: "QueryRoot",
-            fields: [
-              {
-                name: "product",
-                args: [
-                  {
-                    name: "id",
-                    type: {
-                      kind: "NON_NULL",
-                      ofType: {
-                        kind: "SCALAR",
-                        name: "ID",
-                      },
-                    },
-                  },
-                ],
-                type: {
-                  kind: "OBJECT",
-                  name: "Product",
-                },
-              },
-            ],
-          },
-          {
-            kind: "OBJECT",
-            name: "Product",
-            fields: [
-              {
-                name: "id",
-                type: {
-                  kind: "NON_NULL",
-                  ofType: {
-                    kind: "SCALAR",
-                    name: "ID",
-                  },
-                },
-              },
-              {
-                name: "title",
-                type: {
-                  kind: "SCALAR",
-                  name: "String",
-                },
-              },
-            ],
-          },
-        ],
-      },
-    },
-  });
-
-  const mockSchemaObject = {};
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-
-    // Set up mocks
-    vi.mocked(adminSchema.loadSchemaContent).mockResolvedValue(mockSchema);
-    vi.mocked(buildClientSchema).mockReturnValue(mockSchemaObject as any);
-    vi.mocked(parse).mockReturnValue({} as any);
-
-    // Default to no validation errors
-    vi.mocked(validate).mockReturnValue([]);
-  });
-
   test("validates a correct GraphQL query", async () => {
     const validQuery = `
       query GetProduct {
@@ -117,12 +20,6 @@ describe("GraphQL validation", () => {
 
     expect(result.isValid).toBe(true);
     expect(result.errors).toBeUndefined();
-
-    // Verify the right functions were called
-    expect(adminSchema.loadSchemaContent).toHaveBeenCalledWith("mock-path");
-    expect(buildClientSchema).toHaveBeenCalled();
-    expect(parse).toHaveBeenCalledWith(validQuery);
-    expect(validate).toHaveBeenCalled();
   });
 
   test("reports errors for invalid fields", async () => {
@@ -136,20 +33,12 @@ describe("GraphQL validation", () => {
       }
     `;
 
-    // Mock validation errors
-    const mockError = new GraphQLError(
-      'Cannot query field "nonExistentField" on type "Product"',
-    );
-    vi.mocked(validate).mockReturnValue([mockError]);
-
     const result = await validateGraphQL(invalidQuery);
 
     expect(result.isValid).toBe(false);
     expect(result.errors).toBeDefined();
-    expect(result.errors?.length).toBe(1);
-    expect(result.errors?.[0].message).toMatch(
-      /Cannot query field "nonExistentField"/,
-    );
+    expect(result.errors?.length).toBeGreaterThan(0);
+    expect(result.errors?.[0].message).toMatch(/Cannot query field/);
   });
 
   test("reports errors for missing required arguments", async () => {
@@ -162,20 +51,12 @@ describe("GraphQL validation", () => {
       }
     `;
 
-    // Mock validation errors
-    const mockError = new GraphQLError(
-      'Field "product" argument "id" of type "ID!" is required',
-    );
-    vi.mocked(validate).mockReturnValue([mockError]);
-
     const result = await validateGraphQL(invalidQuery);
 
     expect(result.isValid).toBe(false);
     expect(result.errors).toBeDefined();
-    expect(result.errors?.length).toBe(1);
-    expect(result.errors?.[0].message).toMatch(
-      /Field "product" argument "id" of type "ID!" is required/,
-    );
+    expect(result.errors?.length).toBeGreaterThan(0);
+    expect(result.errors?.[0].message).toMatch(/argument.*is required/);
   });
 
   test("handles syntax errors in GraphQL", async () => {
@@ -187,35 +68,174 @@ describe("GraphQL validation", () => {
         // Missing closing brace
     `;
 
-    // Mock parse to throw a syntax error
-    vi.mocked(parse).mockImplementation(() => {
-      throw new GraphQLError("Syntax Error: Expected '}', found <EOF>");
-    });
-
     const result = await validateGraphQL(invalidSyntax);
 
     expect(result.isValid).toBe(false);
     expect(result.errors).toBeDefined();
     expect(result.errors?.length).toBe(1);
     expect(result.errors?.[0].message).toMatch(
-      /GraphQL validation error: Syntax Error/,
+      /Syntax Error|GraphQL validation error/,
     );
   });
 
-  test("handles schema loading errors", async () => {
-    // Mock schema loading failure
-    vi.mocked(adminSchema.loadSchemaContent).mockRejectedValue(
-      new Error("Schema not found"),
-    );
+  test("validates mutations correctly", async () => {
+    const mutation = `
+      mutation CreateProduct($input: ProductCreateInput!) {
+        productCreate(product: $input) {
+          product {
+            id
+            title
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
 
-    const query = `query { product(id: "123") { title } }`;
+    const result = await validateGraphQL(mutation);
 
-    const result = await validateGraphQL(query);
+    expect(result.isValid).toBe(true);
+    expect(result.errors).toBeUndefined();
+  });
+
+  test("handles multiple operations in one document", async () => {
+    const multipleOps = `
+      query GetProduct($id: ID!) {
+        product(id: $id) {
+          title
+        }
+      }
+
+      query GetShop {
+        shop {
+          name
+        }
+      }
+    `;
+
+    const result = await validateGraphQL(multipleOps);
+
+    expect(result.isValid).toBe(true);
+    expect(result.errors).toBeUndefined();
+  });
+
+  test("validates fragments correctly", async () => {
+    const queryWithFragment = `
+      fragment ProductFields on Product {
+        id
+        title
+        description
+      }
+
+      query GetProduct($id: ID!) {
+        product(id: $id) {
+          ...ProductFields
+        }
+      }
+    `;
+
+    const result = await validateGraphQL(queryWithFragment);
+
+    expect(result.isValid).toBe(true);
+    expect(result.errors).toBeUndefined();
+  });
+
+  test("handles empty or whitespace-only input", async () => {
+    const emptyQuery = "   \n   \n   ";
+
+    const result = await validateGraphQL(emptyQuery);
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors?.[0].message).toMatch(/Syntax Error|Expected/);
+  });
+
+  test("reports multiple validation errors", async () => {
+    const queryWithMultipleErrors = `
+      query BadQuery {
+        product(wrongArg: "123") {
+          nonExistentField1
+          nonExistentField2
+        }
+        nonExistentQuery {
+          field
+        }
+      }
+    `;
+
+    const result = await validateGraphQL(queryWithMultipleErrors);
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toBeDefined();
+    expect(result.errors!.length).toBeGreaterThan(1);
+  });
+
+  test("validates complex nested queries", async () => {
+    const complexQuery = `
+      query GetProductWithVariants($id: ID!) {
+        product(id: $id) {
+          id
+          title
+          variants(first: 10) {
+            edges {
+              node {
+                id
+                title
+                price
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const result = await validateGraphQL(complexQuery);
+
+    expect(result.isValid).toBe(true);
+    expect(result.errors).toBeUndefined();
+  });
+
+  test("validates queries with directives", async () => {
+    const queryWithDirectives = `
+      query GetProductConditional($id: ID!, $includeVariants: Boolean!) {
+        product(id: $id) {
+          id
+          title
+          variants(first: 10) @include(if: $includeVariants) {
+            edges {
+              node {
+                id
+                title
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const result = await validateGraphQL(queryWithDirectives);
+
+    expect(result.isValid).toBe(true);
+    expect(result.errors).toBeUndefined();
+  });
+
+  test("reports errors for incorrect variable types", async () => {
+    const queryWithWrongVarType = `
+      query GetProduct($id: String!) {
+        product(id: $id) {
+          id
+          title
+        }
+      }
+    `;
+
+    const result = await validateGraphQL(queryWithWrongVarType);
 
     expect(result.isValid).toBe(false);
     expect(result.errors).toBeDefined();
     expect(result.errors?.[0].message).toMatch(
-      /GraphQL validation error: Schema not found/,
+      /Variable.*used in position expecting type/,
     );
   });
 });

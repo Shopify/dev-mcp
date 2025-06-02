@@ -762,3 +762,78 @@ describe("get_started tool behavior", () => {
     expect(result.content[0].text).toContain("Network failure");
   });
 });
+
+describe("shopifyTools tool registration", () => {
+  let mockServer: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Setup fetch mock for getting_started_apis endpoint
+    const fetchMock = global.fetch as any;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        forEach: (callback: (value: string, key: string) => void) => {
+          callback("application/json", "content-type");
+        },
+      },
+      text: async () => JSON.stringify(sampleGettingStartedApisResponse),
+    });
+
+    // Create a mock server that captures registered tools
+    mockServer = {
+      registeredTools: new Map(),
+      tool: vi.fn((name, description, schema, handler) => {
+        mockServer.registeredTools.set(name, { description, schema, handler });
+      }),
+    };
+  });
+
+  test("registers validate_graphql tool correctly", async () => {
+    // Import and register tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Verify the validate_graphql tool was registered
+    expect(mockServer.registeredTools.has("validate_graphql")).toBe(true);
+
+    const tool = mockServer.registeredTools.get("validate_graphql");
+    expect(tool).toBeDefined();
+    expect(tool.description).toContain("validates GraphQL code");
+    expect(tool.description).toContain(
+      "ALWAYS MAKE SURE THAT THE GRAPHQL CODE YOU GENERATE IS VALID",
+    );
+
+    // Verify the handler function exists
+    expect(tool.handler).toBeDefined();
+    expect(typeof tool.handler).toBe("function");
+  });
+
+  test("validate_graphql tool executes correctly", async () => {
+    // Mock the validation functions
+    vi.mocked(validateGraphQL).mockResolvedValue({
+      isValid: true,
+      errors: undefined,
+    });
+
+    // Import and register tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Get the handler
+    const tool = mockServer.registeredTools.get("validate_graphql");
+    const handler = tool.handler;
+
+    // Execute the handler
+    const result = await handler({ code: "query { shop { name } }" });
+
+    // Verify the result
+    expect(result.content).toBeDefined();
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toContain("## GraphQL Validation Results");
+    expect(result.content[0].text).toContain("✅ Yes");
+  });
+});
