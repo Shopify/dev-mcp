@@ -371,7 +371,10 @@ ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join(
 
       try {
         const response = await fetch(
-          `${SHOPIFY_BASE_URL}/mcp/getting_started?api=${api}`,
+          new URL(
+            `/mcp/getting_started?api=${api}`,
+            SHOPIFY_BASE_URL,
+          ).toString(),
         );
 
         if (!response.ok) {
