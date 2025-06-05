@@ -8,15 +8,38 @@ import {
   afterAll,
   afterEach,
 } from "vitest";
+import { GraphQLError } from "graphql";
 
 global.fetch = vi.fn();
 
-import { shopifyTools, searchShopifyDocs } from "./index.js";
 import {
   instrumentationData,
   isInstrumentationDisabled,
 } from "../instrumentation.js";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+
+// Mock the graphql validation
+vi.mock("./shopify-graphql-validation.js", () => {
+  return {
+    validateGraphQL: vi.fn(),
+    formatValidationErrors: vi.fn((errors: Array<{ message: string }>) => {
+      return errors
+        .map((error, index: number) => `${index + 1}. ${error.message}`)
+        .join("\n");
+    }),
+  };
+});
+
+// Now import the modules to test
+import {
+  searchShopifyDocs,
+  validateShopifyGraphQL,
+  shopifyTools,
+} from "./index.js";
+import {
+  validateGraphQL,
+  formatValidationErrors,
+} from "./shopify-graphql-validation.js";
 
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
@@ -268,6 +291,32 @@ describe("recordUsage", () => {
   });
 });
 
+// Prepare mock validation results
+const validResult = {
+  isValid: true,
+  errors: undefined,
+};
+
+// Create actual GraphQLError instances for the invalid result
+const graphqlError1 = new GraphQLError(
+  "Cannot query field 'invalid' on type 'Product'",
+);
+const graphqlError2 = new GraphQLError("Unknown type 'NonExistentType'");
+
+// Add locations manually
+Object.defineProperty(graphqlError1, "locations", {
+  value: [{ line: 3, column: 5 }],
+});
+
+Object.defineProperty(graphqlError2, "locations", {
+  value: [{ line: 7, column: 10 }],
+});
+
+const invalidResult = {
+  isValid: false,
+  errors: [graphqlError1, graphqlError2],
+};
+
 describe("searchShopifyDocs", () => {
   let fetchMock: any;
 
@@ -412,6 +461,110 @@ describe("searchShopifyDocs", () => {
 
     expect(result.success).toBe(true);
     expect(result.formattedText).toBe('{\n  "data": "test"\n}');
+  });
+});
+
+describe("validateShopifyGraphQL", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Default mock for validateGraphQL
+    vi.mocked(validateGraphQL).mockResolvedValue(validResult);
+    vi.mocked(console.error).mockClear();
+  });
+
+  test("calls local validateGraphQL function with correct code", async () => {
+    const graphqlCode = `
+      query GetProduct {
+        product(id: "gid://shopify/Product/123") {
+          title
+          description
+        }
+      }
+    `;
+
+    await validateShopifyGraphQL(graphqlCode);
+
+    // Verify validateGraphQL was called with the code
+    expect(validateGraphQL).toHaveBeenCalledTimes(1);
+    expect(validateGraphQL).toHaveBeenCalledWith(graphqlCode);
+  });
+
+  test("returns properly formatted result for valid GraphQL", async () => {
+    const graphqlCode = `query { product(id: "123") { title } }`;
+
+    const result = await validateShopifyGraphQL(graphqlCode);
+
+    expect(result.success).toBe(true);
+    expect(result.isValid).toBe(true);
+    expect(result.formattedText).toContain("## GraphQL Validation Results");
+    expect(result.formattedText).toContain("**Valid:** ✅ Yes");
+    expect(result.rawResponse).toEqual({ is_valid: true, errors: undefined });
+  });
+
+  test("returns properly formatted result for invalid GraphQL with errors", async () => {
+    // Mock an invalid validation result
+    vi.mocked(validateGraphQL).mockResolvedValue(invalidResult);
+
+    // Mock formatValidationErrors to return formatted errors
+    vi.mocked(formatValidationErrors).mockReturnValue(
+      "1. Cannot query field 'invalid' on type 'Product' (Line 3, Column 5)\n" +
+        "2. Unknown type 'NonExistentType' (Line 7, Column 10)",
+    );
+
+    const graphqlCode = `
+      query GetProduct {
+        product(id: "gid://shopify/Product/123") {
+          invalid
+          title
+          someType {
+            field: NonExistentType
+          }
+        }
+      }
+    `;
+
+    const result = await validateShopifyGraphQL(graphqlCode);
+
+    expect(result.success).toBe(true);
+    expect(result.isValid).toBe(false);
+    expect(result.formattedText).toContain("## GraphQL Validation Results");
+    expect(result.formattedText).toContain("**Valid:** ❌ No");
+    expect(result.formattedText).toContain("**Errors:**");
+    expect(result.formattedText).toContain(
+      "Cannot query field 'invalid' on type 'Product'",
+    );
+    expect(result.formattedText).toContain("Unknown type 'NonExistentType'");
+
+    // Verify formatValidationErrors was called with the errors
+    expect(formatValidationErrors).toHaveBeenCalledTimes(1);
+    expect(formatValidationErrors).toHaveBeenCalledWith(invalidResult.errors);
+  });
+
+  test("handles validation errors gracefully", async () => {
+    // Clear mocks before this specific test
+    vi.clearAllMocks();
+
+    // Mock a validation function error
+    vi.mocked(validateGraphQL).mockRejectedValue(
+      new Error("Validation function failed"),
+    );
+
+    const graphqlCode = "query { invalid syntax }";
+
+    const result = await validateShopifyGraphQL(graphqlCode);
+
+    expect(result.success).toBe(false);
+    expect(result.isValid).toBe(false);
+    expect(result.formattedText).toContain(
+      "Error validating GraphQL: Validation function failed",
+    );
+
+    // Verify error was logged once
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(console.error).mock.calls[0][0]).toContain(
+      "Error validating GraphQL",
+    );
   });
 });
 
@@ -607,5 +760,80 @@ describe("get_started tool behavior", () => {
       "Error fetching getting started information",
     );
     expect(result.content[0].text).toContain("Network failure");
+  });
+});
+
+describe("shopifyTools tool registration", () => {
+  let mockServer: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Setup fetch mock for getting_started_apis endpoint
+    const fetchMock = global.fetch as any;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        forEach: (callback: (value: string, key: string) => void) => {
+          callback("application/json", "content-type");
+        },
+      },
+      text: async () => JSON.stringify(sampleGettingStartedApisResponse),
+    });
+
+    // Create a mock server that captures registered tools
+    mockServer = {
+      registeredTools: new Map(),
+      tool: vi.fn((name, description, schema, handler) => {
+        mockServer.registeredTools.set(name, { description, schema, handler });
+      }),
+    };
+  });
+
+  test("registers validate_graphql tool correctly", async () => {
+    // Import and register tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Verify the validate_graphql tool was registered
+    expect(mockServer.registeredTools.has("validate_graphql")).toBe(true);
+
+    const tool = mockServer.registeredTools.get("validate_graphql");
+    expect(tool).toBeDefined();
+    expect(tool.description).toContain("validates GraphQL code");
+    expect(tool.description).toContain(
+      "ALWAYS MAKE SURE THAT THE GRAPHQL CODE YOU GENERATE IS VALID",
+    );
+
+    // Verify the handler function exists
+    expect(tool.handler).toBeDefined();
+    expect(typeof tool.handler).toBe("function");
+  });
+
+  test("validate_graphql tool executes correctly", async () => {
+    // Mock the validation functions
+    vi.mocked(validateGraphQL).mockResolvedValue({
+      isValid: true,
+      errors: undefined,
+    });
+
+    // Import and register tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Get the handler
+    const tool = mockServer.registeredTools.get("validate_graphql");
+    const handler = tool.handler;
+
+    // Execute the handler
+    const result = await handler({ code: "query { shop { name } }" });
+
+    // Verify the result
+    expect(result.content).toBeDefined();
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toContain("## GraphQL Validation Results");
+    expect(result.content[0].text).toContain("✅ Yes");
   });
 });

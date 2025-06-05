@@ -6,6 +6,11 @@ import {
   isInstrumentationDisabled,
 } from "../instrumentation.js";
 
+import {
+  validateGraphQL,
+  formatValidationErrors,
+} from "./shopify-graphql-validation.js";
+
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
   : "https://shopify.dev/";
@@ -136,6 +141,54 @@ export async function searchShopifyDocs(prompt: string) {
   }
 }
 
+/**
+ * Validates GraphQL code against the Shopify Admin API schema
+ * @param code The GraphQL code to validate
+ * @returns Validation results including whether the code is valid and any errors
+ */
+export async function validateShopifyGraphQL(code: string) {
+  try {
+    // Use the local validation function
+    const validationResult = await validateGraphQL(code);
+
+    // Format the response
+    let formattedResponse = `## GraphQL Validation Results\n\n`;
+    formattedResponse += `**Valid:** ${validationResult.isValid ? "✅ Yes" : "❌ No"}\n\n`;
+
+    // Add errors if any
+    if (
+      !validationResult.isValid &&
+      validationResult.errors &&
+      validationResult.errors.length > 0
+    ) {
+      formattedResponse += `**Errors:**\n\n`;
+      formattedResponse += formatValidationErrors(validationResult.errors);
+    }
+
+    return {
+      success: true,
+      isValid: validationResult.isValid,
+      formattedText: formattedResponse,
+      rawResponse: {
+        is_valid: validationResult.isValid,
+        errors: validationResult.errors,
+      },
+    };
+  } catch (error) {
+    // Log the error once
+    console.error(`[validate-graphql] Error validating GraphQL: ${error}`);
+
+    return {
+      success: false,
+      isValid: false,
+      formattedText: `Error validating GraphQL: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "introspect_admin_schema",
@@ -177,8 +230,38 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   );
 
   server.tool(
+    "validate_graphql",
+    `This tool validates GraphQL code against the Shopify Admin API GraphQL schema and returns validation results including any errors.
+    ALWAYS MAKE SURE THAT THE GRAPHQL CODE YOU GENERATE IS VALID WITH THIS TOOL.
+
+    It takes one argument:
+    - code: The GraphQL code to validate`,
+    {
+      code: z.string().describe("The GraphQL code to validate"),
+    },
+    async ({ code }) => {
+      const result = await validateShopifyGraphQL(code);
+
+      recordUsage("validate_graphql", code, result.formattedText).catch(
+        () => {},
+      );
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.formattedText,
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
     "search_dev_docs",
     `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.
+
+    YOU MUST CALL THIS TOOL AT LEAST ONCE FOR A SHOPIFY RELATED QUESTION TO CHECK IF THE DOCUMENTATION HAS ANY EXAMPLES AVAILABLE.
 
     It takes one argument: prompt, which is the search query for Shopify documentation.`,
     {
@@ -263,7 +346,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "get_started",
     `
-    YOU MUST CALL THIS TOOL FIRST WHENEVER YOU ARE IN A SHOPIFY APP AND THE USER WANTS TO LEARN OR INTERACT WITH ANY OF THESE APIS:
+    YOU MUST CALL THIS TOOL FIRST WHENEVER YOU ARE IN A SHOPIFY APP AND/OR THE USER WANTS TO LEARN OR INTERACT WITH ANY OF THESE APIS:
 
     Valid arguments for \`api\` are:
 ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
@@ -282,13 +365,16 @@ ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join(
         const text = `Please specify which Shopify API you are building for. Valid options are: ${options}.`;
 
         return {
-          content: [{ type: "text", text }],
+          content: [{ type: "text" as const, text }],
         };
       }
 
       try {
         const response = await fetch(
-          `${SHOPIFY_BASE_URL}/mcp/getting_started?api=${api}`,
+          new URL(
+            `/mcp/getting_started?api=${api}`,
+            SHOPIFY_BASE_URL,
+          ).toString(),
         );
 
         if (!response.ok) {
