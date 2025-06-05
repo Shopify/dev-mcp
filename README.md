@@ -28,6 +28,7 @@ Add the following configuration. For more information, read the [Cursor MCP docu
   }
 }
 ```
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0In0%3D)   
 
 On Windows, you might need to use this alternative configuration:
 
@@ -41,6 +42,7 @@ On Windows, you might need to use this alternative configuration:
   }
 }
 ```
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoiY21kIC9rIG5weCAteSBAc2hvcGlmeS9kZXYtbWNwQGxhdGVzdCJ9)
 
 ### Disable instrumentation
 
@@ -59,6 +61,7 @@ In order to better understand how to improve the MCP server, this package makes 
   }
 }
 ```
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0IiwiZW52Ijp7Ik9QVF9PVVRfSU5TVFJVTUVOVEFUSU9OIjoidHJ1ZSJ9fQ%3D%3D)
 
 ### Opt-in Polaris support (experimental)
 
@@ -77,6 +80,7 @@ If you want Cursor or Claude Desktop to surface Polaris Web Components documenta
   }
 }
 ```
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0IiwiZW52Ijp7IlBPTEFSSVNfVU5JRklFRCI6InRydWUifX0%3D)
 
 ## Available tools
 
