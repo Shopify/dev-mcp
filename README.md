@@ -6,6 +6,10 @@ This project implements a Model Context Protocol (MCP) server that interacts wit
 - Functions
 - (Optional) Polaris Web Components
 
+<a href="https://glama.ai/mcp/servers/@Shopify/dev-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@Shopify/dev-mcp/badge" alt="Shopify Dev MCP server" />
+</a>
+
 ## Setup
 
 To run the Shopify MCP server using npx, use the following command:
@@ -64,7 +68,7 @@ In order to better understand how to improve the MCP server, this package makes 
 }
 ```
 
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0IiwiZW52Ijp7Ik9QVF9PVVRfSU5TVFJVTUVOVEFUSU9OIjoidHJ1ZSJ9fQ%3D%3D)
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0IiwiZW52Ijp7Ik9QVF9PVVRfSU5TVFJVTUVENTEUSU9OCI6InRydWUifX0%3D)
 
 ### Opt-in Polaris support (experimental)
 
