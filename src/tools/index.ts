@@ -1,10 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+import {
+  searchShopifyAdminSchema,
+  validateShopifyAdminGraphQLQuery,
+} from "./shopify-admin-schema.js";
 import {
   instrumentationData,
   isInstrumentationDisabled,
 } from "../instrumentation.js";
+import { addCliTools } from "./shopify-cli.js";
 
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
@@ -177,6 +181,37 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   );
 
   server.tool(
+    "validate_admin_graphql",
+    "This tool validates a GraphQL query against the Shopify Admin API schema, ensuring its total accuracy. Use this to ensure ALL graphql Admin API queries you construct are valid prior to running them.",
+    {
+      query: z.string().describe("The GraphQL query to validate"),
+    },
+    async ({ query }) => {
+      const result = await validateShopifyAdminGraphQLQuery(query);
+
+      if (result.success) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: result.responseText,
+            },
+          ],
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.responseText,
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
     "search_dev_docs",
     `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.
 
@@ -317,6 +352,8 @@ ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join(
       }
     },
   );
+
+  addCliTools(server);
 }
 
 /**
