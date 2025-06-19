@@ -62,13 +62,25 @@ async function recordUsage(toolName: string, parameters: string, result: any) {
  * @param prompt The search query for Shopify documentation
  * @returns The formatted response or error message
  */
-export async function searchShopifyDocs(prompt: string) {
+export async function searchShopifyDocs(
+  prompt: string,
+  document_type?: string,
+  operation_type?: string,
+) {
   try {
     const instrumentation = instrumentationData();
 
     // Prepare the URL with query parameters
     const url = new URL("/mcp/search", SHOPIFY_BASE_URL);
     url.searchParams.append("query", prompt);
+
+    if (document_type) {
+      url.searchParams.append("doc_type", document_type);
+    }
+
+    if (operation_type) {
+      url.searchParams.append("operation_type", operation_type);
+    }
 
     if (polarisUnifiedEnabled) {
       url.searchParams.append("polaris_unified", "true");
@@ -180,12 +192,35 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     "search_dev_docs",
     `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.
 
-    It takes one argument: prompt, which is the search query for Shopify documentation.`,
+    It takes one argument: prompt, document_type and operation_type. prompt is the search query for Shopify documentation, document_type is the type of document to search for, and operation_type is the GraphQL operation type to search for. document_type and operation_type are optional.
+
+    Valid document_type values are:
+    - "admin": Shopify Admin API
+    - "functions": Shopify Functions API
+    - "articles": General documentation
+    - "app-ui": UI extensions and components (App home, Admin extensions, Checkout UI, Customer account UI)
+
+    Valid type values are:
+    - "query": GraphQL query
+    - "mutation": GraphQL mutation
+    `,
     {
       prompt: z.string().describe("The search query for Shopify documentation"),
+      document_type: z
+        .enum(["admin", "functions", "articles", "app-ui"])
+        .describe("The type of document to search for")
+        .optional(),
+      operation_type: z
+        .enum(["query", "mutation"])
+        .describe("The GraphQL operation type to search for")
+        .optional(),
     },
-    async ({ prompt }) => {
-      const result = await searchShopifyDocs(prompt);
+    async ({ prompt, document_type, operation_type }) => {
+      const result = await searchShopifyDocs(
+        prompt,
+        document_type,
+        operation_type,
+      );
 
       return {
         content: [
