@@ -1,0 +1,1772 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Polaris Web Components Schema (generated)",
+  "type": "object",
+  "_generatedAt": "2025-06-19T20:17:53.517Z",
+  "_source": "/Users/maxenceparenteau/Developer/admin-ui-foundations/admin-ui-components/src/components",
+  "definitions": {
+    "Badge": {
+      "type": "object",
+      "description": "Badge",
+      "properties": {
+        "tag": {
+          "const": "s-badge"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "color": {
+              "type": "string"
+            },
+            "icon": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string"
+            },
+            "tone": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "color",
+            "icon",
+            "size",
+            "tone"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Banner": {
+      "type": "object",
+      "description": "Banner",
+      "properties": {
+        "tag": {
+          "const": "s-banner"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "bannerTones": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "info",
+                "success",
+                "warning",
+                "critical"
+              ]
+            },
+            "tone": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tone"
+          ]
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "const": [
+            "secondaryActions"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Box": {
+      "type": "object",
+      "description": "Box",
+      "properties": {
+        "tag": {
+          "const": "s-box"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Button": {
+      "type": "object",
+      "description": "Button",
+      "properties": {
+        "tag": {
+          "const": "s-button"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "buttonTones": {
+              "type": "string",
+              "enum": [
+                "neutral",
+                "critical",
+                "auto"
+              ]
+            },
+            "buttonVariants": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary",
+                "tertiary",
+                "auto"
+              ]
+            },
+            "buttonTypes": {
+              "type": "string",
+              "enum": [
+                "button",
+                "submit",
+                "reset"
+              ]
+            },
+            "tone": {
+              "type": "string"
+            },
+            "icon": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tone",
+            "icon"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Checkbox": {
+      "type": "object",
+      "description": "Checkbox",
+      "properties": {
+        "tag": {
+          "const": "s-checkbox"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "indeterminate": {
+              "type": "string"
+            },
+            "defaultIndeterminate": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "indeterminate",
+            "defaultIndeterminate"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Choice": {
+      "type": "object",
+      "description": "Choice",
+      "properties": {
+        "tag": {
+          "const": "s-choice"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "ChoiceList": {
+      "type": "object",
+      "description": "ChoiceList",
+      "properties": {
+        "tag": {
+          "const": "s-choice-list"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "labelAccessibilityVisibilityOptions": {
+              "type": "string",
+              "enum": [
+                "visible",
+                "exclusive"
+              ]
+            }
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Choice"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Clickable": {
+      "type": "object",
+      "description": "Clickable",
+      "properties": {
+        "tag": {
+          "const": "s-clickable"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "clickableTypes": {
+              "type": "string",
+              "enum": [
+                "button",
+                "submit",
+                "reset"
+              ]
+            }
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "DatePicker": {
+      "type": "object",
+      "description": "DatePicker",
+      "properties": {
+        "tag": {
+          "const": "s-date-picker"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "weekDays": {
+              "type": "string",
+              "enum": [
+                "sunday",
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday"
+              ]
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Divider": {
+      "type": "object",
+      "description": "Divider",
+      "properties": {
+        "tag": {
+          "const": "s-divider"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "direction",
+            "color"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "EmailField": {
+      "type": "object",
+      "description": "EmailField",
+      "properties": {
+        "tag": {
+          "const": "s-email-field"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Grid": {
+      "type": "object",
+      "description": "Grid",
+      "properties": {
+        "tag": {
+          "const": "s-grid"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "gridAlignItems": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "stretch",
+                "...baselinePosition",
+                "...overflowPosition",
+                "...contentPosition"
+              ]
+            },
+            "gridJustifyItems": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "stretch",
+                "...baselinePosition",
+                "...overflowPosition",
+                "...contentPosition"
+              ]
+            },
+            "gridAlignContent": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "...baselinePosition",
+                "...contentDistribution",
+                "...overflowPosition",
+                "...contentPosition"
+              ]
+            },
+            "gridJustifyContent": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "...contentDistribution",
+                "...overflowPosition",
+                "...contentPosition"
+              ]
+            },
+            "gap": {
+              "type": "string"
+            },
+            "rowGap": {
+              "type": "string"
+            },
+            "columnGap": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "gap",
+            "rowGap",
+            "columnGap"
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/GridItem"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "GridItem": {
+      "type": "object",
+      "description": "GridItem",
+      "properties": {
+        "tag": {
+          "const": "s-grid-item"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "gridColumn": {
+              "type": "string"
+            },
+            "gridRow": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "gridColumn",
+            "gridRow"
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Box"
+              },
+              {
+                "$ref": "#/definitions/Stack"
+              },
+              {
+                "$ref": "#/definitions/Text"
+              },
+              {
+                "$ref": "#/definitions/Image"
+              },
+              {
+                "$ref": "#/definitions/Button"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Heading": {
+      "type": "object",
+      "description": "Heading",
+      "properties": {
+        "tag": {
+          "const": "s-heading"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "accessibilityRole": {
+              "type": "string"
+            },
+            "accessibilityVisibility": {
+              "type": "string"
+            },
+            "lineClamp": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accessibilityRole",
+            "accessibilityVisibility",
+            "lineClamp"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Icon": {
+      "type": "object",
+      "description": "Icon",
+      "properties": {
+        "tag": {
+          "const": "s-icon"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "iconTypes": {
+              "type": "string",
+              "enum": [
+                "empty",
+                "...(Object.keys(icons) as IconType["
+              ]
+            },
+            "iconColors": {
+              "type": "string",
+              "enum": [
+                "base",
+                "subdued"
+              ]
+            },
+            "iconTones": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "neutral",
+                "info",
+                "success",
+                "warning",
+                "caution",
+                "critical"
+              ]
+            },
+            "iconSizes": {
+              "type": "string",
+              "enum": [
+                "small",
+                "base"
+              ]
+            },
+            "type": {
+              "type": "string"
+            },
+            "tone": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tone",
+            "color",
+            "size"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Image": {
+      "type": "object",
+      "description": "Image",
+      "properties": {
+        "tag": {
+          "const": "s-image"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "imageObjectFits": {
+              "type": "string",
+              "enum": [
+                "contain",
+                "cover"
+              ]
+            },
+            "imageAccessibilityRoles": {
+              "type": "string",
+              "enum": [
+                "img",
+                "presentation",
+                "none"
+              ]
+            },
+            "imageLoading": {
+              "type": "string",
+              "enum": [
+                "eager",
+                "lazy"
+              ]
+            },
+            "imageInlineSizes": {
+              "type": "string",
+              "enum": [
+                "fill",
+                "auto"
+              ]
+            },
+            "border": {
+              "type": "string"
+            },
+            "borderColor": {
+              "type": "string"
+            },
+            "borderRadius": {
+              "type": "string"
+            },
+            "borderStyle": {
+              "type": "string"
+            },
+            "borderWidth": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "border",
+            "borderColor",
+            "borderRadius",
+            "borderStyle",
+            "borderWidth"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Link": {
+      "type": "object",
+      "description": "Link",
+      "properties": {
+        "tag": {
+          "const": "s-link"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "accessibilityLabel": {
+              "type": "string"
+            },
+            "command": {
+              "type": "string"
+            },
+            "commandFor": {
+              "type": "string"
+            },
+            "download": {
+              "type": "string"
+            },
+            "href": {
+              "type": "string"
+            },
+            "lang": {
+              "type": "string"
+            },
+            "target": {
+              "type": "string"
+            },
+            "tone": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accessibilityLabel",
+            "command",
+            "commandFor",
+            "download",
+            "href",
+            "lang",
+            "target",
+            "tone"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "ListItem": {
+      "type": "object",
+      "description": "ListItem",
+      "properties": {
+        "tag": {
+          "const": "s-list-item"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "MoneyField": {
+      "type": "object",
+      "description": "MoneyField",
+      "properties": {
+        "tag": {
+          "const": "s-money-field"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "moneyfieldCurrencyCodes": {
+              "type": "string",
+              "enum": [
+                "USD",
+                "EUR",
+                "GBP",
+                "CAD",
+                "AFN",
+                "ALL",
+                "DZD",
+                "AOA",
+                "ARS",
+                "AMD",
+                "AWG",
+                "AUD",
+                "BBD",
+                "AZN",
+                "BDT",
+                "BSD",
+                "BHD",
+                "BIF",
+                "BZD",
+                "BMD",
+                "BTN",
+                "BAM",
+                "BRL",
+                "BOB",
+                "BWP",
+                "BND",
+                "BGN",
+                "MMK",
+                "KHR",
+                "CVE",
+                "KYD",
+                "XAF",
+                "CLP",
+                "CNY",
+                "COP",
+                "KMF",
+                "CDF",
+                "CRC",
+                "HRK",
+                "CZK",
+                "DKK",
+                "DOP",
+                "XCD",
+                "EGP",
+                "ETB",
+                "XPF",
+                "FJD",
+                "GMD",
+                "GHS",
+                "GTQ",
+                "GYD",
+                "GEL",
+                "HTG",
+                "HNL",
+                "HKD",
+                "HUF",
+                "ISK",
+                "INR",
+                "IDR",
+                "ILS",
+                "IQD",
+                "JMD",
+                "JPY",
+                "JEP",
+                "JOD",
+                "KZT",
+                "KES",
+                "KWD",
+                "KGS",
+                "LAK",
+                "LVL",
+                "LBP",
+                "LSL",
+                "LRD",
+                "LTL",
+                "MGA",
+                "MKD",
+                "MOP",
+                "MWK",
+                "MVR",
+                "MXN",
+                "MYR",
+                "MUR",
+                "MDL",
+                "MAD",
+                "MNT",
+                "MZN",
+                "NAD",
+                "NPR",
+                "ANG",
+                "NZD",
+                "NIO",
+                "NGN",
+                "NOK",
+                "OMR",
+                "PAB",
+                "PKR",
+                "PGK",
+                "PYG",
+                "PEN",
+                "PHP",
+                "PLN",
+                "QAR",
+                "RON",
+                "RUB",
+                "RWF",
+                "WST",
+                "SAR",
+                "RSD",
+                "SCR",
+                "SGD",
+                "SDG",
+                "SYP",
+                "ZAR",
+                "KRW",
+                "SSP",
+                "SBD",
+                "LKR",
+                "SRD",
+                "SZL",
+                "SEK",
+                "CHF",
+                "TWD",
+                "THB",
+                "TZS",
+                "TTD",
+                "TND",
+                "TRY",
+                "TMT",
+                "UGX",
+                "UAH",
+                "AED",
+                "UYU",
+                "UZS",
+                "VUV",
+                "VND",
+                "XOF",
+                "YER",
+                "ZMW",
+                "BYN",
+                "BYR",
+                "DJF",
+                "ERN",
+                "FKP",
+                "GIP",
+                "GNF",
+                "IRR",
+                "KID",
+                "LYD",
+                "MRU",
+                "SLL",
+                "SHP",
+                "SOS",
+                "STD",
+                "STN",
+                "TJS",
+                "TOP",
+                "VED",
+                "VEF",
+                "VES",
+                "XXX"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "NumberField": {
+      "type": "object",
+      "description": "NumberField",
+      "properties": {
+        "tag": {
+          "const": "s-number-field"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Option": {
+      "type": "object",
+      "description": "Option",
+      "properties": {
+        "tag": {
+          "const": "s-option"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "OptionGroup": {
+      "type": "object",
+      "description": "OptionGroup",
+      "properties": {
+        "tag": {
+          "const": "s-option-group"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Option"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "OrderedList": {
+      "type": "object",
+      "description": "OrderedList",
+      "properties": {
+        "tag": {
+          "const": "s-ordered-list"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/ListItem"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Page": {
+      "type": "object",
+      "description": "Page",
+      "properties": {
+        "tag": {
+          "const": "s-page"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "pageInlineSizes": {
+              "type": "string",
+              "enum": [
+                "base",
+                "large",
+                "small"
+              ]
+            },
+            "inlineSize": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "inlineSize"
+          ]
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "const": [
+            "aside"
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Section"
+              },
+              {
+                "$ref": "#/definitions/Banner"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Paragraph": {
+      "type": "object",
+      "description": "Paragraph",
+      "properties": {
+        "tag": {
+          "const": "s-paragraph"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "paragraphDirs": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "ltr",
+                "rtl"
+              ]
+            },
+            "paragraphFontVariantNumerics": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "normal",
+                "tabular-nums"
+              ]
+            },
+            "paragraphTones": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "neutral",
+                "info",
+                "success",
+                "caution",
+                "warning",
+                "critical"
+              ]
+            },
+            "paragraphColors": {
+              "type": "string",
+              "enum": [
+                "base",
+                "subdued"
+              ]
+            },
+            "paragraphAccessibilityVisibilities": {
+              "type": "string",
+              "enum": [
+                "visible",
+                "hidden",
+                "exclusive"
+              ]
+            },
+            "color": {
+              "type": "string"
+            },
+            "lineClamp": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "color",
+            "lineClamp"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "PasswordField": {
+      "type": "object",
+      "description": "PasswordField",
+      "properties": {
+        "tag": {
+          "const": "s-password-field"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "QueryContainer": {
+      "type": "object",
+      "description": "QueryContainer",
+      "properties": {
+        "tag": {
+          "const": "s-query-container"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "SearchField": {
+      "type": "object",
+      "description": "SearchField",
+      "properties": {
+        "tag": {
+          "const": "s-search-field"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Section": {
+      "type": "object",
+      "description": "Section",
+      "properties": {
+        "tag": {
+          "const": "s-section"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "sectionPaddings": {
+              "type": "string",
+              "enum": [
+                "none",
+                "base"
+              ]
+            },
+            "accessibilityLabel": {
+              "type": "string"
+            },
+            "heading": {
+              "type": "string"
+            },
+            "padding": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accessibilityLabel",
+            "heading",
+            "padding"
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Box"
+              },
+              {
+                "$ref": "#/definitions/Stack"
+              },
+              {
+                "$ref": "#/definitions/Grid"
+              },
+              {
+                "$ref": "#/definitions/Divider"
+              },
+              {
+                "$ref": "#/definitions/Banner"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Select": {
+      "type": "object",
+      "description": "Select",
+      "properties": {
+        "tag": {
+          "const": "s-select"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "labelAccessibilityVisibilityOptions": {
+              "type": "string",
+              "enum": [
+                "visible",
+                "exclusive"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Spinner": {
+      "type": "object",
+      "description": "Spinner",
+      "properties": {
+        "tag": {
+          "const": "s-spinner"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "spinnerSizes": {
+              "type": "string",
+              "enum": [
+                "base",
+                "large",
+                "large-100"
+              ]
+            },
+            "size": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "size"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Stack": {
+      "type": "object",
+      "description": "Stack",
+      "properties": {
+        "tag": {
+          "const": "s-stack"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "stackDirections": {
+              "type": "string",
+              "enum": [
+                "inline",
+                "block"
+              ]
+            },
+            "stackJustifyContents": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "space-between",
+                "space-around",
+                "space-evenly",
+                "stretch",
+                "start",
+                "end",
+                "center",
+                "unsafe start",
+                "unsafe end",
+                "unsafe center",
+                "safe start",
+                "safe end",
+                "safe center"
+              ]
+            },
+            "stackAlignItems": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "stretch",
+                "start",
+                "end",
+                "center",
+                "unsafe start",
+                "unsafe end",
+                "unsafe center",
+                "safe start",
+                "safe end",
+                "safe center",
+                "baseline",
+                "first baseline",
+                "last baseline"
+              ]
+            },
+            "stackAlignContent": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "stretch",
+                "start",
+                "end",
+                "center",
+                "space-between",
+                "space-around",
+                "space-evenly",
+                "unsafe start",
+                "unsafe end",
+                "unsafe center",
+                "safe start",
+                "safe end",
+                "safe center",
+                "baseline",
+                "first baseline",
+                "last baseline"
+              ]
+            },
+            "gap": {
+              "type": "string"
+            },
+            "rowGap": {
+              "type": "string"
+            },
+            "columnGap": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "gap",
+            "rowGap",
+            "columnGap",
+            "direction"
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Box"
+              },
+              {
+                "$ref": "#/definitions/Button"
+              },
+              {
+                "$ref": "#/definitions/Heading"
+              },
+              {
+                "$ref": "#/definitions/Text"
+              },
+              {
+                "$ref": "#/definitions/Image"
+              },
+              {
+                "$ref": "#/definitions/Icon"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Switch": {
+      "type": "object",
+      "description": "Switch",
+      "properties": {
+        "tag": {
+          "const": "s-switch"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "labelAccessibilityVisibilityOptions": {
+              "type": "string",
+              "enum": [
+                "visible",
+                "exclusive"
+              ]
+            }
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Table": {
+      "type": "object",
+      "description": "Table",
+      "properties": {
+        "tag": {
+          "const": "s-table"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "variant": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "variant"
+          ]
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "const": [
+            "filters"
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/TableHeader"
+              },
+              {
+                "$ref": "#/definitions/TableBody"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "TableBody": {
+      "type": "object",
+      "description": "TableBody",
+      "properties": {
+        "tag": {
+          "const": "s-table-body"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/TableRow"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "TableCell": {
+      "type": "object",
+      "description": "TableCell",
+      "properties": {
+        "tag": {
+          "const": "s-table-cell"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "TableHeader": {
+      "type": "object",
+      "description": "TableHeader",
+      "properties": {
+        "tag": {
+          "const": "s-table-header"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "listSlotOptions": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary",
+                "labeled",
+                "kicker",
+                "inline"
+              ]
+            },
+            "listSlot": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "listSlot"
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/TableHeaderRow"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "TableHeaderRow": {
+      "type": "object",
+      "description": "TableHeaderRow",
+      "properties": {
+        "tag": {
+          "const": "s-table-header-row"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/TableHeader"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "TableRow": {
+      "type": "object",
+      "description": "TableRow",
+      "properties": {
+        "tag": {
+          "const": "s-table-row"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/TableCell"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "Text": {
+      "type": "object",
+      "description": "Text",
+      "properties": {
+        "tag": {
+          "const": "s-text"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "textDirs": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "ltr",
+                "rtl"
+              ]
+            },
+            "textFontVariantNumerics": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "normal",
+                "tabular-nums"
+              ]
+            },
+            "textColors": {
+              "type": "string",
+              "enum": [
+                "base",
+                "subdued"
+              ]
+            },
+            "textTones": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "neutral",
+                "info",
+                "success",
+                "warning",
+                "critical",
+                "caution"
+              ]
+            },
+            "textTypes": {
+              "type": "string",
+              "enum": [
+                "address",
+                "redundant",
+                "strong",
+                "generic"
+              ]
+            },
+            "textAccessibilityVisibilities": {
+              "type": "string",
+              "enum": [
+                "visible",
+                "hidden",
+                "exclusive"
+              ]
+            },
+            "color": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "tone": {
+              "type": "string"
+            },
+            "fontVariantNumeric": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "color",
+            "type",
+            "tone",
+            "fontVariantNumeric"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "TextArea": {
+      "type": "object",
+      "description": "TextArea",
+      "properties": {
+        "tag": {
+          "const": "s-text-area"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "TextField": {
+      "type": "object",
+      "description": "TextField",
+      "properties": {
+        "tag": {
+          "const": "s-text-field"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "const": [
+            "accessory"
+          ]
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "URLField": {
+      "type": "object",
+      "description": "URLField",
+      "properties": {
+        "tag": {
+          "const": "s-url-field"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    },
+    "UnorderedList": {
+      "type": "object",
+      "description": "UnorderedList",
+      "properties": {
+        "tag": {
+          "const": "s-unordered-list"
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {}
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/ListItem"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "tag"
+      ]
+    }
+  }
+}

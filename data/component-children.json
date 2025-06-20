@@ -1,0 +1,16 @@
+{
+  "Page": ["Section", "Banner"],
+  "Section": ["Box", "Stack", "Grid", "Divider", "Banner"],
+  "Stack": ["Box", "Button", "Heading", "Text", "Image", "Icon"],
+  "Grid": ["GridItem"],
+  "GridItem": ["Box", "Stack", "Text", "Image", "Button"],
+  "OrderedList": ["ListItem"],
+  "UnorderedList": ["ListItem"],
+  "Table": ["TableHeader", "TableBody"],
+  "TableHeader": ["TableHeaderRow"],
+  "TableHeaderRow": ["TableHeader"],
+  "TableBody": ["TableRow"],
+  "TableRow": ["TableCell"],
+  "OptionGroup": ["Option"],
+  "ChoiceList": ["Choice"]
+}
