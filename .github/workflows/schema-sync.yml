@@ -1,0 +1,141 @@
+name: Schema Sync Check
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      force_sync:
+        description: 'Force schema sync even if no drift detected'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  validate-schema:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run schema validation tests
+        id: schema-tests
+        run: |
+          npm run test:schema
+        continue-on-error: true
+        
+      - name: Run schema sync check
+        id: sync-check
+        run: |
+          npm run schema:sync
+        continue-on-error: true
+        
+      - name: Get schema status
+        id: schema-status
+        run: |
+          npm run schema:version current > schema-status.txt
+          cat schema-status.txt
+          
+          # Extract completeness percentage
+          COMPLETENESS=$(grep "Completeness:" schema-status.txt | grep -o '[0-9.]*%' || echo "0%")
+          echo "completeness=$COMPLETENESS" >> $GITHUB_OUTPUT
+          
+          # Check if major drift detected
+          if [ "${{ steps.sync-check.outcome }}" = "failure" ]; then
+            echo "drift_detected=true" >> $GITHUB_OUTPUT
+          else
+            echo "drift_detected=false" >> $GITHUB_OUTPUT
+          fi
+        
+      - name: Create issue for schema drift
+        if: steps.schema-status.outputs.drift_detected == 'true' || steps.schema-tests.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            
+            // Check if drift issue already exists
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              labels: 'schema-drift',
+              state: 'open'
+            });
+            
+            if (existingIssues.data.length > 0) {
+              console.log('Schema drift issue already exists');
+              return;
+            }
+            
+            const completeness = '${{ steps.schema-status.outputs.completeness }}';
+            const testsFailed = '${{ steps.schema-tests.outcome }}' === 'failure';
+            const syncFailed = '${{ steps.sync-check.outcome }}' === 'failure';
+            
+            let title = '🚨 Polaris Schema Drift Detected';
+            let body = `## Schema Drift Report
+            
+**Current Completeness**: ${completeness}
+**Schema Tests**: ${testsFailed ? '❌ Failed' : '✅ Passed'}  
+**Sync Check**: ${syncFailed ? '❌ Failed' : '✅ Passed'}
+
+### Detected Issues:
+`;
+            
+            if (testsFailed) {
+              body += '- ❌ Schema validation tests are failing\n';
+            }
+            
+            if (syncFailed) {
+              body += '- ❌ Significant schema drift detected (>10 missing components)\n';
+            }
+            
+            body += `
+### Action Required:
+1. Review the [live Polaris components](https://shopify.dev/docs/api/app-home/polaris-web-components)
+2. Update the schema file: \`data/polaris-web-components-schema.json\`
+3. Run \`npm run schema:validate\` to verify fixes
+4. Create new schema version: \`npm run schema:version\`
+
+### Automation Details:
+- **Workflow**: \`schema-sync.yml\`
+- **Triggered**: ${context.eventName === 'schedule' ? 'Scheduled check' : 'Manual trigger'}
+- **Date**: ${new Date().toISOString()}
+
+This issue was created automatically by the schema drift detection system.
+`;
+            
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              body,
+              labels: ['schema-drift', 'maintenance', 'priority-medium']
+            });
+            
+            console.log('Created schema drift issue');
+        
+      - name: Post success comment
+        if: steps.schema-status.outputs.drift_detected == 'false' && steps.schema-tests.outcome == 'success'
+        run: |
+          echo "✅ Schema validation passed - completeness: ${{ steps.schema-status.outputs.completeness }}"
+          echo "No action required at this time."
+        
+      - name: Archive schema status
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: schema-status-report
+          path: |
+            schema-status.txt
+          retention-days: 30 

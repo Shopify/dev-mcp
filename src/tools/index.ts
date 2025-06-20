@@ -5,6 +5,13 @@ import {
   instrumentationData,
   isInstrumentationDisabled,
 } from "../instrumentation.js";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+import {
+  getValidatedComponentInfo,
+  generateUsageSuggestions,
+} from "./polaris-schema-helpers.js";
 
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
@@ -12,6 +19,24 @@ const SHOPIFY_BASE_URL = process.env.DEV
 
 const polarisUnifiedEnabled =
   process.env.POLARIS_UNIFIED === "true" || process.env.POLARIS_UNIFIED === "1";
+
+// Load Polaris schema
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+let POLARIS_SCHEMA: any = null;
+
+try {
+  const schemaPath = resolve(
+    __dirname,
+    "../../data/polaris-web-components-schema.json",
+  );
+  POLARIS_SCHEMA = JSON.parse(readFileSync(schemaPath, "utf8"));
+  console.error(
+    `✅ Polaris schema loaded: ${Object.keys(POLARIS_SCHEMA.definitions || {}).length} component definitions`,
+  );
+} catch (error) {
+  console.error(`⚠️ Warning: Could not load Polaris schema: ${error}`);
+}
 
 const GettingStartedAPISchema = z.object({
   name: z.string(),
@@ -311,6 +336,201 @@ ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join(
             {
               type: "text" as const,
               text: `Error fetching getting started information for ${api}: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
+    },
+  );
+
+  server.tool(
+    "get_component_info",
+    `Get detailed information about a specific Polaris web component including allowed children, required attributes, and available properties. This tool provides structured information from the schema with live validation for critical components.
+    
+    Parameters:
+    - component_tag: The component tag (e.g., 's-page', 's-section', 's-button')
+    
+    Returns detailed component information including attributes, children, and usage guidelines.`,
+    {
+      component_tag: z
+        .string()
+        .describe(
+          "The component tag (e.g., 's-page', 's-section', 's-button')",
+        ),
+    },
+    async ({ component_tag }) => {
+      try {
+        if (!POLARIS_SCHEMA) {
+          // Fallback to live documentation search
+          const searchResult = await searchShopifyDocs(
+            `polaris web component ${component_tag}`,
+          );
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `📖 **Live Documentation for ${component_tag}**\n\n${searchResult.formattedText}`,
+              },
+            ],
+          };
+        }
+
+        const componentInfo = await getValidatedComponentInfo(
+          component_tag,
+          POLARIS_SCHEMA,
+        );
+
+        const response = [
+          `📋 **Component: ${componentInfo.tag}**`,
+          `📝 **Description**: ${componentInfo.description}`,
+          `🔧 **Source**: ${componentInfo.source}`,
+          ``,
+        ];
+
+        if (
+          componentInfo.attributes &&
+          Object.keys(componentInfo.attributes).length > 0
+        ) {
+          response.push(`⚙️ **Available Attributes**:`);
+          Object.entries(componentInfo.attributes).forEach(
+            ([attr, config]: [string, any]) => {
+              const description =
+                config.description || "No description available";
+              const enumValues = config.enum
+                ? ` (options: ${config.enum.join(", ")})`
+                : "";
+              response.push(`  - **${attr}**: ${description}${enumValues}`);
+            },
+          );
+          response.push("");
+        }
+
+        if (componentInfo.children && componentInfo.children.length > 0) {
+          response.push(
+            `👶 **Allowed Children**: ${componentInfo.children.join(", ")}`,
+          );
+          response.push("");
+        }
+
+        response.push(`💡 **Usage Example**:`);
+        response.push("```html");
+
+        // Generate basic usage example
+        const attributes = componentInfo.attributes
+          ? Object.keys(componentInfo.attributes)
+          : [];
+        const sampleAttrs = attributes
+          .slice(0, 2)
+          .map((attr) => `${attr}="sample"`)
+          .join(" ");
+        const attrsStr = sampleAttrs ? ` ${sampleAttrs}` : "";
+
+        if (componentInfo.children && componentInfo.children.length > 0) {
+          response.push(`<${component_tag}${attrsStr}>`);
+          response.push(`  <!-- Add child components here -->`);
+          response.push(`</${component_tag}>`);
+        } else {
+          response.push(`<${component_tag}${attrsStr}></${component_tag}>`);
+        }
+
+        response.push("```");
+
+        recordUsage(
+          "get_component_info",
+          component_tag,
+          response.join("\n"),
+        ).catch(() => {});
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: response.join("\n"),
+            },
+          ],
+        };
+      } catch (error) {
+        console.error(
+          `Error getting component info for ${component_tag}:`,
+          error,
+        );
+
+        // Fallback to search
+        const searchResult = await searchShopifyDocs(
+          `polaris web component ${component_tag}`,
+        );
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `⚠️ Schema unavailable, using live docs:\n\n${searchResult.formattedText}`,
+            },
+          ],
+        };
+      }
+    },
+  );
+
+  server.tool(
+    "suggest_components_for_use_case",
+    `Suggest appropriate Polaris web components and structure based on a use case description. This tool analyzes the use case and provides specific component recommendations, code examples, and best practices for Shopify app development.
+    
+    Parameters:
+    - use_case: Description of what you want to build (e.g., 'product form', 'dashboard overview', 'settings page')
+    
+    Returns structured suggestions with component hierarchy and code examples.`,
+    {
+      use_case: z
+        .string()
+        .describe(
+          "Description of what you want to build (e.g., 'product form', 'dashboard', 'settings page')",
+        ),
+    },
+    async ({ use_case }) => {
+      try {
+        let suggestions: string;
+
+        if (POLARIS_SCHEMA) {
+          suggestions = generateUsageSuggestions(use_case, POLARIS_SCHEMA);
+        } else {
+          // Fallback logic without schema
+          suggestions = `💡 **Component Suggestions for: ${use_case}**\n\n`;
+
+          if (use_case.toLowerCase().includes("form")) {
+            suggestions += `📝 **Form Pattern Detected**\n`;
+            suggestions += `- Start with s-page > s-section structure\n`;
+            suggestions += `- Use s-text-field for inputs\n`;
+            suggestions += `- Use s-select for dropdowns\n`;
+            suggestions += `- Use s-button for actions\n`;
+          } else {
+            suggestions += `🏗️ **General Recommendations**:\n`;
+            suggestions += `- Always start with s-page as root\n`;
+            suggestions += `- Use s-section to organize content\n`;
+            suggestions += `- Use s-stack for layouts\n`;
+          }
+        }
+
+        recordUsage(
+          "suggest_components_for_use_case",
+          use_case,
+          suggestions,
+        ).catch(() => {});
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: suggestions,
+            },
+          ],
+        };
+      } catch (error) {
+        console.error(`Error generating suggestions for "${use_case}":`, error);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error generating suggestions: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
         };

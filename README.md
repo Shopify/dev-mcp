@@ -90,12 +90,14 @@ If you want Cursor or Claude Desktop to surface Polaris Web Components documenta
 
 This MCP server provides the following tools:
 
-| Tool Name               | Description                                            |
-| ----------------------- | ------------------------------------------------------ |
-| search_dev_docs         | Search shopify.dev documentation                       |
-| introspect_admin_schema | Access and search Shopify Admin GraphQL schema         |
-| fetch_docs_by_path      | Retrieve documents from shopify.dev                    |
-| get_started             | Get started with Shopify APIs (Admin, Functions, etc.) |
+| Tool Name                       | Description                                                       |
+| ------------------------------- | ----------------------------------------------------------------- |
+| search_dev_docs                 | Search shopify.dev documentation                                  |
+| introspect_admin_schema         | Access and search Shopify Admin GraphQL schema                    |
+| fetch_docs_by_path              | Retrieve documents from shopify.dev                               |
+| get_started                     | Get started with Shopify APIs (Admin, Functions, etc.)            |
+| get_component_info              | Get detailed Polaris component information with schema validation |
+| suggest_components_for_use_case | AI-powered component suggestions for specific use cases           |
 
 ## Available prompts
 
