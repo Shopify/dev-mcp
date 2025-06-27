@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
-import { parse, validate, buildSchema, GraphQLError } from "graphql";
+import { parse, validate, buildClientSchema, GraphQLError } from "graphql";
 import {
   loadSchemaContent,
   SCHEMA_FILE_PATH,
@@ -63,8 +63,7 @@ function extractGraphQLOperation(markdownCodeBlock: string): string | null {
 async function loadAndBuildGraphQLSchema() {
   const schemaContent = await loadSchemaContent(SCHEMA_FILE_PATH);
   const schemaJson = JSON.parse(schemaContent);
-  const sdl = introspectionToSDL(schemaJson);
-  return buildSchema(sdl);
+  return buildClientSchema(schemaJson.data);
 }
 
 function parseGraphQLDocument(
@@ -106,113 +105,6 @@ function getOperationType(document: any): string {
     }
   }
   return "operation";
-}
-
-/**
- * Converts GraphQL introspection result to SDL (Schema Definition Language)
- */
-function introspectionToSDL(introspectionResult: any): string {
-  const schema = introspectionResult.data.__schema;
-
-  let sdl = "";
-
-  // Add scalar types
-  const scalarTypes = schema.types.filter(
-    (type: any) => type.kind === "SCALAR" && !type.name.startsWith("__"),
-  );
-
-  for (const scalar of scalarTypes) {
-    if (!["String", "Int", "Float", "Boolean", "ID"].includes(scalar.name)) {
-      sdl += `scalar ${scalar.name}\n\n`;
-    }
-  }
-
-  // Add enum types
-  const enumTypes = schema.types.filter((type: any) => type.kind === "ENUM");
-  for (const enumType of enumTypes) {
-    sdl += `enum ${enumType.name} {\n`;
-    for (const value of enumType.enumValues || []) {
-      sdl += `  ${value.name}\n`;
-    }
-    sdl += `}\n\n`;
-  }
-
-  // Add input types
-  const inputTypes = schema.types.filter(
-    (type: any) => type.kind === "INPUT_OBJECT",
-  );
-  for (const inputType of inputTypes) {
-    sdl += `input ${inputType.name} {\n`;
-    for (const field of inputType.inputFields || []) {
-      sdl += `  ${field.name}: ${formatTypeForSDL(field.type)}\n`;
-    }
-    sdl += `}\n\n`;
-  }
-
-  // Add object types
-  const objectTypes = schema.types.filter(
-    (type: any) => type.kind === "OBJECT" && !type.name.startsWith("__"),
-  );
-
-  for (const objectType of objectTypes) {
-    sdl += `type ${objectType.name}`;
-    if (objectType.interfaces && objectType.interfaces.length > 0) {
-      sdl += ` implements ${objectType.interfaces.map((i: any) => i.name).join(" & ")}`;
-    }
-    sdl += ` {\n`;
-
-    for (const field of objectType.fields || []) {
-      sdl += `  ${field.name}`;
-      if (field.args && field.args.length > 0) {
-        sdl += `(${field.args.map((arg: any) => `${arg.name}: ${formatTypeForSDL(arg.type)}`).join(", ")})`;
-      }
-      sdl += `: ${formatTypeForSDL(field.type)}\n`;
-    }
-    sdl += `}\n\n`;
-  }
-
-  // Add interface types
-  const interfaceTypes = schema.types.filter(
-    (type: any) => type.kind === "INTERFACE",
-  );
-  for (const interfaceType of interfaceTypes) {
-    sdl += `interface ${interfaceType.name} {\n`;
-    for (const field of interfaceType.fields || []) {
-      sdl += `  ${field.name}: ${formatTypeForSDL(field.type)}\n`;
-    }
-    sdl += `}\n\n`;
-  }
-
-  // Add union types
-  const unionTypes = schema.types.filter((type: any) => type.kind === "UNION");
-  for (const unionType of unionTypes) {
-    sdl += `union ${unionType.name} = ${unionType.possibleTypes.map((t: any) => t.name).join(" | ")}\n\n`;
-  }
-
-  // Add schema directive to specify root types
-  sdl += `schema {\n`;
-  if (schema.queryType) {
-    sdl += `  query: ${schema.queryType.name}\n`;
-  }
-  if (schema.mutationType) {
-    sdl += `  mutation: ${schema.mutationType.name}\n`;
-  }
-  if (schema.subscriptionType) {
-    sdl += `  subscription: ${schema.subscriptionType.name}\n`;
-  }
-  sdl += `}\n`;
-
-  return sdl;
-}
-
-function formatTypeForSDL(type: any): string {
-  if (type.kind === "NON_NULL") {
-    return `${formatTypeForSDL(type.ofType)}!`;
-  } else if (type.kind === "LIST") {
-    return `[${formatTypeForSDL(type.ofType)}]`;
-  } else {
-    return type.name;
-  }
 }
 
 function validateSchemaIsSupported(
