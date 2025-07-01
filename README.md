@@ -90,12 +90,22 @@ If you want Cursor or Claude Desktop to surface Polaris Web Components documenta
 
 This MCP server provides the following tools:
 
-| Tool Name                | Description                                            |
-| ------------------------ | ------------------------------------------------------ |
-| search_dev_doc_chunks    | Search shopify.dev documentation                       |
-| introspect_admin_schema  | Access and search Shopify Admin GraphQL schema         |
-| fetch_entire_doc_by_path | Retrieve documents from shopify.dev                    |
-| learn_shopify_apis       | Get started with Shopify APIs (Admin, Functions, etc.) |
+| Tool Name                | Description                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| learn_shopify_apis       | **Start here first** - Teaches the LLM about supported Shopify APIs and how to use this MCP server's tools to generate valid code blocks for each API. This tool makes a request to shopify.dev to get the most up-to-date instruction for how to best work with the API the user would need to use for their prompt. |
+| search_dev_doc_chunks    | Search across all shopify.dev documentation to find relevant chunks matching your query. Useful for getting content from many different documentation categories, but may have incomplete context due to chunking                                                                                                     |
+| fetch_entire_doc_by_path | Retrieve complete documentation for specific paths from shopify.dev. Provides full context without chunking loss, but requires knowing the exact path. Paths are provided via `learn_shopify_apis`                                                                                                                    |
+| introspect_admin_schema  | Access and search the Shopify Admin API GraphQL schema                                                                                                                                                                                                                                                                |
+
+## Tool Usage Guidelines
+
+### When to use each documentation tool:bbbbbbbb
+
+- **`learn_shopify_apis`**: Always call this first when working with Shopify APIs. It provides essential context about supported APIs and generates a conversation ID for tracking usage across tool calls.
+
+- **`search_dev_doc_chunks`**: Use when you need to find relevant information across multiple documentation sections or when you don't know the specific path. This tool searches through chunked content which allows for better token matching within smaller content pieces, but may miss some context from individual pages.
+
+- **`fetch_entire_doc_by_path`**: Use when you need complete documentation for a specific API resource and know the exact path (e.g., `/docs/api/admin-rest/resources/product`). This provides full context without any information loss from chunking.
 
 ## Available prompts
 

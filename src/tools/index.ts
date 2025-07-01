@@ -66,7 +66,9 @@ export async function shopifyTools(server: McpServer): Promise<void> {
 
   server.tool(
     "search_dev_doc_chunks",
-    `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.
+    `This tool will take in the user prompt, search shopify.dev, and return relevant chunks (documentation, code examples, etc) across all dev docs that will help answer the user's question.
+
+    Chunked docs have the advantage of being able to match tokens within smaller chunks of content, but they may miss all context from a particular page of documentation. Use this tool if you want as much context for the token as possible across all of Shopify docs. Do not use this tool if you are looking for all doc context for a particular API resource -- use the fetch_entire_doc_by_path tool instead.
 
     It takes two arguments: prompt and conversationId. The prompt is the search query for Shopify documentation. The conversationId is optional but should be passed to track usage across a conversation - this should be the same UUID returned from the learn_shopify_apis tool.`,
     {
@@ -102,6 +104,8 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "fetch_entire_doc_by_path",
     `Use this tool to retrieve a list of documents from shopify.dev.
+
+    This tool provides the full documentation for a particular path. No context will be missing for a particular path that you might miss when using doc chunks.
 
     Args:
     paths: The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"].
