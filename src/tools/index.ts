@@ -65,7 +65,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   );
 
   server.tool(
-    "search_dev_docs",
+    "search_dev_doc_chunks",
     `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.
 
     It takes two arguments: prompt and conversationId. The prompt is the search query for Shopify documentation. The conversationId is optional but should be passed to track usage across a conversation - this should be the same UUID returned from the learn_shopify_apis tool.`,
@@ -82,7 +82,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
       const result = await searchShopifyDocs(prompt);
 
       recordUsage(
-        "search_dev_docs",
+        "search_dev_doc_chunks",
         prompt,
         result.formattedText,
         conversationId,

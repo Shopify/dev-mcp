@@ -137,12 +137,12 @@ describe("MCP Tool Unit Tests", () => {
     };
   });
 
-  test("search_dev_docs tool calls searchShopifyDocs with correct parameters", async () => {
+  test("search_dev_doc_chunks tool calls searchShopifyDocs with correct parameters", async () => {
     await shopifyTools(mockServer);
 
-    expect(mockServer.search_dev_docsHandler).toBeDefined();
+    expect(mockServer.search_dev_doc_chunksHandler).toBeDefined();
 
-    const result = await mockServer.search_dev_docsHandler({
+    const result = await mockServer.search_dev_doc_chunksHandler({
       prompt: "test search query",
     });
 
@@ -151,7 +151,7 @@ describe("MCP Tool Unit Tests", () => {
     );
     expect(result.content[0].text).toBe("Test docs response");
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
-      "search_dev_docs",
+      "search_dev_doc_chunks",
       "test search query",
       "Test docs response",
       undefined,
