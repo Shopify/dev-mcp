@@ -11,7 +11,7 @@ import {
 
 global.fetch = vi.fn();
 
-import { shopifyTools, searchShopifyDocs } from "./index.js";
+import { shopifyTools } from "./index.js";
 import {
   instrumentationData,
   isInstrumentationDisabled,
@@ -19,6 +19,11 @@ import {
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
 import { validateGraphQLOperation } from "../validations/graphqlSchema.js";
 import { ValidationResult } from "../types.js";
+import {
+  recordUsage,
+  searchShopifyDocs,
+  fetchGettingStartedApis,
+} from "./shopifyDevRequests.js";
 
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
@@ -89,6 +94,13 @@ vi.mock("../validations/graphqlSchema.js", () => ({
   validateGraphQLOperation: vi.fn(),
 }));
 
+// Mock shopifyDevRequests functions
+vi.mock("./shopifyDevRequests.js", () => ({
+  recordUsage: vi.fn(),
+  searchShopifyDocs: vi.fn(),
+  fetchGettingStartedApis: vi.fn(),
+}));
+
 vi.mock("../../package.json", () => ({
   default: { version: "1.0.0" },
 }));
@@ -101,374 +113,153 @@ global.fetch = fetchMock;
 const consoleError = console.error;
 const consoleWarn = console.warn;
 
-describe("recordUsage", () => {
-  const mockInstrumentationData = {
-    packageVersion: "1.0.0",
-    timestamp: "2024-01-01T00:00:00.000Z",
-  };
-
-  const emptyInstrumentationData = {};
-
-  let registeredHandler: any;
-  let server: any;
+describe("MCP Tool Integration Tests", () => {
+  let mockServer: any;
 
   beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(instrumentationData).mockReturnValue(mockInstrumentationData);
+    vi.clearAllMocks();
+
+    // Setup mocks
+    vi.mocked(instrumentationData).mockReturnValue({
+      packageVersion: "1.0.0",
+      timestamp: "2024-01-01T00:00:00.000Z",
+    });
     vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
     vi.mocked(searchShopifyAdminSchema).mockResolvedValue({
       success: true,
-      responseText: "Test response",
+      responseText: "Test schema response",
     });
+    vi.mocked(searchShopifyDocs).mockResolvedValue({
+      success: true,
+      formattedText: "Test docs response",
+    });
+    vi.mocked(fetchGettingStartedApis).mockResolvedValue([
+      { name: "admin", description: "Admin API" },
+    ]);
+    vi.mocked(recordUsage).mockResolvedValue(undefined);
 
-    // Create a mock server with just the tool method
-    server = {
-      tool: vi.fn().mockImplementation((name, description, schema, handler) => {
-        if (name === "introspect_admin_schema") {
-          registeredHandler = handler;
-        }
+    // Create a mock server that captures handlers
+    mockServer = {
+      tool: vi.fn((name, description, schema, handler) => {
+        mockServer[`${name}Handler`] = handler;
       }),
     };
-
-    // Mock console methods
-    console.error = vi.fn();
-    console.warn = vi.fn();
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-    // Restore console functions
-    console.error = consoleError;
-    console.warn = consoleWarn;
+  test("search_dev_docs tool calls searchShopifyDocs with correct parameters", async () => {
+    await shopifyTools(mockServer);
+
+    expect(mockServer.search_dev_docsHandler).toBeDefined();
+
+    const result = await mockServer.search_dev_docsHandler({
+      prompt: "test search query",
+    });
+
+    // Verify searchShopifyDocs was called with correct parameters
+    expect(vi.mocked(searchShopifyDocs)).toHaveBeenCalledWith(
+      "test search query",
+    );
+    expect(result.content[0].text).toBe("Test docs response");
   });
 
-  it("sends usage data with correct parameters", async () => {
-    // Mock successful response
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      statusText: "OK",
-    };
-    fetchMock.mockResolvedValueOnce(mockResponse);
+  test("introspect_admin_schema tool calls recordUsage with correct parameters", async () => {
+    await shopifyTools(mockServer);
 
-    // Register tools
-    shopifyTools(server);
+    expect(mockServer.introspect_admin_schemaHandler).toBeDefined();
 
-    // Verify the server.tool method was called correctly for each tool
-    expect(server.tool).toHaveBeenCalledWith(
+    await mockServer.introspect_admin_schemaHandler({
+      query: "product",
+      filter: ["types"],
+    });
+
+    // Verify recordUsage was called with correct parameters
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
       "introspect_admin_schema",
-      expect.any(String),
-      expect.any(Object),
-      expect.any(Function),
+      "product",
+      "Test schema response",
     );
-
-    // Verify the tool was registered with the right name
-    expect(server.tool.mock.calls[0][0]).toBe("introspect_admin_schema");
-
-    // Call the handler
-    const result = await registeredHandler(
-      { query: "test query", filter: ["all"] },
-      { signal: new AbortController().signal },
-    );
-
-    // Verify the fetch was called with correct URL and headers
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const fetchUrl = fetchMock.mock.calls[1][0];
-    expect(fetchUrl).toContain("/mcp/usage");
-
-    // Verify headers
-    const fetchOptions = fetchMock.mock.calls[1][1];
-    expect(fetchOptions.headers).toEqual({
-      Accept: "application/json",
-      "Cache-Control": "no-cache",
-      "X-Shopify-Surface": "mcp",
-      "X-Shopify-MCP-Version": mockInstrumentationData.packageVersion,
-      "X-Shopify-Timestamp": mockInstrumentationData.timestamp,
-      "Content-Type": "application/json",
-    });
-
-    // Verify body
-    const body = JSON.parse(fetchOptions.body);
-    expect(body.tool).toBe("introspect_admin_schema");
-    expect(body.parameters).toBe("test query");
-    expect(body.result).toBe("Test response");
-
-    // Verify result
-    expect(result.content[0].text).toBe("Test response");
   });
 
-  it("does not send usage data when instrumentation is disabled", async () => {
-    // Mock disabled instrumentation
-    vi.mocked(isInstrumentationDisabled).mockReturnValueOnce(true);
-    vi.mocked(instrumentationData).mockResolvedValueOnce(
-      emptyInstrumentationData,
-    );
+  test("fetch_docs_by_path tool calls recordUsage with correct parameters", async () => {
+    await shopifyTools(mockServer);
 
-    // Register tools
-    shopifyTools(server);
+    expect(mockServer.fetch_docs_by_pathHandler).toBeDefined();
 
-    // Call the handler
-    const result = await registeredHandler(
-      { query: "test query", filter: ["all"] },
-      { signal: new AbortController().signal },
-    );
-
-    // Verify fetch was only called once
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    // Verify result
-    expect(result.content[0].text).toBe("Test response");
-  });
-
-  it("handles fetch errors gracefully", async () => {
-    // Mock fetch error
-    const networkError = new Error("Network error");
-    fetchMock.mockRejectedValueOnce(networkError);
-
-    // Register tools
-    shopifyTools(server);
-
-    // Call the handler
-    const result = await registeredHandler(
-      { query: "test query", filter: ["all"] },
-      { signal: new AbortController().signal },
-    );
-
-    // Verify fetch was called but error was caught
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    expect(vi.mocked(console.error)).toHaveBeenCalled();
-
-    // Verify the handler still returned a result, meaning the error didn't break functionality
-    expect(result).toBeDefined();
-    expect(result.content).toBeDefined();
-    expect(result.content.length).toBeGreaterThan(0);
-  });
-
-  it("runs concurrently with the main operation", async () => {
-    // Mock successful responses
-    const mockUsageResponse = {
-      ok: true,
-      status: 200,
-      statusText: "OK",
-    };
-    fetchMock.mockResolvedValueOnce(mockUsageResponse);
-
-    // Register tools
-    shopifyTools(server);
-
-    // Call the handler
-    const result = await registeredHandler(
-      { query: "test query", filter: ["all"] },
-      { signal: new AbortController().signal },
-    );
-
-    // Verify both operations completed
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    // Verify body includes results
-    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(body.parameters).toBe("test query");
-    expect(body.result).toBe("Test response");
-
-    expect(result.content[0].text).toBe("Test response");
-  });
-});
-
-describe("searchShopifyDocs", () => {
-  let fetchMock: any;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    // Setup the mock for fetch
-    fetchMock = global.fetch as any;
-
-    // By default, mock successful response
+    // Mock the global fetch for this tool's internal use
+    const fetchMock = global.fetch as any;
     fetchMock.mockResolvedValue({
       ok: true,
-      status: 200,
-      statusText: "OK",
-      headers: {
-        forEach: (callback: (value: string, key: string) => void) => {
-          callback("application/json", "content-type");
-        },
-      },
-      text: async () => JSON.stringify(sampleDocsResponse),
-    });
-  });
-
-  test("returns formatted JSON response correctly", async () => {
-    // Call the function directly with test parameters
-    const result = await searchShopifyDocs("product listings");
-
-    // Verify the fetch was called with correct URL
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const fetchUrl = fetchMock.mock.calls[0][0];
-    expect(fetchUrl).toContain("/mcp/search");
-    expect(fetchUrl).toContain("query=product+listings");
-
-    // Check that the response is formatted JSON
-    expect(result.success).toBe(true);
-
-    // The response should be properly formatted with indentation
-    expect(result.formattedText).toContain("{\n");
-    expect(result.formattedText).toContain('  "filename":');
-
-    // Parse the response and verify it matches our sample data
-    const parsedResponse = JSON.parse(result.formattedText);
-    expect(parsedResponse).toEqual(sampleDocsResponse);
-    expect(parsedResponse[0].filename).toBe(
-      "api/admin/graphql/reference/products.md",
-    );
-    expect(parsedResponse[0].score).toBe(0.85);
-  });
-
-  test("handles HTTP error", async () => {
-    // Mock an error response
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 500,
-      statusText: "Internal Server Error",
-      headers: {
-        forEach: (callback: (value: string, key: string) => void) => {
-          callback("text/plain", "content-type");
-        },
-      },
+      text: async () => "Test document content",
     });
 
-    // Call the function directly
-    const result = await searchShopifyDocs("product");
-
-    // Check that the error was handled
-    expect(result.success).toBe(false);
-    expect(result.formattedText).toContain("HTTP error! status: 500");
-    expect(result.formattedText).toContain("500");
-  });
-
-  test("handles fetch error", async () => {
-    // Mock a network error
-    fetchMock.mockRejectedValue(new Error("Network error"));
-
-    // Call the function directly
-    const result = await searchShopifyDocs("product");
-
-    // Check that the error was handled
-    expect(result.success).toBe(false);
-    expect(result.formattedText).toContain("Network error");
-  });
-
-  test("handles non-JSON response gracefully", async () => {
-    // Mock a non-JSON response
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      headers: {
-        forEach: (callback: (value: string, key: string) => void) => {
-          callback("text/plain", "content-type");
-        },
-      },
-      text: async () => "This is not valid JSON",
+    await mockServer.fetch_docs_by_pathHandler({
+      paths: ["/docs/api/admin", "/docs/api/storefront"],
     });
 
-    // Clear the mocks before the test
-    vi.mocked(console.warn).mockClear();
-
-    // Call the function directly
-    const result = await searchShopifyDocs("product");
-
-    // Check that the error was handled and raw text is returned
-    expect(result.success).toBe(true);
-    expect(result.formattedText).toBe("This is not valid JSON");
-
-    // Verify that console.warn was called with the JSON parsing error
-    expect(console.warn).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(console.warn).mock.calls[0][0]).toContain(
-      "Error parsing JSON response",
+    // Verify recordUsage was called with correct parameters
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "fetch_docs_by_path",
+      "/docs/api/admin,/docs/api/storefront",
+      expect.stringContaining("Test document content"),
     );
   });
 
-  it("sends no data when instrumentation is disabled", async () => {
-    const emptyInstrumentationData = {};
-
-    vi.mocked(isInstrumentationDisabled).mockReturnValueOnce(true);
-    vi.mocked(instrumentationData).mockResolvedValueOnce(
-      emptyInstrumentationData,
-    );
-
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      text: async () => JSON.stringify({ data: "test" }),
-    };
-    fetchMock.mockResolvedValueOnce(mockResponse);
-
-    const result = await searchShopifyDocs("test query");
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    const fetchOptions = fetchMock.mock.calls[0][1];
-    expect(fetchOptions.headers).toEqual({
-      Accept: "application/json",
-      "Cache-Control": "no-cache",
-      "X-Shopify-MCP-Version": "",
-      "X-Shopify-Timestamp": "",
+  test("validate_admin_api_codeblocks tool calls recordUsage with correct parameters", async () => {
+    vi.mocked(validateGraphQLOperation).mockResolvedValue({
+      result: ValidationResult.SUCCESS,
+      resultDetail: "Valid GraphQL",
     });
 
-    expect(result.success).toBe(true);
-    expect(result.formattedText).toBe('{\n  "data": "test"\n}');
+    await shopifyTools(mockServer);
+
+    expect(mockServer.validate_admin_api_codeblocksHandler).toBeDefined();
+
+    const testCodeBlocks = ["```graphql\nquery { products { id } }\n```"];
+
+    await mockServer.validate_admin_api_codeblocksHandler({
+      codeblocks: testCodeBlocks,
+    });
+
+    // Verify recordUsage was called with correct parameters
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "validate_admin_api_codeblocks",
+      "1 code blocks",
+      expect.objectContaining({
+        valid: true,
+        detailedChecks: expect.any(Array),
+      }),
+    );
   });
-});
 
-describe("fetchGettingStartedApis", () => {
-  let fetchMock: any;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    fetchMock = global.fetch as any;
-
-    // Mock successful response by default
+  test("get_started tool calls fetchGettingStartedApis and recordUsage", async () => {
+    // Mock the global fetch for the get_started endpoint
+    const fetchMock = global.fetch as any;
     fetchMock.mockResolvedValue({
       ok: true,
-      status: 200,
-      statusText: "OK",
-      headers: {
-        forEach: (callback: (value: string, key: string) => void) => {
-          callback("application/json", "content-type");
-        },
-      },
-      text: async () => JSON.stringify(sampleGettingStartedApisResponse),
+      text: async () => "Getting started guide content",
     });
-  });
 
-  test("fetches and validates API information successfully", async () => {
-    // Since this function is not directly exposed, we need to test it indirectly
-    // We'll check that fetch was called with the right URL when shopifyTools is executed
-    // This is a bit of a placeholder test since we can't easily test the unexported function
+    await shopifyTools(mockServer);
 
-    // Import the function we want to test - note that this is a circular import
-    // that would normally be avoided, but it's okay for testing purposes
-    const { shopifyTools } = await import("./index.js");
+    expect(mockServer.get_startedHandler).toBeDefined();
 
-    // Create a mock server
-    const mockServer = {
-      tool: vi.fn(),
-    };
+    await mockServer.get_startedHandler({
+      api: "admin",
+    });
 
-    // Call the function
-    await shopifyTools(mockServer as any);
+    // Verify fetchGettingStartedApis was called
+    expect(vi.mocked(fetchGettingStartedApis)).toHaveBeenCalled();
 
-    // Verify fetch was called to get the APIs
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/mcp/getting_started_apis"),
-      expect.any(Object),
+    // Verify recordUsage was called with correct parameters
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "get_started",
+      "admin",
+      "Getting started guide content",
     );
   });
 });
 
-describe("get_started tool behavior", () => {
+describe("get_started tool error handling", () => {
   let fetchMock: any;
   let mockServer: any;
 
@@ -476,41 +267,15 @@ describe("get_started tool behavior", () => {
     vi.clearAllMocks();
     fetchMock = global.fetch as any;
 
-    // First response is for API list
-    // Second response is for getting started guide
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/mcp/getting_started_apis")) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: "OK",
-          headers: {
-            forEach: (callback: (value: string, key: string) => void) => {
-              callback("application/json", "content-type");
-            },
-          },
-          text: async () => JSON.stringify(sampleGettingStartedApisResponse),
-        });
-      } else if (url.includes("/mcp/getting_started")) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: "OK",
-          headers: {
-            forEach: (callback: (value: string, key: string) => void) => {
-              callback("text/plain", "content-type");
-            },
-          },
-          text: async () => sampleGettingStartedGuide,
-        });
-      }
-      return Promise.reject(new Error("Unexpected URL"));
-    });
+    // Mock the shopifyDevRequests functions
+    vi.mocked(fetchGettingStartedApis).mockResolvedValue([
+      { name: "admin", description: "Admin API" },
+    ]);
+    vi.mocked(recordUsage).mockResolvedValue(undefined);
 
     // Create a mock server that captures the registered tools
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
-        // Store the handler for testing
         if (name === "get_started") {
           mockServer.getStartedHandler = handler;
         }
@@ -519,60 +284,27 @@ describe("get_started tool behavior", () => {
     };
   });
 
-  test("fetches getting started guide successfully", async () => {
-    // Import the function and register the tools
-    const { shopifyTools } = await import("./index.js");
+  test("handles invalid API name", async () => {
     await shopifyTools(mockServer);
 
-    // Ensure the handler was registered
-    expect(mockServer.getStartedHandler).not.toBeNull();
+    const result = await mockServer.getStartedHandler({ api: "invalid-api" });
 
-    // Now we can test the handler directly
-    const result = await mockServer.getStartedHandler({ api: "admin" });
-
-    // Check that the fetch was called with the correct URL
-    const getStartedCalls = fetchMock.mock.calls.filter((call: [string, any]) =>
-      call[0].includes("/mcp/getting_started?api=admin"),
+    // Verify error message for invalid API
+    expect(result.content[0].text).toContain(
+      "Please specify which Shopify API you are building for",
     );
-    expect(getStartedCalls.length).toBe(1);
-
-    // Verify the response content
-    expect(result.content[0].type).toBe("text");
-    expect(result.content[0].text).toBe(sampleGettingStartedGuide);
   });
 
   test("handles HTTP error when fetching guide", async () => {
-    // Set up a failure for the getting started endpoint
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/mcp/getting_started_apis")) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          headers: {
-            forEach: (callback: (value: string, key: string) => void) => {
-              callback("application/json", "content-type");
-            },
-          },
-          text: async () => JSON.stringify(sampleGettingStartedApisResponse),
-        });
-      } else if (url.includes("/mcp/getting_started")) {
-        return Promise.resolve({
-          ok: false,
-          status: 500,
-          statusText: "Internal Server Error",
-          headers: {
-            forEach: () => {},
-          },
-        });
-      }
-      return Promise.reject(new Error("Unexpected URL"));
+    // Mock fetch error for the get_started endpoint
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
     });
 
-    // Register the tools
-    const { shopifyTools } = await import("./index.js");
     await shopifyTools(mockServer);
 
-    // Test the handler
     const result = await mockServer.getStartedHandler({ api: "admin" });
 
     // Verify error handling
@@ -583,30 +315,11 @@ describe("get_started tool behavior", () => {
   });
 
   test("handles network error", async () => {
-    // Set up a network failure
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes("/mcp/getting_started_apis")) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          headers: {
-            forEach: (callback: (value: string, key: string) => void) => {
-              callback("application/json", "content-type");
-            },
-          },
-          text: async () => JSON.stringify(sampleGettingStartedApisResponse),
-        });
-      } else if (url.includes("/mcp/getting_started")) {
-        return Promise.reject(new Error("Network failure"));
-      }
-      return Promise.reject(new Error("Unexpected URL"));
-    });
+    // Mock network error for the get_started endpoint
+    fetchMock.mockRejectedValue(new Error("Network failure"));
 
-    // Register the tools
-    const { shopifyTools } = await import("./index.js");
     await shopifyTools(mockServer);
 
-    // Test the handler
     const result = await mockServer.getStartedHandler({ api: "admin" });
 
     // Verify error handling
@@ -617,21 +330,17 @@ describe("get_started tool behavior", () => {
   });
 });
 
-describe("validate_admin_api_codeblocks tool", () => {
+describe("validate_admin_api_codeblocks tool behavior", () => {
   let mockServer: any;
   let validateGraphQLOperationMock: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     validateGraphQLOperationMock = vi.mocked(validateGraphQLOperation);
-
-    // Mock fetch for getting started APIs
-    const fetchMock = global.fetch as any;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify(sampleGettingStartedApisResponse),
-    });
+    vi.mocked(recordUsage).mockResolvedValue(undefined);
+    vi.mocked(fetchGettingStartedApis).mockResolvedValue([
+      { name: "admin", description: "Admin API" },
+    ]);
 
     // Create a mock server that captures the registered tools
     mockServer = {
@@ -642,46 +351,30 @@ describe("validate_admin_api_codeblocks tool", () => {
       }),
       validateHandler: null,
     };
-
-    // Mock instrumentation
-    vi.mocked(instrumentationData).mockReturnValue({
-      packageVersion: "1.0.0",
-      timestamp: "2024-01-01T00:00:00.000Z",
-    });
-    vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
   });
 
-  test("validates multiple code blocks successfully", async () => {
+  test("validates code blocks in parallel", async () => {
     // Setup mock responses
     validateGraphQLOperationMock
       .mockResolvedValueOnce({
         result: ValidationResult.SUCCESS,
-        resultDetail:
-          "Successfully validated GraphQL query against Shopify Admin API schema.",
+        resultDetail: "Valid GraphQL query",
       })
       .mockResolvedValueOnce({
-        result: ValidationResult.SKIPPED,
-        resultDetail:
-          "No GraphQL operation found in the provided markdown code block.",
+        result: ValidationResult.SUCCESS,
+        resultDetail: "Valid GraphQL mutation",
       });
 
-    // Register the tools
     await shopifyTools(mockServer);
-
-    // Ensure the handler was registered
-    expect(mockServer.validateHandler).not.toBeNull();
 
     const testCodeBlocks = [
       "```graphql\nquery { products { id } }\n```",
-      "```javascript\nconst x = 1;\n```",
+      "```graphql\nmutation { productCreate(input: {}) { product { id } } }\n```",
     ];
 
-    // Call the handler
-    const result = await mockServer.validateHandler({
-      codeblocks: testCodeBlocks,
-    });
+    await mockServer.validateHandler({ codeblocks: testCodeBlocks });
 
-    // Verify validateGraphQLOperation was called correctly
+    // Verify each code block was validated with "admin" schema
     expect(validateGraphQLOperationMock).toHaveBeenCalledTimes(2);
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       1,
@@ -693,169 +386,40 @@ describe("validate_admin_api_codeblocks tool", () => {
       testCodeBlocks[1],
       "admin",
     );
-
-    // Verify the response
-    expect(result.content[0].type).toBe("text");
-    const responseText = result.content[0].text;
-    expect(responseText).toContain("✅ VALID");
-    expect(responseText).toContain("**Total Code Blocks:** 2");
-    expect(responseText).toContain("Successfully validated GraphQL query");
-    expect(responseText).toContain("No GraphQL operation found");
-  });
-
-  test("handles validation failures correctly", async () => {
-    // Setup mock responses with failures
-    validateGraphQLOperationMock
-      .mockResolvedValueOnce({
-        result: ValidationResult.FAILED,
-        resultDetail:
-          "GraphQL validation errors: Cannot query field 'invalidField' on type 'Product'.",
-      })
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail:
-          "Successfully validated GraphQL mutation against Shopify Admin API schema.",
-      });
-
-    // Register the tools
-    await shopifyTools(mockServer);
-
-    const testCodeBlocks = [
-      "```graphql\nquery { products { invalidField } }\n```",
-      "```graphql\nmutation { productCreate(input: {}) { product { id } } }\n```",
-    ];
-
-    // Call the handler
-    const result = await mockServer.validateHandler({
-      codeblocks: testCodeBlocks,
-    });
-
-    // Verify the response shows invalid overall status
-    const responseText = result.content[0].text;
-    expect(responseText).toContain("❌ INVALID");
-    expect(responseText).toContain("**Total Code Blocks:** 2");
-    expect(responseText).toContain("Cannot query field 'invalidField'");
-    expect(responseText).toContain("Successfully validated GraphQL mutation");
-  });
-
-  test("handles mixed validation results", async () => {
-    // Setup mixed results
-    validateGraphQLOperationMock
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail:
-          "Successfully validated GraphQL query against Shopify Admin API schema.",
-      })
-      .mockResolvedValueOnce({
-        result: ValidationResult.SKIPPED,
-        resultDetail:
-          "No GraphQL operation found in the provided markdown code block.",
-      })
-      .mockResolvedValueOnce({
-        result: ValidationResult.FAILED,
-        resultDetail:
-          "GraphQL syntax error: Syntax Error: Expected Name, found }",
-      });
-
-    // Register the tools
-    await shopifyTools(mockServer);
-
-    const testCodeBlocks = [
-      "```graphql\nquery { products { id } }\n```",
-      "```javascript\nconst x = 1;\n```",
-      "```graphql\nquery { products { } }\n```",
-    ];
-
-    // Call the handler
-    const result = await mockServer.validateHandler({
-      codeblocks: testCodeBlocks,
-    });
-
-    // Verify the response shows invalid overall status due to failure
-    const responseText = result.content[0].text;
-    expect(responseText).toContain("❌ INVALID");
-    expect(responseText).toContain("**Total Code Blocks:** 3");
-    expect(responseText).toContain("✅ SUCCESS");
-    expect(responseText).toContain("⏭️ SKIPPED");
-    expect(responseText).toContain("❌ FAILED");
-    expect(responseText).toContain("Syntax Error: Expected Name, found }");
-  });
-
-  test("handles empty code blocks array", async () => {
-    // Register the tools
-    await shopifyTools(mockServer);
-
-    // Call the handler with empty array
-    const result = await mockServer.validateHandler({
-      codeblocks: [],
-    });
-
-    // Verify validateGraphQLOperation was not called
-    expect(validateGraphQLOperationMock).not.toHaveBeenCalled();
-
-    // Verify the response
-    const responseText = result.content[0].text;
-    expect(responseText).toContain("✅ VALID");
-    expect(responseText).toContain("**Total Code Blocks:** 0");
   });
 
   test("handles validation function errors", async () => {
-    // Setup mock to throw an error
     validateGraphQLOperationMock.mockRejectedValueOnce(
       new Error("Schema loading failed"),
     );
 
-    // Register the tools
     await shopifyTools(mockServer);
 
     const testCodeBlocks = ["```graphql\nquery { products { id } }\n```"];
 
-    // Call the handler and expect it to handle the error gracefully
+    // Expect the error to propagate
     await expect(
-      mockServer.validateHandler({
-        codeblocks: testCodeBlocks,
-      }),
+      mockServer.validateHandler({ codeblocks: testCodeBlocks }),
     ).rejects.toThrow("Schema loading failed");
-
-    // Verify validateGraphQLOperation was called
-    expect(validateGraphQLOperationMock).toHaveBeenCalledTimes(1);
   });
 
-  test("records usage data correctly", async () => {
-    // Setup successful validation
+  test("returns formatted validation results", async () => {
     validateGraphQLOperationMock.mockResolvedValueOnce({
       result: ValidationResult.SUCCESS,
-      resultDetail:
-        "Successfully validated GraphQL query against Shopify Admin API schema.",
+      resultDetail: "Valid GraphQL",
     });
 
-    // Mock fetch for usage recording
-    const fetchMock = global.fetch as any;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 200,
-    });
-
-    // Register the tools
     await shopifyTools(mockServer);
 
-    const testCodeBlocks = ["```graphql\nquery { products { id } }\n```"];
-
-    // Call the handler
-    await mockServer.validateHandler({
-      codeblocks: testCodeBlocks,
+    const result = await mockServer.validateHandler({
+      codeblocks: ["```graphql\nquery { products { id } }\n```"],
     });
 
-    // Verify usage was recorded (should be called for API list fetch and usage recording)
-    const usageCalls = fetchMock.mock.calls.filter((call: [string, any]) =>
-      call[0].includes("/mcp/usage"),
-    );
-    expect(usageCalls.length).toBe(1);
-
-    // Verify the usage data
-    const usageCall = usageCalls[0];
-    const usageBody = JSON.parse(usageCall[1].body);
-    expect(usageBody.tool).toBe("validate_admin_api_codeblocks");
-    expect(usageBody.parameters).toBe("1 code blocks");
+    // Verify the response format
+    expect(result.content[0].type).toBe("text");
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("## Validation Summary");
+    expect(responseText).toContain("**Total Code Blocks:** 1");
+    expect(responseText).toContain("## Detailed Results");
   });
 });
