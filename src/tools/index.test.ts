@@ -15,6 +15,7 @@ import { shopifyTools } from "./index.js";
 import {
   instrumentationData,
   isInstrumentationDisabled,
+  generateConversationId,
 } from "../instrumentation.js";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
 import { validateGraphQLOperation } from "../validations/graphqlSchema.js";
@@ -77,6 +78,7 @@ Examples of common API calls with the Admin API.`;
 vi.mock("../instrumentation.js", () => ({
   instrumentationData: vi.fn(),
   isInstrumentationDisabled: vi.fn(),
+  generateConversationId: vi.fn(),
 }));
 
 vi.mock("./shopify-admin-schema.js", () => ({
@@ -114,6 +116,7 @@ describe("MCP Tool Unit Tests", () => {
       timestamp: "2024-01-01T00:00:00.000Z",
     });
     vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
+    vi.mocked(generateConversationId).mockReturnValue("test-conversation-uuid");
     vi.mocked(searchShopifyAdminSchema).mockResolvedValue({
       success: true,
       responseText: "Test schema response",
@@ -147,6 +150,12 @@ describe("MCP Tool Unit Tests", () => {
       "test search query",
     );
     expect(result.content[0].text).toBe("Test docs response");
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "search_dev_docs",
+      "test search query",
+      "Test docs response",
+      undefined,
+    );
   });
 
   test("introspect_admin_schema tool calls recordUsage with correct parameters", async () => {
@@ -163,6 +172,7 @@ describe("MCP Tool Unit Tests", () => {
       "introspect_admin_schema",
       "product",
       "Test schema response",
+      undefined,
     );
   });
 
@@ -185,6 +195,7 @@ describe("MCP Tool Unit Tests", () => {
       "fetch_docs_by_path",
       "/docs/api/admin,/docs/api/storefront",
       expect.stringContaining("Test document content"),
+      undefined,
     );
   });
 
@@ -211,6 +222,7 @@ describe("MCP Tool Unit Tests", () => {
         valid: true,
         detailedChecks: expect.any(Array),
       }),
+      undefined,
     );
   });
 
@@ -235,6 +247,7 @@ describe("MCP Tool Unit Tests", () => {
       "get_started",
       "admin",
       "Getting started guide content",
+      "test-conversation-uuid",
     );
   });
 });
@@ -251,6 +264,7 @@ describe("get_started tool error handling", () => {
       { name: "admin", description: "Admin API" },
     ]);
     vi.mocked(recordUsage).mockResolvedValue(undefined);
+    vi.mocked(generateConversationId).mockReturnValue("test-conversation-uuid");
 
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
@@ -314,6 +328,7 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
     vi.mocked(fetchGettingStartedApis).mockResolvedValue([
       { name: "admin", description: "Admin API" },
     ]);
+    vi.mocked(generateConversationId).mockReturnValue("test-conversation-uuid");
 
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {

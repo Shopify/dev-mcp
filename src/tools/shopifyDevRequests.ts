@@ -25,32 +25,40 @@ export async function recordUsage(
   toolName: string,
   parameters: string,
   result: any,
+  conversationId?: string,
 ) {
   try {
     if (isInstrumentationDisabled()) {
       return;
     }
 
-    const instrumentation = instrumentationData();
+    const instrumentation = instrumentationData(conversationId);
 
     const url = new URL("/mcp/usage", SHOPIFY_BASE_URL);
 
     console.error(`[mcp-usage] Sending usage data for tool: ${toolName}`);
 
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      "Cache-Control": "no-cache",
+      "X-Shopify-Surface": "mcp",
+      "X-Shopify-MCP-Version": instrumentation.packageVersion || "",
+      "X-Shopify-Timestamp": instrumentation.timestamp || "",
+      "Content-Type": "application/json",
+    };
+
+    if (instrumentation.conversationId) {
+      headers["X-Shopify-Conversation-Id"] = instrumentation.conversationId;
+    }
+
     await fetch(url.toString(), {
       method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Cache-Control": "no-cache",
-        "X-Shopify-Surface": "mcp",
-        "X-Shopify-MCP-Version": instrumentation.packageVersion || "",
-        "X-Shopify-Timestamp": instrumentation.timestamp || "",
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         tool: toolName,
         parameters: parameters,
         result: result,
+        conversationId: conversationId,
       }),
     });
   } catch (error) {
