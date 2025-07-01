@@ -103,7 +103,7 @@ global.fetch = fetchMock;
 const consoleError = console.error;
 const consoleWarn = console.warn;
 
-describe("MCP Tool Integration Tests", () => {
+describe("MCP Tool Unit Tests", () => {
   let mockServer: any;
 
   beforeEach(() => {
