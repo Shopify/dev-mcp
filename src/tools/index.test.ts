@@ -176,10 +176,10 @@ describe("MCP Tool Unit Tests", () => {
     );
   });
 
-  test("fetch_docs_by_path tool calls recordUsage with correct parameters", async () => {
+  test("fetch_entire_doc_by_path tool calls recordUsage with correct parameters", async () => {
     await shopifyTools(mockServer);
 
-    expect(mockServer.fetch_docs_by_pathHandler).toBeDefined();
+    expect(mockServer.fetch_entire_doc_by_pathHandler).toBeDefined();
 
     const fetchMock = global.fetch as any;
     fetchMock.mockResolvedValue({
@@ -187,12 +187,12 @@ describe("MCP Tool Unit Tests", () => {
       text: async () => "Test document content",
     });
 
-    await mockServer.fetch_docs_by_pathHandler({
+    await mockServer.fetch_entire_doc_by_pathHandler({
       paths: ["/docs/api/admin", "/docs/api/storefront"],
     });
 
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
-      "fetch_docs_by_path",
+      "fetch_entire_doc_by_path",
       "/docs/api/admin,/docs/api/storefront",
       expect.stringContaining("Test document content"),
       undefined,
@@ -226,7 +226,7 @@ describe("MCP Tool Unit Tests", () => {
     );
   });
 
-  test("get_started tool calls fetchGettingStartedApis and recordUsage", async () => {
+  test("learn_shopify_apis tool calls fetchGettingStartedApis and recordUsage", async () => {
     const fetchMock = global.fetch as any;
     fetchMock.mockResolvedValue({
       ok: true,
@@ -235,16 +235,16 @@ describe("MCP Tool Unit Tests", () => {
 
     await shopifyTools(mockServer);
 
-    expect(mockServer.get_startedHandler).toBeDefined();
+    expect(mockServer.learn_shopify_apisHandler).toBeDefined();
 
-    await mockServer.get_startedHandler({
+    await mockServer.learn_shopify_apisHandler({
       api: "admin",
     });
 
     expect(vi.mocked(fetchGettingStartedApis)).toHaveBeenCalled();
 
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
-      "get_started",
+      "learn_shopify_apis",
       "admin",
       "Getting started guide content",
       "test-conversation-uuid",
@@ -252,7 +252,7 @@ describe("MCP Tool Unit Tests", () => {
   });
 });
 
-describe("get_started tool error handling", () => {
+describe("learn_shopify_apis tool error handling", () => {
   let fetchMock: any;
   let mockServer: any;
 
@@ -268,18 +268,20 @@ describe("get_started tool error handling", () => {
 
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
-        if (name === "get_started") {
-          mockServer.getStartedHandler = handler;
+        if (name === "learn_shopify_apis") {
+          mockServer.learn_shopify_apisHandler = handler;
         }
       }),
-      getStartedHandler: null,
+      learn_shopify_apisHandler: null,
     };
   });
 
   test("handles invalid API name", async () => {
     await shopifyTools(mockServer);
 
-    const result = await mockServer.getStartedHandler({ api: "invalid-api" });
+    const result = await mockServer.learn_shopify_apisHandler({
+      api: "invalid-api",
+    });
 
     expect(result.content[0].text).toContain(
       "Please specify which Shopify API you are building for",
@@ -295,7 +297,7 @@ describe("get_started tool error handling", () => {
 
     await shopifyTools(mockServer);
 
-    const result = await mockServer.getStartedHandler({ api: "admin" });
+    const result = await mockServer.learn_shopify_apisHandler({ api: "admin" });
 
     expect(result.content[0].text).toContain(
       "Error fetching getting started information",
@@ -308,7 +310,7 @@ describe("get_started tool error handling", () => {
 
     await shopifyTools(mockServer);
 
-    const result = await mockServer.getStartedHandler({ api: "admin" });
+    const result = await mockServer.learn_shopify_apisHandler({ api: "admin" });
 
     expect(result.content[0].text).toContain(
       "Error fetching getting started information",
