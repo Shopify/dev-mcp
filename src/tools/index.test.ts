@@ -35,7 +35,6 @@ afterAll(() => {
   console.warn = originalConsoleWarn;
 });
 
-// Sample response data for mocking
 const sampleDocsResponse = [
   {
     filename: "api/admin/graphql/reference/products.md",
@@ -51,7 +50,6 @@ const sampleDocsResponse = [
   },
 ];
 
-// Sample response for getting_started_apis
 const sampleGettingStartedApisResponse = [
   {
     name: "app-ui",
@@ -68,7 +66,6 @@ const sampleGettingStartedApisResponse = [
   },
 ];
 
-// Sample getting started guide response
 const sampleGettingStartedGuide = `# Getting Started with Admin API
 This guide walks you through the first steps of using the Shopify Admin API.
 
@@ -77,24 +74,19 @@ Learn how to authenticate your app with OAuth.
 
 ## Making API Calls
 Examples of common API calls with the Admin API.`;
-
-// Mock instrumentation first
 vi.mock("../instrumentation.js", () => ({
   instrumentationData: vi.fn(),
   isInstrumentationDisabled: vi.fn(),
 }));
 
-// Mock searchShopifyAdminSchema
 vi.mock("./shopify-admin-schema.js", () => ({
   searchShopifyAdminSchema: vi.fn(),
 }));
 
-// Mock validateGraphQLOperation
 vi.mock("../validations/graphqlSchema.js", () => ({
   validateGraphQLOperation: vi.fn(),
 }));
 
-// Mock shopifyDevRequests functions
 vi.mock("./shopifyDevRequests.js", () => ({
   recordUsage: vi.fn(),
   searchShopifyDocs: vi.fn(),
@@ -105,11 +97,9 @@ vi.mock("../../package.json", () => ({
   default: { version: "1.0.0" },
 }));
 
-// Mock fetch globally
 const fetchMock = vi.fn();
 global.fetch = fetchMock;
 
-// Mock console.error and console.warn
 const consoleError = console.error;
 const consoleWarn = console.warn;
 
@@ -119,7 +109,6 @@ describe("MCP Tool Integration Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Setup mocks
     vi.mocked(instrumentationData).mockReturnValue({
       packageVersion: "1.0.0",
       timestamp: "2024-01-01T00:00:00.000Z",
@@ -138,7 +127,6 @@ describe("MCP Tool Integration Tests", () => {
     ]);
     vi.mocked(recordUsage).mockResolvedValue(undefined);
 
-    // Create a mock server that captures handlers
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
         mockServer[`${name}Handler`] = handler;
@@ -155,7 +143,6 @@ describe("MCP Tool Integration Tests", () => {
       prompt: "test search query",
     });
 
-    // Verify searchShopifyDocs was called with correct parameters
     expect(vi.mocked(searchShopifyDocs)).toHaveBeenCalledWith(
       "test search query",
     );
@@ -172,7 +159,6 @@ describe("MCP Tool Integration Tests", () => {
       filter: ["types"],
     });
 
-    // Verify recordUsage was called with correct parameters
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
       "introspect_admin_schema",
       "product",
@@ -185,7 +171,6 @@ describe("MCP Tool Integration Tests", () => {
 
     expect(mockServer.fetch_docs_by_pathHandler).toBeDefined();
 
-    // Mock the global fetch for this tool's internal use
     const fetchMock = global.fetch as any;
     fetchMock.mockResolvedValue({
       ok: true,
@@ -196,7 +181,6 @@ describe("MCP Tool Integration Tests", () => {
       paths: ["/docs/api/admin", "/docs/api/storefront"],
     });
 
-    // Verify recordUsage was called with correct parameters
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
       "fetch_docs_by_path",
       "/docs/api/admin,/docs/api/storefront",
@@ -220,7 +204,6 @@ describe("MCP Tool Integration Tests", () => {
       codeblocks: testCodeBlocks,
     });
 
-    // Verify recordUsage was called with correct parameters
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
       "validate_admin_api_codeblocks",
       "1 code blocks",
@@ -232,7 +215,6 @@ describe("MCP Tool Integration Tests", () => {
   });
 
   test("get_started tool calls fetchGettingStartedApis and recordUsage", async () => {
-    // Mock the global fetch for the get_started endpoint
     const fetchMock = global.fetch as any;
     fetchMock.mockResolvedValue({
       ok: true,
@@ -247,10 +229,8 @@ describe("MCP Tool Integration Tests", () => {
       api: "admin",
     });
 
-    // Verify fetchGettingStartedApis was called
     expect(vi.mocked(fetchGettingStartedApis)).toHaveBeenCalled();
 
-    // Verify recordUsage was called with correct parameters
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
       "get_started",
       "admin",
@@ -267,13 +247,11 @@ describe("get_started tool error handling", () => {
     vi.clearAllMocks();
     fetchMock = global.fetch as any;
 
-    // Mock the shopifyDevRequests functions
     vi.mocked(fetchGettingStartedApis).mockResolvedValue([
       { name: "admin", description: "Admin API" },
     ]);
     vi.mocked(recordUsage).mockResolvedValue(undefined);
 
-    // Create a mock server that captures the registered tools
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
         if (name === "get_started") {
@@ -289,14 +267,12 @@ describe("get_started tool error handling", () => {
 
     const result = await mockServer.getStartedHandler({ api: "invalid-api" });
 
-    // Verify error message for invalid API
     expect(result.content[0].text).toContain(
       "Please specify which Shopify API you are building for",
     );
   });
 
   test("handles HTTP error when fetching guide", async () => {
-    // Mock fetch error for the get_started endpoint
     fetchMock.mockResolvedValue({
       ok: false,
       status: 500,
@@ -307,7 +283,6 @@ describe("get_started tool error handling", () => {
 
     const result = await mockServer.getStartedHandler({ api: "admin" });
 
-    // Verify error handling
     expect(result.content[0].text).toContain(
       "Error fetching getting started information",
     );
@@ -315,14 +290,12 @@ describe("get_started tool error handling", () => {
   });
 
   test("handles network error", async () => {
-    // Mock network error for the get_started endpoint
     fetchMock.mockRejectedValue(new Error("Network failure"));
 
     await shopifyTools(mockServer);
 
     const result = await mockServer.getStartedHandler({ api: "admin" });
 
-    // Verify error handling
     expect(result.content[0].text).toContain(
       "Error fetching getting started information",
     );
@@ -342,7 +315,6 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
       { name: "admin", description: "Admin API" },
     ]);
 
-    // Create a mock server that captures the registered tools
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
         if (name === "validate_admin_api_codeblocks") {
@@ -354,7 +326,6 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
   });
 
   test("validates code blocks in parallel", async () => {
-    // Setup mock responses
     validateGraphQLOperationMock
       .mockResolvedValueOnce({
         result: ValidationResult.SUCCESS,
@@ -374,7 +345,6 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
 
     await mockServer.validateHandler({ codeblocks: testCodeBlocks });
 
-    // Verify each code block was validated with "admin" schema
     expect(validateGraphQLOperationMock).toHaveBeenCalledTimes(2);
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       1,
@@ -397,7 +367,6 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
 
     const testCodeBlocks = ["```graphql\nquery { products { id } }\n```"];
 
-    // Expect the error to propagate
     await expect(
       mockServer.validateHandler({ codeblocks: testCodeBlocks }),
     ).rejects.toThrow("Schema loading failed");
@@ -415,7 +384,6 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
       codeblocks: ["```graphql\nquery { products { id } }\n```"],
     });
 
-    // Verify the response format
     expect(result.content[0].type).toBe("text");
     const responseText = result.content[0].text;
     expect(responseText).toContain("## Validation Summary");
