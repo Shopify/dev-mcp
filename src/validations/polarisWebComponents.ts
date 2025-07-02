@@ -59,53 +59,79 @@ function validatePolarisComponentUsage(code: string): {
   isValid: boolean;
   error: string;
 } {
-  // Validate against @shopify/app-bridge-ui-types directly
+  // Parse JSX/TSX using TypeScript compiler API to extract components
+  const shopifyComponents = extractShopifyComponentsFromAST(code);
 
-  // Check for Shopify UI components (s-* pattern)
-  const shopifyComponentPattern = /<s-[a-z-]+/gi;
-  const shopifyComponents = code.match(shopifyComponentPattern);
-
-  // Also check for ui-* pattern (legacy or alternative naming)
-  const uiComponentPattern = /<ui-[a-z-]+/gi;
-  const uiComponents = code.match(uiComponentPattern);
-
-  const allComponents = [...(shopifyComponents || []), ...(uiComponents || [])];
-
-  if (!allComponents || allComponents.length === 0) {
+  if (shopifyComponents.length === 0) {
     return {
       isValid: false,
-      error: "No Shopify UI components (s-* or ui-* elements) found in code",
+      error: "No Shopify UI components (s-* elements) found in code",
     };
   }
 
-  // Validate each component against TypeScript types directly
-  for (const component of allComponents) {
-    const tagName = component.replace("<", "").toLowerCase();
-
-    // Validate component and props against TypeScript types
-    const validation = validateComponentAgainstTypes(tagName, code);
-    if (!validation.isValid) {
-      return validation;
-    }
-
-    // Check for proper closing tags
-    const closingTag = `</${tagName}>`;
-    const selfClosingPattern = new RegExp(`<${tagName}[^>]*/>`, "gi");
-    const hasClosingTag = code.includes(closingTag);
-    const isSelfClosing = selfClosingPattern.test(code);
-
-    if (!hasClosingTag && !isSelfClosing) {
-      return { isValid: false, error: `Missing closing tag for ${component}` };
-    }
-  }
-
-  return { isValid: true, error: "" };
+  // Validate the complete code with all components against TypeScript types
+  const validation = validateComponentAgainstTypes(code);
+  return validation;
 }
 
-function validateComponentAgainstTypes(
-  tagName: string,
-  code: string,
-): { isValid: boolean; error: string } {
+function extractShopifyComponentsFromAST(code: string): string[] {
+  try {
+    // Enhanced code with necessary imports for parsing
+    const enhancedCode = `
+/** @jsx h */
+import { h } from "preact";
+import "@shopify/app-bridge-ui-types";
+
+const element = ${code};
+`;
+
+    // Create a TypeScript source file for AST parsing
+    const sourceFile = ts.createSourceFile(
+      "temp.tsx",
+      enhancedCode,
+      ts.ScriptTarget.ES2020,
+      true,
+      ts.ScriptKind.TSX,
+    );
+
+    const shopifyComponents: string[] = [];
+
+    // Recursively visit AST nodes to find JSX elements
+    function visit(node: ts.Node) {
+      if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+        const tagName = getJsxTagName(node);
+        if (tagName && tagName.startsWith("s-")) {
+          shopifyComponents.push(tagName);
+        }
+      }
+      ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return [...new Set(shopifyComponents)]; // Remove duplicates
+  } catch (error) {
+    // Fallback to empty array if parsing fails
+    return [];
+  }
+}
+
+function getJsxTagName(
+  node: ts.JsxElement | ts.JsxSelfClosingElement,
+): string | null {
+  const tagNameNode = ts.isJsxElement(node)
+    ? node.openingElement.tagName
+    : node.tagName;
+
+  if (ts.isIdentifier(tagNameNode)) {
+    return tagNameNode.text;
+  }
+  return null;
+}
+
+function validateComponentAgainstTypes(code: string): {
+  isValid: boolean;
+  error: string;
+} {
   try {
     // Enhanced code with Preact JSX pragma and imports - match your working example
     const enhancedCode = `
