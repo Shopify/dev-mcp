@@ -20,7 +20,11 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     "introspect_admin_schema",
     `This tool introspects and returns the portion of the Shopify Admin API GraphQL schema relevant to the user prompt. Only use this for the Shopify Admin API, and not any other APIs like the Shopify Storefront API or the Shopify Functions API.
 
-    It takes three arguments: query, filter, and conversationId. The query argument is the string search term to filter schema elements by name. The filter argument is an array of strings to filter results to show specific sections. The conversationId is optional but should be passed to track usage across a conversation - this should be the same UUID returned from the learn_shopify_apis tool.`,
+    ⚠️  REQUIRES CONVERSATION ID: You must call learn_shopify_apis first to get a conversationId.
+
+    Any GraphQL codeblocks generated after using this tool MUST be validated with the validate_admin_api_codeblocks tool.
+
+    It takes three arguments: query, filter, and conversationId. The query argument is the string search term to filter schema elements by name. The filter argument is an array of strings to filter results to show specific sections. The conversationId is REQUIRED and must be the conversationId returned from the learn_shopify_apis tool.`,
     {
       query: z
         .string()
@@ -36,9 +40,8 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         ),
       conversationId: z
         .string()
-        .optional()
         .describe(
-          "Optional UUID to track this tool usage within a conversation. Should be the same UUID returned from learn_shopify_apis tool.",
+          "🔗 REQUIRED: conversationId from learn_shopify_apis tool. Call learn_shopify_apis first if you don't have this.",
         ),
     },
     async ({ query, filter, conversationId }) => {
@@ -68,16 +71,17 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     "search_dev_doc_chunks",
     `This tool will take in the user prompt, search shopify.dev, and return relevant chunks (documentation, code examples, etc) across all dev docs that will help answer the user's question.
 
+    ⚠️  REQUIRES CONVERSATION ID: You must call learn_shopify_apis first to get a conversationId.
+
     Chunked docs have the advantage of being able to match tokens within smaller chunks of content, but they may miss all context from a particular page of documentation. Use this tool if you want as much context for the token as possible across all of Shopify docs. Do not use this tool if you are looking for all doc context for a particular API resource -- use the fetch_entire_doc_by_path tool instead.
 
-    It takes two arguments: prompt and conversationId. The prompt is the search query for Shopify documentation. The conversationId is optional but should be passed to track usage across a conversation - this should be the same UUID returned from the learn_shopify_apis tool.`,
+    It takes two arguments: prompt and conversationId. The prompt is the search query for Shopify documentation. The conversationId is REQUIRED and must be the conversationId returned from the learn_shopify_apis tool.`,
     {
       prompt: z.string().describe("The search query for Shopify documentation"),
       conversationId: z
         .string()
-        .optional()
         .describe(
-          "Optional UUID to track this tool usage within a conversation. Should be the same UUID returned from learn_shopify_apis tool.",
+          "🔗 REQUIRED: conversationId from learn_shopify_apis tool. Call learn_shopify_apis first if you don't have this.",
         ),
     },
     async ({ prompt, conversationId }) => {
@@ -105,19 +109,20 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     "fetch_entire_doc_by_path",
     `Use this tool to retrieve a list of documents from shopify.dev.
 
+    ⚠️  REQUIRES CONVERSATION ID: You must call learn_shopify_apis first to get a conversationId.
+
     This tool provides the full documentation for a particular path. No context will be missing for a particular path that you might miss when using doc chunks.
 
     Args:
     paths: The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"].
     Paths should be relative to the root of the developer documentation site.
-    conversationId: Optional UUID to track this tool usage within a conversation - this should be the same UUID returned from the learn_shopify_apis tool.`,
+    conversationId: REQUIRED conversationId from learn_shopify_apis tool.`,
     {
       paths: z.array(z.string()).describe("The paths to the documents to read"),
       conversationId: z
         .string()
-        .optional()
         .describe(
-          "Optional UUID to track this tool usage within a conversation. Should be the same UUID returned from learn_shopify_apis tool.",
+          "🔗 REQUIRED: conversationId from learn_shopify_apis tool. Call learn_shopify_apis first if you don't have this.",
         ),
     },
     async ({ paths, conversationId }) => {
@@ -173,7 +178,9 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     "validate_admin_api_codeblocks",
     `This tool is used to ensure that the codeblock generated by LLMs don't have hallucinated fields or operations. If a user asks for an LLM to generate a graphql operation, this tool should always be used to ensure valid code blocks were generated.
 
-    It takes two arguments: codeblocks and conversationId. The codeblocks argument is an array of markdown code blocks containing GraphQL operations to validate. The conversationId is optional but should be passed to track usage across a conversation - this should be the same UUID returned from the learn_shopify_apis tool.
+    ⚠️  REQUIRES CONVERSATION ID: You must call learn_shopify_apis first to get a conversationId.
+
+    It takes two arguments: codeblocks and conversationId. The codeblocks argument is an array of markdown code blocks containing GraphQL operations to validate. The conversationId is REQUIRED and must be the conversationId returned from the learn_shopify_apis tool.
     It returns a comprehensive validation result with details for each code block explaining why a code block was valid, invalid, or skipped. This detail is provided so LLMs know how to modify codeblocks to remove errors within generated codeblocks.`,
 
     {
@@ -184,9 +191,8 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         ),
       conversationId: z
         .string()
-        .optional()
         .describe(
-          "Optional UUID to track this tool usage within a conversation. Should be the same UUID returned from learn_shopify_apis tool.",
+          "🔗 REQUIRED: conversationId from learn_shopify_apis tool. Call learn_shopify_apis first if you don't have this.",
         ),
     },
     async ({ codeblocks, conversationId }) => {
@@ -232,18 +238,24 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     // This tool is the entrypoint for our MCP server. It has the following responsibilities:
 
     // 1. It teaches the LLM what Shopify APIs are supported with this MCP server. This is done by making a remote request for the latest up-to-date context of each API.
-    // 2. It generates and returns a conversation UUID that should be passed to all subsequent tool calls within the same chat session.
+    // 2. It generates and returns a conversationId that should be passed to all subsequent tool calls within the same chat session.
     "learn_shopify_apis",
-    `
-    YOU MUST CALL THIS TOOL FIRST WHENEVER YOU ARE IN A SHOPIFY APP AND THE USER WANTS TO LEARN OR INTERACT WITH ANY OF THESE APIS:
+    `🚨 MANDATORY FIRST STEP: This tool MUST be called before any other Shopify tools.
 
-    Valid arguments for \`api\` are:
+⚠️  ALL OTHER SHOPIFY TOOLS WILL FAIL without a conversationId from this tool.
+
+This tool generates a conversationId that is REQUIRED for all subsequent tool calls. After calling this tool, you MUST extract the conversationId from the response and pass it to every other Shopify tool call.
+
+Valid arguments for \`api\` are:
 ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
 
-    This tool generates a conversation UUID that should be passed to all subsequent tool calls within the same chat session. Use the returned conversationId in all other MCP tool calls to track usage across the conversation.
+🔄 WORKFLOW:
+1. Call learn_shopify_apis first
+2. Extract the conversationId from the response 
+3. Pass that same conversationId to ALL other Shopify tools
 
-    DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE.
-    PREFER THE USE OF THE fetch_entire_doc_by_path TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
+DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE.
+PREFER THE USE OF THE fetch_entire_doc_by_path TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
   `,
     {
       api: z
@@ -253,7 +265,7 @@ ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join(
         .string()
         .optional()
         .describe(
-          "Optional existing conversation UUID. If not provided, a new UUID will be generated for this conversation.",
+          "Optional existing conversation UUID. If not provided, a new conversation ID will be generated for this conversation. This conversationId should be passed to all subsequent tool calls within the same chat session.",
         ),
     },
     async ({ api, conversationId }) => {
@@ -288,9 +300,20 @@ ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join(
         ).catch(() => {});
 
         // Include the conversation ID in the response
-        const responseText = `**Conversation ID:** ${currentConversationId}
+        const responseText =
+          currentConversationId === "opted-out"
+            ? `🔗 **Conversation ID:** ${currentConversationId}
 
-Please use this conversation ID in all subsequent MCP tool calls within this chat session.
+You MUST use this conversationId in ALL subsequent Shopify tool calls in this conversation.
+
+---
+
+${text}`
+            : `🔗 **IMPORTANT - SAVE THIS CONVERSATION ID:** ${currentConversationId}
+
+⚠️  CRITICAL: You MUST use this exact conversationId in ALL subsequent Shopify tool calls in this conversation.
+
+🚨 ALL OTHER SHOPIFY TOOLS WILL RETURN ERRORS if you don't provide this conversationId.
 
 ---
 

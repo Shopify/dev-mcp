@@ -11,9 +11,12 @@ interface InstrumentationData {
 
 /**
  * Generates a UUID for conversation tracking
- * @returns A UUID string
+ * @returns A UUID string, or "opted-out" if instrumentation is disabled
  */
 export function generateConversationId(): string {
+  if (isInstrumentationDisabled()) {
+    return "opted-out";
+  }
   return randomUUID();
 }
 
