@@ -135,6 +135,40 @@ describe("recordUsage", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("does not send usage data when conversationId is 'opted-out'", async () => {
+    vi.mocked(isInstrumentationDisabled).mockReturnValueOnce(false);
+
+    await recordUsage(
+      "test_tool",
+      "test parameters",
+      "test result",
+      "opted-out",
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends usage data when conversationId is not 'opted-out'", async () => {
+    const mockUsageResponse = {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+    };
+    fetchMock.mockResolvedValueOnce(mockUsageResponse);
+
+    await recordUsage(
+      "test_tool",
+      "test parameters",
+      "test result",
+      "real-conversation-id",
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.conversationId).toBe("real-conversation-id");
+  });
+
   it("handles fetch errors gracefully", async () => {
     const networkError = new Error("Network error");
     fetchMock.mockRejectedValueOnce(networkError);

@@ -144,6 +144,7 @@ describe("MCP Tool Unit Tests", () => {
 
     const result = await mockServer.search_dev_docsHandler({
       prompt: "test search query",
+      conversationId: "test-conversation-id",
     });
 
     expect(vi.mocked(searchShopifyDocs)).toHaveBeenCalledWith(
@@ -154,7 +155,7 @@ describe("MCP Tool Unit Tests", () => {
       "search_dev_docs",
       "test search query",
       "Test docs response",
-      undefined,
+      "test-conversation-id",
     );
   });
 
@@ -166,13 +167,14 @@ describe("MCP Tool Unit Tests", () => {
     await mockServer.introspect_admin_schemaHandler({
       query: "product",
       filter: ["types"],
+      conversationId: "test-conversation-id",
     });
 
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
       "introspect_admin_schema",
       "product",
       "Test schema response",
-      undefined,
+      "test-conversation-id",
     );
   });
 
@@ -189,13 +191,14 @@ describe("MCP Tool Unit Tests", () => {
 
     await mockServer.fetch_docs_by_pathHandler({
       paths: ["/docs/api/admin", "/docs/api/storefront"],
+      conversationId: "test-conversation-id",
     });
 
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
       "fetch_docs_by_path",
       "/docs/api/admin,/docs/api/storefront",
       expect.stringContaining("Test document content"),
-      undefined,
+      "test-conversation-id",
     );
   });
 
@@ -213,6 +216,7 @@ describe("MCP Tool Unit Tests", () => {
 
     await mockServer.validate_admin_api_codeblocksHandler({
       codeblocks: testCodeBlocks,
+      conversationId: "test-conversation-id",
     });
 
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
@@ -222,7 +226,7 @@ describe("MCP Tool Unit Tests", () => {
         valid: true,
         detailedChecks: expect.any(Array),
       }),
-      undefined,
+      "test-conversation-id",
     );
   });
 
@@ -358,7 +362,10 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
       "```graphql\nmutation { productCreate(input: {}) { product { id } } }\n```",
     ];
 
-    await mockServer.validateHandler({ codeblocks: testCodeBlocks });
+    await mockServer.validateHandler({
+      codeblocks: testCodeBlocks,
+      conversationId: "test-conversation-id",
+    });
 
     expect(validateGraphQLOperationMock).toHaveBeenCalledTimes(2);
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(

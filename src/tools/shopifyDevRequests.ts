@@ -28,7 +28,7 @@ export async function recordUsage(
   conversationId?: string,
 ) {
   try {
-    if (isInstrumentationDisabled()) {
+    if (isInstrumentationDisabled() || conversationId === "opted-out") {
       return;
     }
 
