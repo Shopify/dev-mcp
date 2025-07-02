@@ -25,7 +25,7 @@ export function validatePolarisWebComponents(codeBlock: string) {
 
   if (validation.isValid) {
     result = true;
-    resultDetail = "Code uses valid Polaris web components";
+    resultDetail = "Codeblocks that included Polaris web components were validated with the Typescript compiler with the Polaris types.";
   } else {
     resultDetail = validation.error;
   }
