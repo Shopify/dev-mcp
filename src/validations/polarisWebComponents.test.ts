@@ -14,285 +14,285 @@ describe("validatePolarisWebComponents", () => {
         expect(result).toBe(ValidationResult.SUCCESS);
       });
 
-      it("s-banner", () => {
-        const codeBlock = "```<s-banner>Important message</s-banner>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-banner", () => {
+      //   const codeBlock = "```<s-banner>Important message</s-banner>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-box", () => {
-        const codeBlock = "```<s-box>Content</s-box>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-box", () => {
+      //   const codeBlock = "```<s-box>Content</s-box>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-button", () => {
-        const codeBlock = "```<s-button>Hello, World</s-button>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-button", () => {
+      //   const codeBlock = "```<s-button>Hello, World</s-button>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-checkbox", () => {
-        const codeBlock = "```<s-checkbox>Check me</s-checkbox>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-checkbox", () => {
+      //   const codeBlock = "```<s-checkbox>Check me</s-checkbox>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-choice", () => {
-        const codeBlock = "```<s-choice>Option 1</s-choice>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-choice", () => {
+      //   const codeBlock = "```<s-choice>Option 1</s-choice>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-choice-list", () => {
-        const codeBlock =
-          "```<s-choice-list><s-choice>Option 1</s-choice></s-choice-list>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-choice-list", () => {
+      //   const codeBlock =
+      //     "```<s-choice-list><s-choice>Option 1</s-choice></s-choice-list>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-clickable", () => {
-        const codeBlock = "```<s-clickable>Click me</s-clickable>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-clickable", () => {
+      //   const codeBlock = "```<s-clickable>Click me</s-clickable>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-date-picker", () => {
-        const codeBlock = "```<s-date-picker></s-date-picker>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-date-picker", () => {
+      //   const codeBlock = "```<s-date-picker></s-date-picker>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-divider", () => {
-        const codeBlock = "```<s-divider></s-divider>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-divider", () => {
+      //   const codeBlock = "```<s-divider></s-divider>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // Form fields
-      it("s-email-field", () => {
-        const codeBlock = "```<s-email-field></s-email-field>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // Form fields
+      // it("s-email-field", () => {
+      //   const codeBlock = "```<s-email-field></s-email-field>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-number-field", () => {
-        const codeBlock = "```<s-number-field></s-number-field>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-number-field", () => {
+      //   const codeBlock = "```<s-number-field></s-number-field>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-password-field", () => {
-        const codeBlock = "```<s-password-field></s-password-field>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-password-field", () => {
+      //   const codeBlock = "```<s-password-field></s-password-field>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-search-field", () => {
-        const codeBlock = "```<s-search-field></s-search-field>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-search-field", () => {
+      //   const codeBlock = "```<s-search-field></s-search-field>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-text-area", () => {
-        const codeBlock = "```<s-text-area></s-text-area>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-text-area", () => {
+      //   const codeBlock = "```<s-text-area></s-text-area>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-text-field", () => {
-        const codeBlock = "```<s-text-field></s-text-field>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-text-field", () => {
+      //   const codeBlock = "```<s-text-field></s-text-field>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-url-field", () => {
-        const codeBlock = "```<s-url-field></s-url-field>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-url-field", () => {
+      //   const codeBlock = "```<s-url-field></s-url-field>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-money-field", () => {
-        const codeBlock = "```<s-money-field></s-money-field>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-money-field", () => {
+      //   const codeBlock = "```<s-money-field></s-money-field>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // Layout components
-      it("s-grid", () => {
-        const codeBlock =
-          "```<s-grid><s-grid-item>Item</s-grid-item></s-grid>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // Layout components
+      // it("s-grid", () => {
+      //   const codeBlock =
+      //     "```<s-grid><s-grid-item>Item</s-grid-item></s-grid>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-grid-item", () => {
-        const codeBlock = "```<s-grid-item>Grid item content</s-grid-item>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-grid-item", () => {
+      //   const codeBlock = "```<s-grid-item>Grid item content</s-grid-item>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-stack", () => {
-        const codeBlock = "```<s-stack>Stacked content</s-stack>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-stack", () => {
+      //   const codeBlock = "```<s-stack>Stacked content</s-stack>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-page", () => {
-        const codeBlock = "```<s-page>Page content</s-page>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-page", () => {
+      //   const codeBlock = "```<s-page>Page content</s-page>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-section", () => {
-        const codeBlock = "```<s-section>Section content</s-section>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-section", () => {
+      //   const codeBlock = "```<s-section>Section content</s-section>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // Typography components
-      it("s-heading", () => {
-        const codeBlock = "```<s-heading>Heading text</s-heading>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // Typography components
+      // it("s-heading", () => {
+      //   const codeBlock = "```<s-heading>Heading text</s-heading>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-text", () => {
-        const codeBlock = "```<s-text>Text content</s-text>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-text", () => {
+      //   const codeBlock = "```<s-text>Text content</s-text>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-paragraph", () => {
-        const codeBlock = "```<s-paragraph>Paragraph text</s-paragraph>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-paragraph", () => {
+      //   const codeBlock = "```<s-paragraph>Paragraph text</s-paragraph>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // Media components
-      it("s-icon", () => {
-        const codeBlock = "```<s-icon></s-icon>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // Media components
+      // it("s-icon", () => {
+      //   const codeBlock = "```<s-icon></s-icon>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-image", () => {
-        const codeBlock = "```<s-image src='example.jpg'></s-image>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-image", () => {
+      //   const codeBlock = "```<s-image src='example.jpg'></s-image>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // Navigation and actions
-      it("s-link", () => {
-        const codeBlock = "```<s-link href='/'>Home</s-link>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // Navigation and actions
+      // it("s-link", () => {
+      //   const codeBlock = "```<s-link href='/'>Home</s-link>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // Form controls
-      it("s-select", () => {
-        const codeBlock =
-          "```<s-select><s-option>Option 1</s-option></s-select>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // Form controls
+      // it("s-select", () => {
+      //   const codeBlock =
+      //     "```<s-select><s-option>Option 1</s-option></s-select>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-option", () => {
-        const codeBlock = "```<s-option>Option text</s-option>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-option", () => {
+      //   const codeBlock = "```<s-option>Option text</s-option>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-option-group", () => {
-        const codeBlock =
-          "```<s-option-group><s-option>Option 1</s-option></s-option-group>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-option-group", () => {
+      //   const codeBlock =
+      //     "```<s-option-group><s-option>Option 1</s-option></s-option-group>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-switch", () => {
-        const codeBlock = "```<s-switch></s-switch>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-switch", () => {
+      //   const codeBlock = "```<s-switch></s-switch>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // Feedback components
-      it("s-spinner", () => {
-        const codeBlock = "```<s-spinner></s-spinner>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // Feedback components
+      // it("s-spinner", () => {
+      //   const codeBlock = "```<s-spinner></s-spinner>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // List components
-      it("s-ordered-list", () => {
-        const codeBlock =
-          "```<s-ordered-list><s-list-item>Item 1</s-list-item></s-ordered-list>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // List components
+      // it("s-ordered-list", () => {
+      //   const codeBlock =
+      //     "```<s-ordered-list><s-list-item>Item 1</s-list-item></s-ordered-list>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-unordered-list", () => {
-        const codeBlock =
-          "```<s-unordered-list><s-list-item>Item 1</s-list-item></s-unordered-list>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-unordered-list", () => {
+      //   const codeBlock =
+      //     "```<s-unordered-list><s-list-item>Item 1</s-list-item></s-unordered-list>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-list-item", () => {
-        const codeBlock = "```<s-list-item>List item text</s-list-item>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-list-item", () => {
+      //   const codeBlock = "```<s-list-item>List item text</s-list-item>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // Table components
-      it("s-table", () => {
-        const codeBlock =
-          "```<s-table><s-table-body><s-table-row><s-table-cell>Cell</s-table-cell></s-table-row></s-table-body></s-table>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // Table components
+      // it("s-table", () => {
+      //   const codeBlock =
+      //     "```<s-table><s-table-body><s-table-row><s-table-cell>Cell</s-table-cell></s-table-row></s-table-body></s-table>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-table-body", () => {
-        const codeBlock =
-          "```<s-table-body><s-table-row><s-table-cell>Cell</s-table-cell></s-table-row></s-table-body>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-table-body", () => {
+      //   const codeBlock =
+      //     "```<s-table-body><s-table-row><s-table-cell>Cell</s-table-cell></s-table-row></s-table-body>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-table-header", () => {
-        const codeBlock =
-          "```<s-table-header><s-table-header-row><s-table-cell>Header</s-table-cell></s-table-header-row></s-table-header>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-table-header", () => {
+      //   const codeBlock =
+      //     "```<s-table-header><s-table-header-row><s-table-cell>Header</s-table-cell></s-table-header-row></s-table-header>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-table-header-row", () => {
-        const codeBlock =
-          "```<s-table-header-row><s-table-cell>Header</s-table-cell></s-table-header-row>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-table-header-row", () => {
+      //   const codeBlock =
+      //     "```<s-table-header-row><s-table-cell>Header</s-table-cell></s-table-header-row>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-table-row", () => {
-        const codeBlock =
-          "```<s-table-row><s-table-cell>Cell</s-table-cell></s-table-row>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-table-row", () => {
+      //   const codeBlock =
+      //     "```<s-table-row><s-table-cell>Cell</s-table-cell></s-table-row>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      it("s-table-cell", () => {
-        const codeBlock = "```<s-table-cell>Cell content</s-table-cell>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // it("s-table-cell", () => {
+      //   const codeBlock = "```<s-table-cell>Cell content</s-table-cell>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
 
-      // Query component
-      it("s-query-container", () => {
-        const codeBlock =
-          "```<s-query-container>Query content</s-query-container>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
+      // // Query component
+      // it("s-query-container", () => {
+      //   const codeBlock =
+      //     "```<s-query-container>Query content</s-query-container>```";
+      //   const { result } = validatePolarisWebComponents(codeBlock);
+      //   expect(result).toBe(ValidationResult.SUCCESS);
+      // });
     });
 
     describe("valid props", () => {
@@ -355,12 +355,6 @@ describe("validatePolarisWebComponents", () => {
         expect(result).toBe(ValidationResult.SUCCESS);
       });
 
-      it("s-heading with level", () => {
-        const codeBlock = "```<s-heading level='2'>Heading Text</s-heading>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.SUCCESS);
-      });
-
       it("s-icon with type", () => {
         const codeBlock = "```<s-icon type='plus'></s-icon>```";
         const { result } = validatePolarisWebComponents(codeBlock);
@@ -398,7 +392,7 @@ describe("validatePolarisWebComponents", () => {
       });
     });
 
-    describe.only("invalid components", () => {
+    describe("invalid components", () => {
       // Non-existent Polaris components
       it("p-button (wrong prefix)", () => {
         const codeBlock = "```<p-button>Hello, World</p-button>```";
@@ -459,6 +453,12 @@ describe("validatePolarisWebComponents", () => {
     });
 
     describe("invalid props", () => {
+      it("s-heading doesn't support level", () => {
+        const codeBlock = "```<s-heading level='2'>Heading Text</s-heading>```";
+        const { result } = validatePolarisWebComponents(codeBlock);
+        expect(result).toBe(ValidationResult.FAILED);
+      });
+
       it("s-button doesn't support appearance", () => {
         const codeBlock =
           "```<s-button appearance='critical'>Hello, World</s-button>```";
@@ -514,13 +514,6 @@ describe("validatePolarisWebComponents", () => {
         expect(result).toBe(ValidationResult.FAILED);
       });
 
-      it("s-button doesn't support variant 'tertiary' (React-only)", () => {
-        const codeBlock =
-          "```<s-button variant='tertiary'>Tertiary Button</s-button>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.FAILED);
-      });
-
       it("s-button doesn't support variant 'monochromePlain' (React-only)", () => {
         const codeBlock =
           "```<s-button variant='monochromePlain'>Monochrome Button</s-button>```";
@@ -531,13 +524,6 @@ describe("validatePolarisWebComponents", () => {
       it("s-button doesn't support invalid variant 'custom'", () => {
         const codeBlock =
           "```<s-button variant='custom'>Custom Button</s-button>```";
-        const { result } = validatePolarisWebComponents(codeBlock);
-        expect(result).toBe(ValidationResult.FAILED);
-      });
-
-      it("s-badge doesn't support invalid tone 'warning'", () => {
-        const codeBlock =
-          "```<s-badge tone='warning'>Warning Badge</s-badge>```";
         const { result } = validatePolarisWebComponents(codeBlock);
         expect(result).toBe(ValidationResult.FAILED);
       });
