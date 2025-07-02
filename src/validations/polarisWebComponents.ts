@@ -1,9 +1,30 @@
 import * as ts from "typescript";
-import * as appBridgeUiTypes from "@shopify/app-bridge-ui-types";
-import * as fs from "fs";
 
-export function validatePolarisWebComponents(codeBlock: string) {
-  let result = false;
+export enum ValidationResult {
+  SUCCESS = "success",
+  FAILED = "failed",
+  SKIPPED = "skipped",
+}
+
+export interface ValidationResponse {
+  /**
+   * The status of the validation check
+   */
+  result: ValidationResult;
+
+  /**
+   * Explanation of the validation result.
+   * For FAILED: Details about why validation failed
+   * For SKIPPED: Rationale for why validation was skipped
+   * For SUCCESS: Description of what validation was successfully performed
+   */
+  resultDetail: string;
+}
+
+export function validatePolarisWebComponents(
+  codeBlock: string,
+): ValidationResponse {
+  let result = ValidationResult.FAILED;
   let resultDetail = "";
 
   // extract code from language-less codeblock
@@ -24,8 +45,9 @@ export function validatePolarisWebComponents(codeBlock: string) {
   const validation = validatePolarisComponentUsage(code);
 
   if (validation.isValid) {
-    result = true;
-    resultDetail = "Codeblocks that included Polaris web components were validated with the Typescript compiler with the Polaris types.";
+    result = ValidationResult.SUCCESS;
+    resultDetail =
+      "Codeblocks that included Polaris web components were validated with the Typescript compiler with the Polaris types.";
   } else {
     resultDetail = validation.error;
   }
@@ -80,7 +102,10 @@ function validatePolarisComponentUsage(code: string): {
   return { isValid: true, error: "" };
 }
 
-function validateComponentAgainstTypes(tagName: string, code: string): { isValid: boolean; error: string } {
+function validateComponentAgainstTypes(
+  tagName: string,
+  code: string,
+): { isValid: boolean; error: string } {
   try {
     // Enhanced code with Preact JSX pragma and imports - match your working example
     const enhancedCode = `
@@ -93,7 +118,7 @@ const button = ${code};
 
     const compilerOptions: ts.CompilerOptions = {
       target: ts.ScriptTarget.ES2020,
-      module: ts.ModuleKind.ESNext, 
+      module: ts.ModuleKind.ESNext,
       moduleResolution: ts.ModuleResolutionKind.NodeJs,
       skipLibCheck: false, // Enable checking to catch type errors
       strict: true, // Enable strict checking
@@ -121,51 +146,80 @@ const button = ${code};
     // Use default compiler host but override getSourceFile for virtual files
     const host = ts.createCompilerHost(compilerOptions);
     const originalGetSourceFile = host.getSourceFile;
-    
-    host.getSourceFile = (fileName, languageVersion, onError, shouldCreateNewSourceFile) => {
+
+    host.getSourceFile = (
+      fileName,
+      languageVersion,
+      onError,
+      shouldCreateNewSourceFile,
+    ) => {
       if (fileName === "virtual-file.tsx") {
         return sourceFile;
       }
       // Let TypeScript resolve actual modules from node_modules
-      return originalGetSourceFile(fileName, languageVersion, onError, shouldCreateNewSourceFile);
+      return originalGetSourceFile(
+        fileName,
+        languageVersion,
+        onError,
+        shouldCreateNewSourceFile,
+      );
     };
 
-    const program = ts.createProgram(["virtual-file.tsx"], compilerOptions, host);
+    const program = ts.createProgram(
+      ["virtual-file.tsx"],
+      compilerOptions,
+      host,
+    );
 
     // Get diagnostics - if there are any, the code is invalid
     const allDiagnostics = ts.getPreEmitDiagnostics(program);
-    
+
     // Filter out React/dependency errors but keep actual type validation errors
-    const diagnostics = allDiagnostics
-      .filter(d => {
-        // Use flattened message text to get the complete error message including nested parts
-        const msg = ts.flattenDiagnosticMessageText(d.messageText, "\n");
-        
-        // First, filter out React/dependency related errors and internal interface issues
-        if (msg.includes('Could not find a declaration file for module')) return false;
-        if (msg.includes('only refers to a type, but is being used as a namespace')) return false;
-        if (msg.includes('Invalid module name in augmentation')) return false;
-        if (msg.includes('Cannot find name \'HTMLAttributes\'')) return false;
-        if (msg.includes('Cannot find module')) return false;
-        if (msg.includes('ChoiceListProps$1') || msg.includes('ClickableProps$1')) return false;
-        if (msg.includes('MultipleInputProps') || msg.includes('BaseClickableProps')) return false;
-        
-        // Then, keep only relevant type validation errors (the core validation we want)
-        if (msg.includes('is not assignable to type')) return true;
-        if (msg.includes('Property') && msg.includes('does not exist on type')) return true;
-        if (msg.includes('has no exported member')) return true;
-        if (msg.includes('Object literal may only specify known properties')) return true;
-        if (msg.includes('does not exist on type')) return true;
-        if (msg.includes('Argument of type') && msg.includes('is not assignable')) return true;
-        
-        return false; // Default to filtering out unknown errors
-      });
+    const diagnostics = allDiagnostics.filter((d) => {
+      // Use flattened message text to get the complete error message including nested parts
+      const msg = ts.flattenDiagnosticMessageText(d.messageText, "\n");
+
+      // First, filter out React/dependency related errors and internal interface issues
+      if (msg.includes("Could not find a declaration file for module"))
+        return false;
+      if (
+        msg.includes("only refers to a type, but is being used as a namespace")
+      )
+        return false;
+      if (msg.includes("Invalid module name in augmentation")) return false;
+      if (msg.includes("Cannot find name 'HTMLAttributes'")) return false;
+      if (msg.includes("Cannot find module")) return false;
+      if (msg.includes("ChoiceListProps$1") || msg.includes("ClickableProps$1"))
+        return false;
+      if (
+        msg.includes("MultipleInputProps") ||
+        msg.includes("BaseClickableProps")
+      )
+        return false;
+
+      // Then, keep only relevant type validation errors (the core validation we want)
+      if (msg.includes("is not assignable to type")) return true;
+      if (msg.includes("Property") && msg.includes("does not exist on type"))
+        return true;
+      if (msg.includes("has no exported member")) return true;
+      if (msg.includes("Object literal may only specify known properties"))
+        return true;
+      if (msg.includes("does not exist on type")) return true;
+      if (msg.includes("Argument of type") && msg.includes("is not assignable"))
+        return true;
+
+      return false; // Default to filtering out unknown errors
+    });
 
     if (diagnostics.length > 0) {
       const errors = diagnostics.map((diagnostic) => {
         if (diagnostic.file && diagnostic.start !== undefined) {
-          const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
-          const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
+          const { line, character } =
+            diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+          const message = ts.flattenDiagnosticMessageText(
+            diagnostic.messageText,
+            "\n",
+          );
           return `Line ${line + 1}, Column ${character + 1}: ${message}`;
         } else {
           return ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
