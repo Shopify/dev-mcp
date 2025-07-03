@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateGraphQLOperation } from "./graphqlSchema.js";
+import validateGraphQLOperation from "./graphqlSchema.js";
 import { ValidationResult } from "../types.js";
 import * as shopifyAdminSchema from "../tools/shopify-admin-schema.js";
 
@@ -397,7 +397,7 @@ query {
         expect(result.detailedChecks[0].resultDetail).toContain(
           "Successfully validated GraphQL",
         );
-        expect(result.detailedChecks[0].resultDetail).toContain("admin schema");
+        expect(result.detailedChecks[0].resultDetail).toContain("Admin API schema");
       } else if (result.detailedChecks[0].result === ValidationResult.FAILED) {
         // Could be schema loading/conversion error, not syntax or schema name error
         expect(result.detailedChecks[0].resultDetail).not.toContain(
@@ -435,7 +435,7 @@ query {
         expect(result.detailedChecks[0].resultDetail).toContain(
           "Successfully validated GraphQL",
         );
-        expect(result.detailedChecks[0].resultDetail).toContain("admin schema");
+        expect(result.detailedChecks[0].resultDetail).toContain("Admin API schema");
       } else if (result.detailedChecks[0].result === ValidationResult.FAILED) {
         // Could be schema loading/conversion error, not syntax error
         expect(result.detailedChecks[0].resultDetail).not.toContain(
@@ -519,7 +519,7 @@ query {
       expect(result.detailedChecks[0].resultDetail).toContain(
         "Successfully validated GraphQL",
       );
-      expect(result.detailedChecks[0].resultDetail).toContain("admin schema");
+      expect(result.detailedChecks[0].resultDetail).toContain("Admin API schema");
     });
   });
 

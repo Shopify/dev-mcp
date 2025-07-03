@@ -122,8 +122,14 @@ function validationResult(
   return { result, resultDetail };
 }
 
-function validateSchemaName(schemaName: string): boolean {
-  return schemaName === "admin";
+function validateSchemaName(
+  schemaName: string,
+): schemaName is SupportedSchemaName {
+  return schemaName in SCHEMA_MAPPINGS;
+}
+
+function getSchemaPath(schemaName: SupportedSchemaName): string {
+  return SCHEMA_MAPPINGS[schemaName];
 }
 
 function extractGraphQLCodeblocks(markdownResponse: string): string[] {
@@ -173,8 +179,9 @@ function isLikelyGraphQLOperation(content: string): boolean {
   return graphqlKeywords.test(content) || graphqlSyntax.test(content);
 }
 
-async function loadAndBuildGraphQLSchema() {
-  const schemaContent = await loadSchemaContent(SCHEMA_FILE_PATH);
+async function loadAndBuildGraphQLSchema(schemaName: SupportedSchemaName) {
+  const schemaPath = getSchemaPath(schemaName);
+  const schemaContent = await loadSchemaContent(schemaPath);
   const schemaJson = JSON.parse(schemaContent);
   return buildClientSchema(schemaJson.data);
 }
@@ -212,10 +219,11 @@ function getOperationType(document: any): string {
 function validateSchemaIsSupported(
   schemaName: string,
 ): ValidationResponse | null {
-  if (validateSchemaName(schemaName) === false) {
+  if (!validateSchemaName(schemaName)) {
+    const supportedSchemas = Object.keys(SCHEMA_MAPPINGS).join(", ");
     return validationResult(
       ValidationResult.FAILED,
-      `Unsupported schema name: ${schemaName}. Currently only 'admin' is supported.`,
+      `Unsupported schema name: ${schemaName}. Currently supported schemas: ${supportedSchemas}`,
     );
   }
   return null;

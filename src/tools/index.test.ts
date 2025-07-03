@@ -385,10 +385,10 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
     // Verify the response
     expect(result.content[0].type).toBe("text");
     const responseText = result.content[0].text;
-    expect(responseText).toContain("✅ VALID");
-    expect(responseText).toContain("**Total Code Blocks:** 2");
-    expect(responseText).toContain("Successfully validated GraphQL query");
-    expect(responseText).toContain("No GraphQL operation found");
+    expect(responseText).toContain("## Detailed Results");
+    expect(responseText).toContain("**Status:** ✅ SUCCESS");
+    expect(responseText).toContain("Valid GraphQL query");
+    expect(responseText).toContain("Valid GraphQL mutation");
   });
 
   test("handles validation failures correctly", async () => {

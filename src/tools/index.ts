@@ -205,8 +205,9 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         return `\`\`\`graphql\n${block}\n\`\`\``;
       });
 
-      const validationResult =
-        await validateAdminGraphQLCodeblocks(formattedCodeblocks);
+      const validationResult = await validateAdminGraphQLCodeblocks(
+        formattedCodeblocks.join("\n\n"),
+      );
       const responseText = validationSummary(validationResult);
 
       recordUsage(
