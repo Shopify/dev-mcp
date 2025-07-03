@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  validatePolarisWebComponents,
-  ValidationResult,
-} from "./polarisWebComponents.js";
+import { validatePolarisWebComponents } from "./polarisWebComponents.js";
+import { ValidationResult } from "../types.js";
 
 describe("validatePolarisWebComponents", () => {
   describe("app home", () => {
@@ -593,6 +591,33 @@ describe("validatePolarisWebComponents", () => {
         const { result } = validatePolarisWebComponents(codeBlock);
         expect(result).toBe(ValidationResult.FAILED);
       });
+    });
+  });
+
+  describe("real life examples", () => {
+    it("should validate a real life example with type errors", () => {
+      // This example contains invalid props that cause TypeScript errors:
+      // 1. s-heading level="2" - Property 'level' does not exist on type
+      // 2. s-link url="..." external - Properties 'url' and 'external' do not exist on type
+      // Note: s-stack direction="horizontal" might be filtered out by the validation logic
+      const codeBlock =
+        '```html<s-stack direction="horizontal" gap="large">\n  <s-section>\n    <s-heading level="2">Congrats on creating a new Shopify app 🎉</s-heading>\n    <s-paragraph>\n      This embedded app template uses <s-link url="https://shopify.dev/docs/apps/tools/app-bridge" external>App Bridge</s-link>\n    </s-paragraph>\n  </s-section>\n</s-stack>\n```';
+      const { result, resultDetail } = validatePolarisWebComponents(codeBlock);
+      expect(result).toBe(ValidationResult.FAILED);
+      expect(resultDetail).toContain("TypeScript compilation errors:");
+      
+      // Check for specific prop validation errors that are actually caught
+      expect(resultDetail).toContain("level");
+      expect(resultDetail).toContain("url");
+      expect(resultDetail).toContain("external");
+      
+      // Check for specific error types
+      expect(resultDetail).toContain("is not assignable to type");
+      expect(resultDetail).toContain("does not exist on type");
+      
+      // Check that the problematic props are mentioned in the error
+      expect(resultDetail).toContain("Property 'level' does not exist");
+      expect(resultDetail).toContain("Property 'url' does not exist");
     });
   });
 });
