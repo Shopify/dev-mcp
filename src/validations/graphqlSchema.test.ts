@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import validateGraphQLOperation from "./graphqlSchema.js";
+import { validateGraphQLOperation } from "./graphqlSchema.js";
 import { ValidationResult } from "../types.js";
 import * as shopifyAdminSchema from "../tools/shopify-admin-schema.js";
 
@@ -12,6 +12,7 @@ describe("validateGraphQLOperation", () => {
     mockLoadSchemaContent.mockClear();
     mockLoadSchemaContent.mockRestore();
   });
+
   describe("schema name validation", () => {
     it("should reject unsupported schema names", async () => {
       const result = await validateGraphQLOperation(
@@ -19,8 +20,10 @@ describe("validateGraphQLOperation", () => {
         "unsupported-schema",
       );
 
-      expect(result.result).toBe(ValidationResult.FAILED);
-      expect(result.resultDetail).toBe(
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.FAILED);
+      expect(result.detailedChecks[0].resultDetail).toBe(
         "Unsupported schema name: unsupported-schema. Currently supported schemas: admin",
       );
     });
@@ -33,9 +36,12 @@ describe("validateGraphQLOperation", () => {
       );
 
       // Should proceed past schema name validation but may fail on field validation
-      expect(result.resultDetail).not.toContain("Unsupported schema name");
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].resultDetail).not.toContain(
+        "Unsupported schema name",
+      );
+      expect(result.detailedChecks[0].resultDetail).toBeDefined();
+      expect(typeof result.detailedChecks[0].resultDetail).toBe("string");
     });
 
     it("should list all supported schemas in error message", async () => {
@@ -44,34 +50,42 @@ describe("validateGraphQLOperation", () => {
         "invalid-schema",
       );
 
-      expect(result.result).toBe(ValidationResult.FAILED);
-      expect(result.resultDetail).toContain("Currently supported schemas:");
-      expect(result.resultDetail).toContain("admin");
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.FAILED);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "Currently supported schemas:",
+      );
+      expect(result.detailedChecks[0].resultDetail).toContain("admin");
     });
   });
 
   describe("GraphQL operation extraction", () => {
-    it("should skip empty code blocks", async () => {
+    it("should skip when no GraphQL codeblocks found", async () => {
+      const result = await validateGraphQLOperation(
+        "```python\nprint('hello')\n```",
+        "admin",
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.SKIPPED);
+      expect(result.detailedChecks[0].resultDetail).toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+    });
+
+    it("should skip empty GraphQL codeblocks", async () => {
       const result = await validateGraphQLOperation(
         "```graphql\n\n```",
         "admin",
       );
 
-      expect(result.result).toBe(ValidationResult.SKIPPED);
-      expect(result.resultDetail).toBe(
-        "No GraphQL operation found in the provided markdown code block.",
-      );
-    });
-
-    it("should skip code blocks with only whitespace", async () => {
-      const result = await validateGraphQLOperation(
-        "```graphql\n   \n  \n```",
-        "admin",
-      );
-
-      expect(result.result).toBe(ValidationResult.SKIPPED);
-      expect(result.resultDetail).toBe(
-        "No GraphQL operation found in the provided markdown code block.",
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.SKIPPED);
+      expect(result.detailedChecks[0].resultDetail).toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
       );
     });
 
@@ -83,50 +97,204 @@ describe("validateGraphQLOperation", () => {
 
       // Should proceed past extraction (GraphQL was found and extracted)
       // May succeed or fail based on schema validation, but won't be skipped due to missing GraphQL
-      expect(result.result).not.toBe(ValidationResult.SKIPPED);
-      expect(result.resultDetail).not.toBe(
-        "No GraphQL operation found in the provided markdown code block.",
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
       );
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
+      expect(result.detailedChecks[0].resultDetail).not.toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+      expect(result.detailedChecks[0].resultDetail).toBeDefined();
+      expect(typeof result.detailedChecks[0].resultDetail).toBe("string");
     });
 
-    it("should handle GraphQL blocks without language specifier", async () => {
+    it("should handle multiple GraphQL blocks", async () => {
       const result = await validateGraphQLOperation(
-        "```\nquery { nonExistentField }\n```",
+        "```graphql\nquery { shop { name } }\n```\n\n```graphql\nquery { products { id } }\n```",
         "admin",
       );
 
-      // Should proceed past extraction
-      expect(result.result).not.toBe(ValidationResult.SKIPPED);
-      expect(result.resultDetail).not.toBe(
-        "No GraphQL operation found in the provided markdown code block.",
+      // Should extract multiple blocks
+      expect(result.detailedChecks).toHaveLength(2);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
       );
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
-    });
-
-    it("should handle plain GraphQL without markdown wrapper", async () => {
-      const result = await validateGraphQLOperation(
-        "query { nonExistentField }",
-        "admin",
+      expect(result.detailedChecks[1].result).not.toBe(
+        ValidationResult.SKIPPED,
       );
-
-      // Should extract the raw GraphQL and proceed
-      expect(result.result).not.toBe(ValidationResult.SKIPPED);
-      expect(result.resultDetail).not.toBe(
-        "No GraphQL operation found in the provided markdown code block.",
-      );
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
     });
 
     it("should skip empty string input", async () => {
       const result = await validateGraphQLOperation("", "admin");
 
-      expect(result.result).toBe(ValidationResult.SKIPPED);
-      expect(result.resultDetail).toBe(
-        "No GraphQL operation found in the provided markdown code block.",
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.SKIPPED);
+      expect(result.detailedChecks[0].resultDetail).toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+    });
+
+    it("should extract GraphQL from codeblocks with 'query' language identifier", async () => {
+      const result = await validateGraphQLOperation(
+        "```query\nquery { shop { name } }\n```",
+        "admin",
+      );
+
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
+      );
+      expect(result.detailedChecks[0].resultDetail).not.toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+    });
+
+    it("should extract GraphQL from codeblocks with 'mutation' language identifier", async () => {
+      const result = await validateGraphQLOperation(
+        '```mutation\nmutation { productCreate(input: {title: "Test"}) { product { id } } }\n```',
+        "admin",
+      );
+
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
+      );
+      expect(result.detailedChecks[0].resultDetail).not.toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+    });
+
+    it("should extract GraphQL from codeblocks with 'subscription' language identifier", async () => {
+      const result = await validateGraphQLOperation(
+        "```subscription\nsubscription { orders { id } }\n```",
+        "admin",
+      );
+
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
+      );
+      expect(result.detailedChecks[0].resultDetail).not.toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+    });
+
+    it("should extract GraphQL from codeblocks with operation name after language identifier", async () => {
+      const result = await validateGraphQLOperation(
+        "```query AssignedFulfillmentOrderList\nquery { shop { name } }\n```",
+        "admin",
+      );
+
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
+      );
+      expect(result.detailedChecks[0].resultDetail).not.toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+    });
+
+    it("should use fallback extraction for unlabeled codeblocks with GraphQL content", async () => {
+      const result = await validateGraphQLOperation(
+        "```\nquery { shop { name } }\n```",
+        "admin",
+      );
+
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
+      );
+      expect(result.detailedChecks[0].resultDetail).not.toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+    });
+
+    it("should skip non-GraphQL codeblocks even with fallback", async () => {
+      const result = await validateGraphQLOperation(
+        "```\nconst x = 'hello world';\nconsole.log(x);\n```",
+        "admin",
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.SKIPPED);
+      expect(result.detailedChecks[0].resultDetail).toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+    });
+
+    it("should prefer primary regex over fallback when both match", async () => {
+      // This markdown has both a graphql-labeled block and an unlabeled block
+      const result = await validateGraphQLOperation(
+        "```graphql\nquery { shop { name } }\n```\n\n```\nquery { products { id } }\n```",
+        "admin",
+      );
+
+      // Should only extract the graphql-labeled block (primary regex)
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
+      );
+    });
+
+    it("should fix the original Claude 4.1 issue with 'query' language identifier and operation name", async () => {
+      // This tests the core issue: extraction from codeblocks with operation names after language identifier
+      const claudeGeneratedMarkdown =
+        "```query GetProducts\nquery { shop { name } }\n```";
+
+      const result = await validateGraphQLOperation(
+        claudeGeneratedMarkdown,
+        "admin",
+      );
+
+      // Should successfully extract the GraphQL operation (the main fix)
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
+      );
+      expect(result.detailedChecks[0].resultDetail).not.toBe(
+        "No GraphQL codeblocks found in the provided markdown response.",
+      );
+
+      // The key fix: we should be able to extract and process the GraphQL
+      // Before the fix, this would have been skipped entirely
+      expect([ValidationResult.SUCCESS, ValidationResult.FAILED]).toContain(
+        result.detailedChecks[0].result,
+      );
+    });
+
+    it("should properly validate invalid GraphQL queries and return failure", async () => {
+      // Test the user's specific case to ensure validation works correctly
+      const invalidQuery = `\`\`\`graphql
+query {
+  shop {
+    name
+    bananaField
+  }
+  nonExistentRootQuery {
+    id
+  }
+}
+\`\`\``;
+
+      const result = await validateGraphQLOperation(invalidQuery, "admin");
+
+      // Should extract the GraphQL successfully
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).not.toBe(
+        ValidationResult.SKIPPED,
+      );
+
+      // Should fail validation due to invalid fields
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.FAILED);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "GraphQL validation errors:",
+      );
+      expect(result.detailedChecks[0].resultDetail).toContain("bananaField");
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "nonExistentRootQuery",
       );
     });
   });
@@ -138,8 +306,12 @@ describe("validateGraphQLOperation", () => {
 
       const result = await validateGraphQLOperation(invalidGraphQL, "admin");
 
-      expect(result.result).toBe(ValidationResult.FAILED);
-      expect(result.resultDetail).toContain("GraphQL syntax error:");
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.FAILED);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "GraphQL syntax error:",
+      );
     });
 
     it("should handle malformed query structures", async () => {
@@ -147,19 +319,26 @@ describe("validateGraphQLOperation", () => {
 
       const result = await validateGraphQLOperation(malformedGraphQL, "admin");
 
-      expect(result.result).toBe(ValidationResult.FAILED);
-      expect(result.resultDetail).toContain("GraphQL syntax error:");
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.FAILED);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "GraphQL syntax error:",
+      );
     });
 
     it("should parse valid GraphQL syntax", async () => {
-      const validSyntax = "```graphql\nquery { nonExistentField }\n```";
+      const validSyntax = "```graphql\nquery { shop { name } }\n```";
 
       const result = await validateGraphQLOperation(validSyntax, "admin");
 
       // Should proceed past parsing (may succeed or fail based on schema validation)
-      expect(result.resultDetail).not.toContain("GraphQL syntax error:");
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].resultDetail).not.toContain(
+        "GraphQL syntax error:",
+      );
+      expect(result.detailedChecks[0].resultDetail).toBeDefined();
+      expect(typeof result.detailedChecks[0].resultDetail).toBe("string");
     });
   });
 
@@ -173,15 +352,20 @@ describe("validateGraphQLOperation", () => {
         "admin",
       );
 
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].resultDetail).toBeDefined();
+      expect(typeof result.detailedChecks[0].resultDetail).toBe("string");
 
       // Should fail for schema validation errors (non-existent fields)
       // Unless there are schema loading/conversion issues that cause try/catch errors
-      if (result.result === ValidationResult.FAILED) {
+      if (result.detailedChecks[0].result === ValidationResult.FAILED) {
         // Could be either a schema validation error OR a schema loading error
-        expect(result.resultDetail).not.toContain("GraphQL syntax error:");
-        expect(result.resultDetail).not.toContain("Unsupported schema name");
+        expect(result.detailedChecks[0].resultDetail).not.toContain(
+          "GraphQL syntax error:",
+        );
+        expect(result.detailedChecks[0].resultDetail).not.toContain(
+          "Unsupported schema name",
+        );
       }
     });
 
@@ -203,18 +387,25 @@ describe("validateGraphQLOperation", () => {
 
       const result = await validateGraphQLOperation(validQuery, "admin");
 
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].resultDetail).toBeDefined();
+      expect(typeof result.detailedChecks[0].resultDetail).toBe("string");
 
       // Should succeed for valid GraphQL operations
       // Unless there are schema loading/conversion issues that cause try/catch errors
-      if (result.result === ValidationResult.SUCCESS) {
-        expect(result.resultDetail).toContain("Successfully validated GraphQL");
-        expect(result.resultDetail).toContain("admin schema");
-      } else if (result.result === ValidationResult.FAILED) {
+      if (result.detailedChecks[0].result === ValidationResult.SUCCESS) {
+        expect(result.detailedChecks[0].resultDetail).toContain(
+          "Successfully validated GraphQL",
+        );
+        expect(result.detailedChecks[0].resultDetail).toContain("admin schema");
+      } else if (result.detailedChecks[0].result === ValidationResult.FAILED) {
         // Could be schema loading/conversion error, not syntax or schema name error
-        expect(result.resultDetail).not.toContain("GraphQL syntax error:");
-        expect(result.resultDetail).not.toContain("Unsupported schema name");
+        expect(result.detailedChecks[0].resultDetail).not.toContain(
+          "GraphQL syntax error:",
+        );
+        expect(result.detailedChecks[0].resultDetail).not.toContain(
+          "Unsupported schema name",
+        );
       }
     });
 
@@ -234,18 +425,25 @@ describe("validateGraphQLOperation", () => {
 
       const result = await validateGraphQLOperation(mutation, "admin");
 
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].resultDetail).toBeDefined();
+      expect(typeof result.detailedChecks[0].resultDetail).toBe("string");
 
       // Should succeed for valid mutations
       // Unless there are schema loading/conversion issues that cause try/catch errors
-      if (result.result === ValidationResult.SUCCESS) {
-        expect(result.resultDetail).toContain("Successfully validated GraphQL");
-        expect(result.resultDetail).toContain("admin schema");
-      } else if (result.result === ValidationResult.FAILED) {
+      if (result.detailedChecks[0].result === ValidationResult.SUCCESS) {
+        expect(result.detailedChecks[0].resultDetail).toContain(
+          "Successfully validated GraphQL",
+        );
+        expect(result.detailedChecks[0].resultDetail).toContain("admin schema");
+      } else if (result.detailedChecks[0].result === ValidationResult.FAILED) {
         // Could be schema loading/conversion error, not syntax error
-        expect(result.resultDetail).not.toContain("GraphQL syntax error:");
-        expect(result.resultDetail).not.toContain("Unsupported schema name");
+        expect(result.detailedChecks[0].resultDetail).not.toContain(
+          "GraphQL syntax error:",
+        );
+        expect(result.detailedChecks[0].resultDetail).not.toContain(
+          "Unsupported schema name",
+        );
       }
     });
 
@@ -264,21 +462,29 @@ describe("validateGraphQLOperation", () => {
 
       const result = await validateGraphQLOperation(invalidMutation, "admin");
 
-      expect(result.result).toBe(ValidationResult.FAILED);
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.FAILED);
+      expect(result.detailedChecks[0].resultDetail).toBeDefined();
+      expect(typeof result.detailedChecks[0].resultDetail).toBe("string");
 
       // Should fail for either GraphQL validation errors OR schema conversion errors
       // Both indicate the operation is invalid
-      expect(result.resultDetail).not.toContain("GraphQL syntax error:");
-      expect(result.resultDetail).not.toContain("Unsupported schema name");
+      expect(result.detailedChecks[0].resultDetail).not.toContain(
+        "GraphQL syntax error:",
+      );
+      expect(result.detailedChecks[0].resultDetail).not.toContain(
+        "Unsupported schema name",
+      );
 
       // The error could be either:
       // 1. "GraphQL validation errors:" for actual field validation
       // 2. "Validation error:" for schema conversion issues
       const hasValidationError =
-        result.resultDetail.includes("GraphQL validation errors:") ||
-        result.resultDetail.includes("Validation error:");
+        result.detailedChecks[0].resultDetail.includes(
+          "GraphQL validation errors:",
+        ) ||
+        result.detailedChecks[0].resultDetail.includes("Validation error:");
       expect(hasValidationError).toBe(true);
     });
   });
@@ -307,9 +513,13 @@ describe("validateGraphQLOperation", () => {
       // This should succeed - the query is valid GraphQL for Shopify Admin API
       // Before the fix, this would fail with interface implementation errors
       // After the fix, it should validate successfully
-      expect(result.result).toBe(ValidationResult.SUCCESS);
-      expect(result.resultDetail).toContain("Successfully validated GraphQL");
-      expect(result.resultDetail).toContain("admin schema");
+      expect(result.valid).toBe(true);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.SUCCESS);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "Successfully validated GraphQL",
+      );
+      expect(result.detailedChecks[0].resultDetail).toContain("admin schema");
     });
   });
 
@@ -321,8 +531,12 @@ describe("validateGraphQLOperation", () => {
         "admin",
       );
 
-      expect(result.result).toBe(ValidationResult.FAILED);
-      expect(result.resultDetail).toContain("GraphQL validation errors:");
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.FAILED);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "GraphQL validation errors:",
+      );
     });
 
     it("should handle schema loading robustly", async () => {
@@ -333,8 +547,12 @@ describe("validateGraphQLOperation", () => {
         "admin",
       );
 
-      expect(result.result).toBe(ValidationResult.SUCCESS);
-      expect(result.resultDetail).toContain("Successfully validated GraphQL");
+      expect(result.valid).toBe(true);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.SUCCESS);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "Successfully validated GraphQL",
+      );
     });
 
     it("should provide clear error messages for invalid operations", async () => {
@@ -343,9 +561,15 @@ describe("validateGraphQLOperation", () => {
         "admin",
       );
 
-      expect(result.result).toBe(ValidationResult.FAILED);
-      expect(result.resultDetail).toContain("GraphQL validation errors:");
-      expect(result.resultDetail).toContain("Cannot query field");
+      expect(result.valid).toBe(false);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.FAILED);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "GraphQL validation errors:",
+      );
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "Cannot query field",
+      );
     });
   });
 
@@ -362,7 +586,10 @@ describe("validateGraphQLOperation", () => {
         );
 
         // Should not fail due to unsupported schema name
-        expect(result.resultDetail).not.toContain("Unsupported schema name");
+        expect(result.detailedChecks).toHaveLength(1);
+        expect(result.detailedChecks[0].resultDetail).not.toContain(
+          "Unsupported schema name",
+        );
       }
     });
   });

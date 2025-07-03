@@ -4,12 +4,8 @@ import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 import { parse, validate, buildClientSchema, GraphQLError } from "graphql";
 import { loadSchemaContent } from "../tools/shopify-admin-schema.js";
-import { ValidationResult } from "../types.js";
+import { ValidationResult, ValidationFunctionResult } from "../types.js";
 import type { ValidationResponse } from "../types.js";
-
-// ============================================================================
-// Schema Configuration
-// ============================================================================
 
 /**
  * Mapping of schema names to their file paths
@@ -27,36 +23,97 @@ type SupportedSchemaName = keyof typeof SCHEMA_MAPPINGS;
 // ============================================================================
 
 /**
- * Validates a GraphQL operation from a markdown code block against the specified schema
+ * Validates GraphQL operations from a markdown response against the specified schema
  *
- * @param markdownCodeBlock - The markdown code block containing the GraphQL operation
+ * @param markdownResponse - The markdown response containing GraphQL codeblocks
  * @param schemaName - The name of the schema (currently supports 'admin' for Shopify Admin API)
- * @returns ValidationResponse indicating the status of the validation
+ * @returns ValidationFunctionResult with overall status and detailed checks for each codeblock
  */
 export default async function validateGraphQLOperation(
-  markdownCodeBlock: string,
+  markdownResponse: string,
   schemaName: string,
-): Promise<ValidationResponse> {
+): Promise<ValidationFunctionResult> {
   try {
-    return (
-      validateSchemaIsSupported(schemaName) ||
-      skipIfNoGraphQLFound(markdownCodeBlock) ||
-      (await performGraphQLValidation(
-        markdownCodeBlock,
-        schemaName as SupportedSchemaName,
-      ))
+    const schemaValidationResult = checkSchemaSupport(schemaName);
+    if (schemaValidationResult) {
+      return createFailedResult([schemaValidationResult]);
+    }
+
+    const codeblocks = extractGraphQLCodeblocks(markdownResponse);
+
+    const noCodeblocksResult = handleNoCodeblocksFound(codeblocks);
+    if (noCodeblocksResult) {
+      return noCodeblocksResult;
+    }
+
+    return await validateAllCodeblocks(
+      codeblocks,
+      schemaName as SupportedSchemaName,
     );
   } catch (error) {
-    return validationResult(
-      ValidationResult.FAILED,
-      `Validation error: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return createFailedResult([
+      validationResult(
+        ValidationResult.FAILED,
+        `Validation error: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+    ]);
   }
 }
 
 // ============================================================================
 // Private Implementation Details
 // ============================================================================
+
+function checkSchemaSupport(schemaName: string): ValidationResponse | null {
+  return validateSchemaIsSupported(schemaName);
+}
+
+function handleNoCodeblocksFound(
+  codeblocks: string[],
+): ValidationFunctionResult | null {
+  if (codeblocks.length === 0) {
+    return createFailedResult([
+      validationResult(
+        ValidationResult.SKIPPED,
+        "No GraphQL codeblocks found in the provided markdown response.",
+      ),
+    ]);
+  }
+  return null;
+}
+
+async function validateAllCodeblocks(
+  codeblocks: string[],
+  schemaName: SupportedSchemaName,
+): Promise<ValidationFunctionResult> {
+  const validationResponses = await Promise.all(
+    codeblocks.map(async (codeblock) => {
+      return await validateSingleGraphQLCodeblock(codeblock, schemaName);
+    }),
+  );
+
+  return createValidationResult(validationResponses);
+}
+
+function createFailedResult(
+  detailedChecks: ValidationResponse[],
+): ValidationFunctionResult {
+  return {
+    valid: false,
+    detailedChecks,
+  };
+}
+
+function createValidationResult(
+  validationResponses: ValidationResponse[],
+): ValidationFunctionResult {
+  return {
+    valid: validationResponses.every(
+      (response) => response.result === ValidationResult.SUCCESS,
+    ),
+    detailedChecks: validationResponses,
+  };
+}
 
 function validationResult(
   result: ValidationResult,
@@ -65,29 +122,59 @@ function validationResult(
   return { result, resultDetail };
 }
 
-function validateSchemaName(
-  schemaName: string,
-): schemaName is SupportedSchemaName {
-  return schemaName in SCHEMA_MAPPINGS;
+function validateSchemaName(schemaName: string): boolean {
+  return schemaName === "admin";
 }
 
-function getSchemaPath(schemaName: SupportedSchemaName): string {
-  return SCHEMA_MAPPINGS[schemaName];
-}
-
-function extractGraphQLOperation(markdownCodeBlock: string): string | null {
-  const operation = extractGraphQLFromMarkdown(markdownCodeBlock);
-
-  if (!operation) {
-    return null;
+function extractGraphQLCodeblocks(markdownResponse: string): string[] {
+  const primaryResults = extractWithPrimaryRegex(markdownResponse);
+  if (primaryResults.length > 0) {
+    return primaryResults;
   }
 
-  return operation;
+  return extractWithFallbackRegex(markdownResponse);
 }
 
-async function loadAndBuildGraphQLSchema(schemaName: SupportedSchemaName) {
-  const schemaPath = getSchemaPath(schemaName);
-  const schemaContent = await loadSchemaContent(schemaPath);
+function extractWithPrimaryRegex(markdownResponse: string): string[] {
+  const primaryRegex =
+    /```(?:graphql|gql|query|mutation|subscription)(?:\s+[\w\s]*?)?\s*\n?([\s\S]*?)\n?```/g;
+  return extractCodeblocksWithRegex(markdownResponse, primaryRegex);
+}
+
+function extractWithFallbackRegex(markdownResponse: string): string[] {
+  const fallbackRegex = /```(?:\w+\s*)?\s*\n?([\s\S]*?)\n?```/g;
+  return extractCodeblocksWithRegex(markdownResponse, fallbackRegex).filter(
+    (codeblock) => isLikelyGraphQLOperation(codeblock),
+  );
+}
+
+function extractCodeblocksWithRegex(
+  markdownResponse: string,
+  regex: RegExp,
+): string[] {
+  const codeblocks: string[] = [];
+  let match;
+
+  while ((match = regex.exec(markdownResponse)) !== null) {
+    const operation = match[1].trim();
+    if (operation) {
+      codeblocks.push(operation);
+    }
+  }
+
+  return codeblocks;
+}
+
+function isLikelyGraphQLOperation(content: string): boolean {
+  const graphqlKeywords = /^\s*(?:query|mutation|subscription|fragment)\s+/i;
+  const graphqlSyntax =
+    /(?:query|mutation|subscription|fragment)\s*(?:\w+\s*)?\{|^\s*\{/;
+
+  return graphqlKeywords.test(content) || graphqlSyntax.test(content);
+}
+
+async function loadAndBuildGraphQLSchema() {
+  const schemaContent = await loadSchemaContent(SCHEMA_FILE_PATH);
   const schemaJson = JSON.parse(schemaContent);
   return buildClientSchema(schemaJson.data);
 }
@@ -112,17 +199,6 @@ function validateGraphQLAgainstSchema(schema: any, document: any): string[] {
   return validationErrors.map((e) => e.message);
 }
 
-function extractGraphQLFromMarkdown(markdownCodeBlock: string): string {
-  const codeBlockRegex = /^```(?:graphql|gql)?\s*\n?([\s\S]*?)\n?```$/;
-  const match = markdownCodeBlock.trim().match(codeBlockRegex);
-
-  if (match) {
-    return match[1].trim();
-  }
-
-  return markdownCodeBlock.trim();
-}
-
 function getOperationType(document: any): string {
   if (document.definitions.length > 0) {
     const operationDefinition = document.definitions[0];
@@ -136,37 +212,22 @@ function getOperationType(document: any): string {
 function validateSchemaIsSupported(
   schemaName: string,
 ): ValidationResponse | null {
-  if (!validateSchemaName(schemaName)) {
-    const supportedSchemas = Object.keys(SCHEMA_MAPPINGS).join(", ");
+  if (validateSchemaName(schemaName) === false) {
     return validationResult(
       ValidationResult.FAILED,
-      `Unsupported schema name: ${schemaName}. Currently supported schemas: ${supportedSchemas}`,
+      `Unsupported schema name: ${schemaName}. Currently only 'admin' is supported.`,
     );
   }
   return null;
 }
 
-function skipIfNoGraphQLFound(
-  markdownCodeBlock: string,
-): ValidationResponse | null {
-  const operation = extractGraphQLOperation(markdownCodeBlock);
-  if (operation === null) {
-    return validationResult(
-      ValidationResult.SKIPPED,
-      "No GraphQL operation found in the provided markdown code block.",
-    );
-  }
-  return null;
-}
-
-async function performGraphQLValidation(
-  markdownCodeBlock: string,
+async function validateSingleGraphQLCodeblock(
+  codeblock: string,
   schemaName: SupportedSchemaName,
 ): Promise<ValidationResponse> {
-  const operation = extractGraphQLOperation(markdownCodeBlock)!; // We know it exists from previous check
   const schema = await loadAndBuildGraphQLSchema(schemaName);
 
-  const parseResult = parseGraphQLDocument(operation);
+  const parseResult = parseGraphQLDocument(codeblock);
   if (parseResult.success === false) {
     return validationResult(
       ValidationResult.FAILED,
@@ -188,6 +249,6 @@ async function performGraphQLValidation(
   const operationType = getOperationType(parseResult.document);
   return validationResult(
     ValidationResult.SUCCESS,
-    `Successfully validated GraphQL ${operationType} against ${schemaName} schema.`,
+    `Successfully validated GraphQL ${operationType} against Shopify Admin API schema.`,
   );
 }

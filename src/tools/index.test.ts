@@ -369,6 +369,51 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
 
     const testCodeBlocks = [
       "```graphql\nquery { products { id } }\n```",
+      "```javascript\nconst x = 1;\n```",
+    ];
+
+    // Call the handler
+    const result = await mockServer.validateHandler({
+      codeblocks: testCodeBlocks,
+    });
+
+    expect(validateAdminGraphQLCodeblocksMock).toHaveBeenCalledTimes(1);
+    expect(validateAdminGraphQLCodeblocksMock).toHaveBeenCalledWith(
+      testCodeBlocks.join("\n\n"),
+    );
+
+    // Verify the response
+    expect(result.content[0].type).toBe("text");
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+    expect(responseText).toContain("**Total Code Blocks:** 2");
+    expect(responseText).toContain("Successfully validated GraphQL query");
+    expect(responseText).toContain("No GraphQL operation found");
+  });
+
+  test("handles validation failures correctly", async () => {
+    // Setup mock responses with failures
+    validateAdminGraphQLCodeblocksMock.mockResolvedValueOnce({
+      valid: false,
+      detailedChecks: [
+        {
+          result: ValidationResult.FAILED,
+          resultDetail:
+            "GraphQL validation errors: Cannot query field 'invalidField' on type 'Product'.",
+        },
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail:
+            "Successfully validated GraphQL mutation against Shopify Admin API schema.",
+        },
+      ],
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeBlocks = [
+      "```graphql\nquery { products { invalidField } }\n```",
       "```graphql\nmutation { productCreate(input: {}) { product { id } } }\n```",
     ];
 
@@ -379,7 +424,7 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
 
     expect(validateAdminGraphQLCodeblocksMock).toHaveBeenCalledTimes(1);
     expect(validateAdminGraphQLCodeblocksMock).toHaveBeenCalledWith(
-      testCodeBlocks,
+      testCodeBlocks.join("\n\n"),
     );
   });
 

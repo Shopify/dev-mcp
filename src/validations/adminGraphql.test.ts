@@ -15,33 +15,38 @@ describe("validateAdminGraphQLCodeblocks", () => {
     vi.clearAllMocks();
   });
 
-  it("should validate multiple codeblocks in parallel", async () => {
-    mockValidateGraphQLOperation
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail: "Valid GraphQL query",
-      })
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail: "Valid GraphQL mutation",
-      });
+  it("should validate multiple codeblocks in markdown response", async () => {
+    mockValidateGraphQLOperation.mockResolvedValueOnce({
+      valid: true,
+      detailedChecks: [
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL query",
+        },
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL mutation",
+        },
+      ],
+    });
 
-    const codeblocks = [
-      "```graphql\nquery { products { id } }\n```",
-      "```graphql\nmutation { productCreate(input: {}) { product { id } } }\n```",
-    ];
+    const markdownResponse = `
+Here are some GraphQL operations:
 
-    const result = await validateAdminGraphQLCodeblocks(codeblocks);
+\`\`\`graphql
+query { products { id } }
+\`\`\`
 
-    expect(mockValidateGraphQLOperation).toHaveBeenCalledTimes(2);
-    expect(mockValidateGraphQLOperation).toHaveBeenNthCalledWith(
-      1,
-      codeblocks[0],
-      "admin",
-    );
-    expect(mockValidateGraphQLOperation).toHaveBeenNthCalledWith(
-      2,
-      codeblocks[1],
+\`\`\`graphql
+mutation { productCreate(input: {}) { product { id } } }
+\`\`\`
+    `;
+
+    const result = await validateAdminGraphQLCodeblocks(markdownResponse);
+
+    expect(mockValidateGraphQLOperation).toHaveBeenCalledTimes(1);
+    expect(mockValidateGraphQLOperation).toHaveBeenCalledWith(
+      markdownResponse,
       "admin",
     );
 
@@ -61,40 +66,62 @@ describe("validateAdminGraphQLCodeblocks", () => {
   });
 
   it("should return valid: true only when all validations succeed", async () => {
-    mockValidateGraphQLOperation
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail: "Valid GraphQL",
-      })
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail: "Valid GraphQL",
-      });
+    mockValidateGraphQLOperation.mockResolvedValueOnce({
+      valid: true,
+      detailedChecks: [
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL",
+        },
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL",
+        },
+      ],
+    });
 
-    const result = await validateAdminGraphQLCodeblocks([
-      "```graphql\nquery { products { id } }\n```",
-      "```graphql\nquery { shop { name } }\n```",
-    ]);
+    const markdownResponse = `
+\`\`\`graphql
+query { products { id } }
+\`\`\`
+
+\`\`\`graphql
+query { shop { name } }
+\`\`\`
+    `;
+
+    const result = await validateAdminGraphQLCodeblocks(markdownResponse);
 
     expect(result.valid).toBe(true);
     expect(result.detailedChecks).toHaveLength(2);
   });
 
   it("should return valid: false when any validation fails", async () => {
-    mockValidateGraphQLOperation
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail: "Valid GraphQL",
-      })
-      .mockResolvedValueOnce({
-        result: ValidationResult.FAILED,
-        resultDetail: "Invalid GraphQL",
-      });
+    mockValidateGraphQLOperation.mockResolvedValueOnce({
+      valid: false,
+      detailedChecks: [
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL",
+        },
+        {
+          result: ValidationResult.FAILED,
+          resultDetail: "Invalid GraphQL",
+        },
+      ],
+    });
 
-    const result = await validateAdminGraphQLCodeblocks([
-      "```graphql\nquery { products { id } }\n```",
-      "```graphql\nquery { invalidField }\n```",
-    ]);
+    const markdownResponse = `
+\`\`\`graphql
+query { products { id } }
+\`\`\`
+
+\`\`\`graphql
+query { invalidField }
+\`\`\`
+    `;
+
+    const result = await validateAdminGraphQLCodeblocks(markdownResponse);
 
     expect(result.valid).toBe(false);
     expect(result.detailedChecks).toHaveLength(2);
@@ -103,20 +130,31 @@ describe("validateAdminGraphQLCodeblocks", () => {
   });
 
   it("should return valid: false when any validation is skipped", async () => {
-    mockValidateGraphQLOperation
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail: "Valid GraphQL",
-      })
-      .mockResolvedValueOnce({
-        result: ValidationResult.SKIPPED,
-        resultDetail: "Skipped empty codeblock",
-      });
+    mockValidateGraphQLOperation.mockResolvedValueOnce({
+      valid: false,
+      detailedChecks: [
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL",
+        },
+        {
+          result: ValidationResult.SKIPPED,
+          resultDetail: "Skipped empty codeblock",
+        },
+      ],
+    });
 
-    const result = await validateAdminGraphQLCodeblocks([
-      "```graphql\nquery { products { id } }\n```",
-      "```graphql\n\n```",
-    ]);
+    const markdownResponse = `
+\`\`\`graphql
+query { products { id } }
+\`\`\`
+
+\`\`\`graphql
+
+\`\`\`
+    `;
+
+    const result = await validateAdminGraphQLCodeblocks(markdownResponse);
 
     expect(result.valid).toBe(false);
     expect(result.detailedChecks).toHaveLength(2);
@@ -124,25 +162,44 @@ describe("validateAdminGraphQLCodeblocks", () => {
     expect(result.detailedChecks[1].result).toBe(ValidationResult.SKIPPED);
   });
 
-  it("should handle empty codeblocks array", async () => {
-    const result = await validateAdminGraphQLCodeblocks([]);
-
-    expect(mockValidateGraphQLOperation).not.toHaveBeenCalled();
-    expect(result).toEqual({
-      valid: true,
-      detailedChecks: [],
+  it("should handle empty markdown response", async () => {
+    mockValidateGraphQLOperation.mockResolvedValueOnce({
+      valid: false,
+      detailedChecks: [
+        {
+          result: ValidationResult.SKIPPED,
+          resultDetail:
+            "No GraphQL codeblocks found in the provided markdown response.",
+        },
+      ],
     });
+
+    const result = await validateAdminGraphQLCodeblocks("");
+
+    expect(mockValidateGraphQLOperation).toHaveBeenCalledTimes(1);
+    expect(result.valid).toBe(false);
+    expect(result.detailedChecks).toHaveLength(1);
+    expect(result.detailedChecks[0].result).toBe(ValidationResult.SKIPPED);
   });
 
   it("should handle single codeblock", async () => {
     mockValidateGraphQLOperation.mockResolvedValueOnce({
-      result: ValidationResult.SUCCESS,
-      resultDetail: "Valid GraphQL",
+      valid: true,
+      detailedChecks: [
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL",
+        },
+      ],
     });
 
-    const result = await validateAdminGraphQLCodeblocks([
-      "```graphql\nquery { products { id } }\n```",
-    ]);
+    const markdownResponse = `
+\`\`\`graphql
+query { products { id } }
+\`\`\`
+    `;
+
+    const result = await validateAdminGraphQLCodeblocks(markdownResponse);
 
     expect(mockValidateGraphQLOperation).toHaveBeenCalledTimes(1);
     expect(result.valid).toBe(true);
@@ -150,14 +207,28 @@ describe("validateAdminGraphQLCodeblocks", () => {
   });
 
   it("should propagate validation errors", async () => {
-    mockValidateGraphQLOperation.mockRejectedValueOnce(
-      new Error("Schema loading failed"),
-    );
+    mockValidateGraphQLOperation.mockResolvedValueOnce({
+      valid: false,
+      detailedChecks: [
+        {
+          result: ValidationResult.FAILED,
+          resultDetail: "Validation error: Schema loading failed",
+        },
+      ],
+    });
 
-    await expect(
-      validateAdminGraphQLCodeblocks([
-        "```graphql\nquery { products { id } }\n```",
-      ]),
-    ).rejects.toThrow("Schema loading failed");
+    const markdownResponse = `
+\`\`\`graphql
+query { products { id } }
+\`\`\`
+    `;
+
+    const result = await validateAdminGraphQLCodeblocks(markdownResponse);
+
+    expect(result.valid).toBe(false);
+    expect(result.detailedChecks[0].result).toBe(ValidationResult.FAILED);
+    expect(result.detailedChecks[0].resultDetail).toContain(
+      "Schema loading failed",
+    );
   });
 });

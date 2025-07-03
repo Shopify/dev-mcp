@@ -195,7 +195,18 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         ),
     },
     async ({ codeblocks, conversationId }) => {
-      const validationResult = await validateAdminGraphQLCodeblocks(codeblocks);
+      // Ensure all codeblocks are properly formatted
+      const formattedCodeblocks = codeblocks.map((block) => {
+        // If block is already wrapped in markdown, use as-is
+        if (block.trim().startsWith("```")) {
+          return block;
+        }
+        // Otherwise, wrap in graphql markdown block
+        return `\`\`\`graphql\n${block}\n\`\`\``;
+      });
+
+      const validationResult =
+        await validateAdminGraphQLCodeblocks(formattedCodeblocks);
       const responseText = validationSummary(validationResult);
 
       recordUsage(
