@@ -397,7 +397,9 @@ query {
         expect(result.detailedChecks[0].resultDetail).toContain(
           "Successfully validated GraphQL",
         );
-        expect(result.detailedChecks[0].resultDetail).toContain("Admin API schema");
+        expect(result.detailedChecks[0].resultDetail).toContain(
+          "Admin API schema",
+        );
       } else if (result.detailedChecks[0].result === ValidationResult.FAILED) {
         // Could be schema loading/conversion error, not syntax or schema name error
         expect(result.detailedChecks[0].resultDetail).not.toContain(
@@ -435,7 +437,9 @@ query {
         expect(result.detailedChecks[0].resultDetail).toContain(
           "Successfully validated GraphQL",
         );
-        expect(result.detailedChecks[0].resultDetail).toContain("Admin API schema");
+        expect(result.detailedChecks[0].resultDetail).toContain(
+          "Admin API schema",
+        );
       } else if (result.detailedChecks[0].result === ValidationResult.FAILED) {
         // Could be schema loading/conversion error, not syntax error
         expect(result.detailedChecks[0].resultDetail).not.toContain(
@@ -519,7 +523,119 @@ query {
       expect(result.detailedChecks[0].resultDetail).toContain(
         "Successfully validated GraphQL",
       );
-      expect(result.detailedChecks[0].resultDetail).toContain("Admin API schema");
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "Admin API schema",
+      );
+    });
+
+    it("should handle markdown responses with backslashes and documentation URLs", async () => {
+      const markdownResponse = `To fetch a catalog by ID using the Shopify Admin GraphQL API, you should use the \`catalog\` query and provide the catalog's global ID (e.g., \`"gid://shopify/Catalog/1234567890"\`).
+
+Here's a GraphQL example that retrieves a catalog by ID—returning the basic fields commonly needed:
+
+\`\`\`graphql
+query getCatalogById($id: ID!) {
+  catalog(id: $id) {
+    id
+    status
+    title
+    priceList {
+      id
+      name
+      currency
+    }
+    publication {
+      id
+      autoPublish
+    }
+  }
+}
+\`\`\`
+
+You can supply your catalog's ID in the variables section of your request:
+
+\`\`\`json
+{
+  "id": "gid://shopify/Catalog/1234567890"
+}
+\`\`\`
+
+This query will return:
+- The unique ID of the catalog
+- The current status (such as ACTIVE, DRAFT, etc.)
+- The catalog's title
+- Details about the price list (ID, name, currency)
+- Publication details (ID, whether it's auto-publishing)
+
+Would you like any specific fields or relationships included in your result? If you have a catalog ID, you can use this sample in your API call!
+
+For more, see the Shopify documentation:  
+[Catalog Query Reference](https://shopify.dev/docs/api/admin-graphql/latest/queries/catalog)`;
+
+      const result = await validateGraphQLOperation(markdownResponse, "admin");
+      expect(result.valid).toBe(true);
+      expect(result.detailedChecks).toHaveLength(1);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.SUCCESS);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "Successfully validated GraphQL query",
+      );
+    });
+
+    it("should correctly filter out JSON blocks when using fallback regex", async () => {
+      // This test reproduces the exact scenario that was causing the issue
+      const markdownResponse = `Here's some content with mixed codeblocks:
+
+\`\`\`
+query getCatalogById($id: ID!) {
+  catalog(id: $id) {
+    id
+    title
+  }
+}
+\`\`\`
+
+\`\`\`json
+{
+  "id": "gid://shopify/Catalog/\\1234567890"
+}
+\`\`\`
+
+\`\`\`
+{
+  "another": "block\\with\\backslashes"
+}
+\`\`\`
+
+\`\`\`
+query getShop {
+  shop {
+    id
+    name
+  }
+}
+\`\`\`
+
+\`\`\`typescript
+const x = "string\\with\\backslashes";
+\`\`\`
+
+\`\`\`
+{
+  "final": "json\\block"
+}
+\`\`\``;
+
+      const result = await validateGraphQLOperation(markdownResponse, "admin");
+      // Should only validate the 2 actual GraphQL operations, not the JSON blocks
+      expect(result.detailedChecks).toHaveLength(2);
+      expect(result.detailedChecks[0].result).toBe(ValidationResult.SUCCESS);
+      expect(result.detailedChecks[0].resultDetail).toContain(
+        "Successfully validated GraphQL query",
+      );
+      expect(result.detailedChecks[1].result).toBe(ValidationResult.SUCCESS);
+      expect(result.detailedChecks[1].resultDetail).toContain(
+        "Successfully validated GraphQL query",
+      );
     });
   });
 

@@ -174,9 +174,15 @@ function extractCodeblocksWithRegex(
 function isLikelyGraphQLOperation(content: string): boolean {
   const graphqlKeywords = /^\s*(?:query|mutation|subscription|fragment)\s+/i;
   const graphqlSyntax =
-    /(?:query|mutation|subscription|fragment)\s*(?:\w+\s*)?\{|^\s*\{/;
+    /(?:query|mutation|subscription|fragment)\s*(?:\w+\s*)?\{/;
 
-  return graphqlKeywords.test(content) || graphqlSyntax.test(content);
+  const anonymousGraphQL = /^\s*\{\s*\w+\s*(?:\([^)]*\))?\s*\{/;
+
+  return (
+    graphqlKeywords.test(content) ||
+    graphqlSyntax.test(content) ||
+    anonymousGraphQL.test(content)
+  );
 }
 
 async function loadAndBuildGraphQLSchema(schemaName: SupportedSchemaName) {
