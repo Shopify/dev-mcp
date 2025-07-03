@@ -1,11 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+<<<<<<< Updated upstream
 import {
   instrumentationData,
   isInstrumentationDisabled,
 } from "../instrumentation.js";
 import { validateGraphQLOperation } from "../validations/graphqlSchema.js";
+=======
+import validateGraphQLOperation from "../validations/graphqlSchema.js";
+>>>>>>> Stashed changes
 import { ValidationResult } from "../types.js";
 import type { ValidationToolResult, ValidationResponse } from "../types.js";
 
@@ -144,7 +148,15 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     "introspect_admin_schema",
     `This tool introspects and returns the portion of the Shopify Admin API GraphQL schema relevant to the user prompt. Only use this for the Shopify Admin API, and not any other APIs like the Shopify Storefront API or the Shopify Functions API.
 
+<<<<<<< Updated upstream
     It takes two arguments: query and filter. The query argument is the string search term to filter schema elements by name. The filter argument is an array of strings to filter results to show specific sections.`,
+=======
+    ⚠️ REQUIRES CONVERSATION ID: You must call learn_shopify_apis first to get a conversationId.
+
+    ⚠️ THIS IS IMPORTANT: All GraphQL codeblocks generated after using this tool MUST be validated with the validate_admin_api_codeblocks tool. This tool will detect and give direction on how to fix any errors in the codeblocks.
+
+    It takes three arguments: query, filter, and conversationId. The query argument is the string search term to filter schema elements by name. The filter argument is an array of strings to filter results to show specific sections. The conversationId is REQUIRED and must be the conversationId returned from the learn_shopify_apis tool.`,
+>>>>>>> Stashed changes
     {
       query: z
         .string()

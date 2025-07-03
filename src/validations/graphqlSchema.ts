@@ -3,21 +3,37 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 import { parse, validate, buildClientSchema, GraphQLError } from "graphql";
-import {
-  loadSchemaContent,
-  SCHEMA_FILE_PATH,
-} from "../tools/shopify-admin-schema.js";
+import { loadSchemaContent } from "../tools/shopify-admin-schema.js";
 import { ValidationResult } from "../types.js";
 import type { ValidationResponse } from "../types.js";
 
+// ============================================================================
+// Schema Configuration
+// ============================================================================
+
 /**
- * Validates a GraphQL operation from a markdown code block against the Shopify Admin API schema
+ * Mapping of schema names to their file paths
+ */
+const SCHEMA_MAPPINGS = {
+  admin: fileURLToPath(
+    new URL("../../data/admin_schema_2025-01.json", import.meta.url),
+  ),
+} as const;
+
+type SupportedSchemaName = keyof typeof SCHEMA_MAPPINGS;
+
+// ============================================================================
+// Public API
+// ============================================================================
+
+/**
+ * Validates a GraphQL operation from a markdown code block against the specified schema
  *
  * @param markdownCodeBlock - The markdown code block containing the GraphQL operation
  * @param schemaName - The name of the schema (currently supports 'admin' for Shopify Admin API)
  * @returns ValidationResponse indicating the status of the validation
  */
-export async function validateGraphQLOperation(
+export default async function validateGraphQLOperation(
   markdownCodeBlock: string,
   schemaName: string,
 ): Promise<ValidationResponse> {
@@ -25,7 +41,10 @@ export async function validateGraphQLOperation(
     return (
       validateSchemaIsSupported(schemaName) ||
       skipIfNoGraphQLFound(markdownCodeBlock) ||
-      (await performGraphQLValidation(markdownCodeBlock))
+      (await performGraphQLValidation(
+        markdownCodeBlock,
+        schemaName as SupportedSchemaName,
+      ))
     );
   } catch (error) {
     return validationResult(
@@ -46,8 +65,14 @@ function validationResult(
   return { result, resultDetail };
 }
 
-function validateSchemaName(schemaName: string): boolean {
-  return schemaName === "admin";
+function validateSchemaName(
+  schemaName: string,
+): schemaName is SupportedSchemaName {
+  return schemaName in SCHEMA_MAPPINGS;
+}
+
+function getSchemaPath(schemaName: SupportedSchemaName): string {
+  return SCHEMA_MAPPINGS[schemaName];
 }
 
 function extractGraphQLOperation(markdownCodeBlock: string): string | null {
@@ -60,8 +85,9 @@ function extractGraphQLOperation(markdownCodeBlock: string): string | null {
   return operation;
 }
 
-async function loadAndBuildGraphQLSchema() {
-  const schemaContent = await loadSchemaContent(SCHEMA_FILE_PATH);
+async function loadAndBuildGraphQLSchema(schemaName: SupportedSchemaName) {
+  const schemaPath = getSchemaPath(schemaName);
+  const schemaContent = await loadSchemaContent(schemaPath);
   const schemaJson = JSON.parse(schemaContent);
   return buildClientSchema(schemaJson.data);
 }
@@ -110,10 +136,11 @@ function getOperationType(document: any): string {
 function validateSchemaIsSupported(
   schemaName: string,
 ): ValidationResponse | null {
-  if (validateSchemaName(schemaName) === false) {
+  if (!validateSchemaName(schemaName)) {
+    const supportedSchemas = Object.keys(SCHEMA_MAPPINGS).join(", ");
     return validationResult(
       ValidationResult.FAILED,
-      `Unsupported schema name: ${schemaName}. Currently only 'admin' is supported.`,
+      `Unsupported schema name: ${schemaName}. Currently supported schemas: ${supportedSchemas}`,
     );
   }
   return null;
@@ -134,9 +161,10 @@ function skipIfNoGraphQLFound(
 
 async function performGraphQLValidation(
   markdownCodeBlock: string,
+  schemaName: SupportedSchemaName,
 ): Promise<ValidationResponse> {
   const operation = extractGraphQLOperation(markdownCodeBlock)!; // We know it exists from previous check
-  const schema = await loadAndBuildGraphQLSchema();
+  const schema = await loadAndBuildGraphQLSchema(schemaName);
 
   const parseResult = parseGraphQLDocument(operation);
   if (parseResult.success === false) {
@@ -160,6 +188,6 @@ async function performGraphQLValidation(
   const operationType = getOperationType(parseResult.document);
   return validationResult(
     ValidationResult.SUCCESS,
-    `Successfully validated GraphQL ${operationType} against Shopify Admin API schema.`,
+    `Successfully validated GraphQL ${operationType} against ${schemaName} schema.`,
   );
 }

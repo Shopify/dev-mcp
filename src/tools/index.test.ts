@@ -17,7 +17,7 @@ import {
   isInstrumentationDisabled,
 } from "../instrumentation.js";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
-import { validateGraphQLOperation } from "../validations/graphqlSchema.js";
+import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { ValidationResult } from "../types.js";
 
 const originalConsoleError = console.error;
@@ -86,7 +86,7 @@ vi.mock("./shopify-admin-schema.js", () => ({
 
 // Mock validateGraphQLOperation
 vi.mock("../validations/graphqlSchema.js", () => ({
-  validateGraphQLOperation: vi.fn(),
+  default: vi.fn(),
 }));
 
 vi.mock("../../package.json", () => ({
