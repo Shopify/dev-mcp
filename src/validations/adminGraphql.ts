@@ -1,6 +1,5 @@
 import validateGraphQLOperation from "./graphqlSchema.js";
 import { ValidationFunctionResult, ValidationResult } from "../types.js";
-import { aggregateValidationResults } from "./validationUtils.js";
 
 /**
  * Validates multiple GraphQL Admin API codeblocks
