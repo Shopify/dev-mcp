@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateGraphQLOperation } from "./graphqlSchema.js";
+import validateGraphQLOperation from "./graphqlSchema.js";
 import { ValidationResult } from "../types.js";
 import * as shopifyAdminSchema from "../tools/shopify-admin-schema.js";
 
@@ -21,7 +21,7 @@ describe("validateGraphQLOperation", () => {
 
       expect(result.result).toBe(ValidationResult.FAILED);
       expect(result.resultDetail).toBe(
-        "Unsupported schema name: unsupported-schema. Currently only 'admin' is supported.",
+        "Unsupported schema name: unsupported-schema. Currently supported schemas: admin",
       );
     });
 
@@ -36,6 +36,17 @@ describe("validateGraphQLOperation", () => {
       expect(result.resultDetail).not.toContain("Unsupported schema name");
       expect(result.resultDetail).toBeDefined();
       expect(typeof result.resultDetail).toBe("string");
+    });
+
+    it("should list all supported schemas in error message", async () => {
+      const result = await validateGraphQLOperation(
+        "```graphql\nquery { products { id } }\n```",
+        "invalid-schema",
+      );
+
+      expect(result.result).toBe(ValidationResult.FAILED);
+      expect(result.resultDetail).toContain("Currently supported schemas:");
+      expect(result.resultDetail).toContain("admin");
     });
   });
 
@@ -199,7 +210,7 @@ describe("validateGraphQLOperation", () => {
       // Unless there are schema loading/conversion issues that cause try/catch errors
       if (result.result === ValidationResult.SUCCESS) {
         expect(result.resultDetail).toContain("Successfully validated GraphQL");
-        expect(result.resultDetail).toContain("Shopify Admin API schema");
+        expect(result.resultDetail).toContain("admin schema");
       } else if (result.result === ValidationResult.FAILED) {
         // Could be schema loading/conversion error, not syntax or schema name error
         expect(result.resultDetail).not.toContain("GraphQL syntax error:");
@@ -230,7 +241,7 @@ describe("validateGraphQLOperation", () => {
       // Unless there are schema loading/conversion issues that cause try/catch errors
       if (result.result === ValidationResult.SUCCESS) {
         expect(result.resultDetail).toContain("Successfully validated GraphQL");
-        expect(result.resultDetail).toContain("Shopify Admin API schema");
+        expect(result.resultDetail).toContain("admin schema");
       } else if (result.result === ValidationResult.FAILED) {
         // Could be schema loading/conversion error, not syntax error
         expect(result.resultDetail).not.toContain("GraphQL syntax error:");
@@ -298,7 +309,7 @@ describe("validateGraphQLOperation", () => {
       // After the fix, it should validate successfully
       expect(result.result).toBe(ValidationResult.SUCCESS);
       expect(result.resultDetail).toContain("Successfully validated GraphQL");
-      expect(result.resultDetail).toContain("Shopify Admin API schema");
+      expect(result.resultDetail).toContain("admin schema");
     });
   });
 
@@ -335,6 +346,24 @@ describe("validateGraphQLOperation", () => {
       expect(result.result).toBe(ValidationResult.FAILED);
       expect(result.resultDetail).toContain("GraphQL validation errors:");
       expect(result.resultDetail).toContain("Cannot query field");
+    });
+  });
+
+  describe("schema mapping extensibility", () => {
+    it("should be easily extensible for new schemas", async () => {
+      // This test documents the expected behavior when new schemas are added
+      // Currently only 'admin' is supported, but the structure supports more
+      const supportedSchemas = ["admin"]; // This would grow as schemas are added
+
+      for (const schema of supportedSchemas) {
+        const result = await validateGraphQLOperation(
+          "```graphql\nquery { shop { name } }\n```",
+          schema,
+        );
+
+        // Should not fail due to unsupported schema name
+        expect(result.resultDetail).not.toContain("Unsupported schema name");
+      }
     });
   });
 });

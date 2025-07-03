@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
-import { validateGraphQLOperation } from "../validations/graphqlSchema.js";
+import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { ValidationResult } from "../types.js";
 import type { ValidationToolResult, ValidationResponse } from "../types.js";
 import {
