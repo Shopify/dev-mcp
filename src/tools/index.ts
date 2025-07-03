@@ -1,9 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
-import validateGraphQLOperation from "../validations/graphqlSchema.js";
-import { ValidationResult } from "../types.js";
-import type { ValidationToolResult, ValidationResponse } from "../types.js";
+import validateAdminGraphQLCodeblocks from "../validations/adminGraphql.js";
+import { validationSummary } from "../validations/validationUtils.js";
 import {
   recordUsage,
   searchShopifyDocs,
@@ -196,28 +195,15 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         ),
     },
     async ({ codeblocks, conversationId }) => {
-      // Validate all code blocks in parallel
-      const validationResponses = await Promise.all(
-        codeblocks.map(async (block) => {
-          return await validateGraphQLOperation(block, "admin");
-        }),
-      );
-
-      // Aggregate the results using the shared function
-      const validationResult = validationToolResult(validationResponses);
+      const validationResult = await validateAdminGraphQLCodeblocks(codeblocks);
+      const responseText = validationSummary(validationResult);
 
       recordUsage(
         "validate_admin_api_codeblocks",
         `${codeblocks.length} code blocks`,
-        validationResult,
+        responseText,
         conversationId,
       ).catch(() => {});
-
-      // Format the response using the shared formatting function
-      const responseText = formatValidationResult(
-        validationResult,
-        "Code Blocks",
-      );
 
       return {
         content: [
@@ -337,59 +323,4 @@ ${text}`;
       }
     },
   );
-}
-
-// ============================================================================
-// Private Helper Functions
-// ============================================================================
-
-/**
- * Aggregates multiple validation responses into a single ValidationToolResult
- * @param validationResponses - Array of individual validation responses
- * @returns ValidationToolResult with overall status and detailed checks
- */
-function validationToolResult(
-  validationResponses: ValidationResponse[],
-): ValidationToolResult {
-  // Check if all validations passed or were skipped (no failures)
-  const valid = validationResponses.every(
-    (response) =>
-      response.result === ValidationResult.SUCCESS ||
-      response.result === ValidationResult.SKIPPED,
-  );
-
-  return {
-    valid,
-    detailedChecks: validationResponses,
-  };
-}
-
-/**
- * Formats a ValidationToolResult into a readable markdown response
- * @param result - The validation result to format
- * @param itemName - Name of the items being validated (e.g., "Code Blocks", "Operations")
- * @returns Formatted markdown string with validation summary and details
- */
-function formatValidationResult(
-  result: ValidationToolResult,
-  itemName: string = "Items",
-): string {
-  let responseText = `## Validation Summary\n\n`;
-  responseText += `**Overall Status:** ${result.valid ? "✅ VALID" : "❌ INVALID"}\n`;
-  responseText += `**Total ${itemName}:** ${result.detailedChecks.length}\n\n`;
-
-  responseText += `## Detailed Results\n\n`;
-  result.detailedChecks.forEach((check, index) => {
-    const statusIcon =
-      check.result === ValidationResult.SUCCESS
-        ? "✅"
-        : check.result === ValidationResult.SKIPPED
-          ? "⏭️"
-          : "❌";
-    responseText += `### ${itemName.slice(0, -1)} ${index + 1}\n`;
-    responseText += `**Status:** ${statusIcon} ${check.result.toUpperCase()}\n`;
-    responseText += `**Details:** ${check.resultDetail}\n\n`;
-  });
-
-  return responseText;
 }

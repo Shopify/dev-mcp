@@ -18,7 +18,7 @@ import {
   generateConversationId,
 } from "../instrumentation.js";
 import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
-import validateGraphQLOperation from "../validations/graphqlSchema.js";
+import validateAdminGraphQLCodeblocks from "../validations/adminGraphql.js";
 import { ValidationResult } from "../types.js";
 import {
   recordUsage,
@@ -85,7 +85,7 @@ vi.mock("./shopify-admin-schema.js", () => ({
   searchShopifyAdminSchema: vi.fn(),
 }));
 
-vi.mock("../validations/graphqlSchema.js", () => ({
+vi.mock("../validations/adminGraphql.js", () => ({
   default: vi.fn(),
 }));
 
@@ -203,9 +203,14 @@ describe("MCP Tool Unit Tests", () => {
   });
 
   test("validate_admin_api_codeblocks tool calls recordUsage with correct parameters", async () => {
-    vi.mocked(validateGraphQLOperation).mockResolvedValue({
-      result: ValidationResult.SUCCESS,
-      resultDetail: "Valid GraphQL",
+    vi.mocked(validateAdminGraphQLCodeblocks).mockResolvedValue({
+      valid: true,
+      detailedChecks: [
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL",
+        },
+      ],
     });
 
     await shopifyTools(mockServer);
@@ -222,10 +227,7 @@ describe("MCP Tool Unit Tests", () => {
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
       "validate_admin_api_codeblocks",
       "1 code blocks",
-      expect.objectContaining({
-        valid: true,
-        detailedChecks: expect.any(Array),
-      }),
+      expect.stringContaining("Detailed Results"),
       "test-conversation-id",
     );
   });
@@ -325,11 +327,13 @@ describe("learn_shopify_apis tool error handling", () => {
 
 describe("validate_admin_api_codeblocks tool behavior", () => {
   let mockServer: any;
-  let validateGraphQLOperationMock: any;
+  let validateAdminGraphQLCodeblocksMock: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    validateGraphQLOperationMock = vi.mocked(validateGraphQLOperation);
+    validateAdminGraphQLCodeblocksMock = vi.mocked(
+      validateAdminGraphQLCodeblocks,
+    );
     vi.mocked(recordUsage).mockResolvedValue(undefined);
     vi.mocked(fetchGettingStartedApis).mockResolvedValue([
       { name: "admin", description: "Admin API" },
@@ -346,16 +350,20 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
     };
   });
 
-  test("validates code blocks in parallel", async () => {
-    validateGraphQLOperationMock
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail: "Valid GraphQL query",
-      })
-      .mockResolvedValueOnce({
-        result: ValidationResult.SUCCESS,
-        resultDetail: "Valid GraphQL mutation",
-      });
+  test("validates code blocks and returns result", async () => {
+    validateAdminGraphQLCodeblocksMock.mockResolvedValueOnce({
+      valid: true,
+      detailedChecks: [
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL query",
+        },
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL mutation",
+        },
+      ],
+    });
 
     await shopifyTools(mockServer);
 
@@ -369,21 +377,14 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
       conversationId: "test-conversation-id",
     });
 
-    expect(validateGraphQLOperationMock).toHaveBeenCalledTimes(2);
-    expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
-      1,
-      testCodeBlocks[0],
-      "admin",
-    );
-    expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
-      2,
-      testCodeBlocks[1],
-      "admin",
+    expect(validateAdminGraphQLCodeblocksMock).toHaveBeenCalledTimes(1);
+    expect(validateAdminGraphQLCodeblocksMock).toHaveBeenCalledWith(
+      testCodeBlocks,
     );
   });
 
   test("handles validation function errors", async () => {
-    validateGraphQLOperationMock.mockRejectedValueOnce(
+    validateAdminGraphQLCodeblocksMock.mockRejectedValueOnce(
       new Error("Schema loading failed"),
     );
 
@@ -397,9 +398,14 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
   });
 
   test("returns formatted validation results", async () => {
-    validateGraphQLOperationMock.mockResolvedValueOnce({
-      result: ValidationResult.SUCCESS,
-      resultDetail: "Valid GraphQL",
+    validateAdminGraphQLCodeblocksMock.mockResolvedValueOnce({
+      valid: true,
+      detailedChecks: [
+        {
+          result: ValidationResult.SUCCESS,
+          resultDetail: "Valid GraphQL",
+        },
+      ],
     });
 
     await shopifyTools(mockServer);
@@ -410,8 +416,8 @@ describe("validate_admin_api_codeblocks tool behavior", () => {
 
     expect(result.content[0].type).toBe("text");
     const responseText = result.content[0].text;
-    expect(responseText).toContain("## Validation Summary");
-    expect(responseText).toContain("**Total Code Blocks:** 1");
     expect(responseText).toContain("## Detailed Results");
+    expect(responseText).toContain("### Validation 1");
+    expect(responseText).toContain("**Status:** ✅ SUCCESS");
   });
 });

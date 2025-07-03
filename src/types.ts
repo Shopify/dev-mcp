@@ -19,7 +19,7 @@ export interface ValidationResponse {
   resultDetail: string;
 }
 
-export interface ValidationToolResult {
+export interface ValidationFunctionResult {
   /**
    * Overall validation status - true only if all checks passed or were skipped
    */
