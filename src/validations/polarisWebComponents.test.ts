@@ -595,7 +595,7 @@ describe("validatePolarisWebComponents", () => {
   });
 
   describe("real life examples", () => {
-    it("should validate a real life example with type errors", () => {
+    it("tophat take 1", () => {
       // This example contains invalid props that cause TypeScript errors:
       // 1. s-heading level="2" - Property 'level' does not exist on type
       // 2. s-link url="..." external - Properties 'url' and 'external' do not exist on type
@@ -622,6 +622,14 @@ describe("validatePolarisWebComponents", () => {
       // Check for the actual errors that are being caught
       expect(resultDetail).toContain("Property 'level' does not exist on type");
       expect(resultDetail).toContain("Property 'url' does not exist on type");
+    });
+
+    it("tophat take 2", () => {
+      const codeBlock =
+        '```html\n<s-page>\n  <ui-title-bar title="Remix app template">\n    <s-button variant="primary" onClick={generateProduct} slot="actions">\n      Generate a product\n    </s-button>\n  </ui-title-bar>\n  <s-stack gap="large">\n    <s-grid gridTemplateColumns="2fr 1fr" gap="large">\n      <s-section>\n        <s-stack gap="large">\n          <s-stack gap="base">\n            <s-heading>Congrats on creating a new Shopify app 🎉</s-heading>\n            <s-text>\n              This embedded app template uses\n              <s-link href="https://shopify.dev/docs/apps/tools/app-bridge" target="_blank">\n                App Bridge\n              </s-link>\n              interface examples like an <s-link href="/app/additional">additional page in the app nav</s-link>, as\n              well as an\n              <s-link href="https://shopify.dev/docs/api/admin-graphql" target="_blank">\n                Admin GraphQL\n              </s-link>\n              mutation demo, to provide a starting point for app development.\n            </s-text>\n          </s-stack>\n        </s-stack>\n      </s-section>\n    </s-grid>\n  </s-stack>\n</s-page>\n```';
+
+      const { result } = validatePolarisWebComponents(codeBlock);
+      expect(result).toBe(ValidationResult.SUCCESS);
     });
   });
 });
