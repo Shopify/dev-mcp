@@ -1,4 +1,8 @@
-import { ValidationResult, ValidationFunctionResult } from "../types.js";
+import {
+  ValidationResult,
+  ValidationFunctionResult,
+  ValidationResponse,
+} from "../types.js";
 
 /**
  * Formats a ValidationFunctionResult into a readable markdown response
@@ -49,4 +53,48 @@ function overallStatus(results: ValidationFunctionResult): ValidationResult {
   } else {
     return ValidationResult.SKIPPED;
   }
+}
+
+export function extractCodeblocksWithRegex(
+  markdownResponse: string,
+  regex: RegExp,
+): string[] {
+  const codeblocks: string[] = [];
+  let match;
+
+  while ((match = regex.exec(markdownResponse)) !== null) {
+    const operation = match[1].trim();
+    if (operation) {
+      codeblocks.push(operation);
+    }
+  }
+
+  return codeblocks;
+}
+
+export function createFailedResult(
+  detailedChecks: ValidationResponse[],
+): ValidationFunctionResult {
+  return {
+    valid: false,
+    detailedChecks,
+  };
+}
+
+export function validationResult(
+  result: ValidationResult,
+  resultDetail: string,
+): ValidationResponse {
+  return { result, resultDetail };
+}
+
+export function createValidationResult(
+  validationResponses: ValidationResponse[],
+): ValidationFunctionResult {
+  return {
+    valid: validationResponses.every(
+      (response) => response.result === ValidationResult.SUCCESS,
+    ),
+    detailedChecks: validationResponses,
+  };
 }
