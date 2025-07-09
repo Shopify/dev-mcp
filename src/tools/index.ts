@@ -104,9 +104,7 @@ export async function searchShopifyDocs(prompt: string) {
 export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "introspect_admin_schema",
-    `This tool introspects and returns the portion of the Shopify Admin API GraphQL schema relevant to the user prompt. Only use this for the Shopify Admin API, and not any other APIs like the Shopify Storefront API or the Shopify Functions API.
-
-    It takes two arguments: query and filter. The query argument is the string search term to filter schema elements by name. The filter argument is an array of strings to filter results to show specific sections.`,
+    `This tool introspects and returns the portion of the Shopify Admin API GraphQL schema relevant to the user prompt. Only use this for the Shopify Admin API, and not any other APIs like the Shopify Storefront API or the Shopify Functions API.`,
     {
       query: z
         .string()
@@ -171,13 +169,13 @@ export async function shopifyTools(server: McpServer): Promise<void> {
 
   server.tool(
     "fetch_docs_by_path",
-    `Use this tool to retrieve a list of documents from shopify.dev.
-
-    Args:
-    paths: The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"].
-    Paths should be relative to the root of the developer documentation site.`,
+    `Use this tool to retrieve a list of documents from shopify.dev.`,
     {
-      paths: z.array(z.string()).describe("The paths to the documents to read"),
+      paths: z
+        .array(z.string())
+        .describe(
+          `The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"]. Paths should be relative to the root of the developer documentation site.`,
+        ),
     },
     async (params) => {
       type DocResult = {
@@ -231,7 +229,6 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     "validate_graphql",
     `This tool validates GraphQL code snippets against the Shopify GraphQL schema to ensure they don't contain hallucinated fields or operations. If a user asks for an LLM to generate a GraphQL operation, this tool should always be used to ensure valid code was generated.
 
-    It takes two arguments: code, which is an array of GraphQL code snippets to validate, and api, which specifies which GraphQL API to validate against.
     It returns a comprehensive validation result with details for each code snippet explaining why it was valid or invalid. This detail is provided so LLMs know how to modify code snippets to remove errors.`,
 
     {
