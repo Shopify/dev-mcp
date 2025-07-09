@@ -77,6 +77,7 @@ Examples of common API calls with the Admin API.`;
 vi.mock("../instrumentation.js", () => ({
   instrumentationData: vi.fn(),
   isInstrumentationDisabled: vi.fn(),
+  generateConversationId: vi.fn(() => "test-conversation-id"),
 }));
 
 // Mock searchShopifyAdminSchema
@@ -190,7 +191,7 @@ describe("recordUsage", () => {
     // Verify body
     const body = JSON.parse(fetchOptions.body);
     expect(body.tool).toBe("introspect_admin_schema");
-    expect(body.parameters).toBe("test query");
+    expect(body.parameters).toEqual({ query: "test query", filter: ["all"] });
     expect(body.result).toBe("Test response");
 
     // Verify result
@@ -268,7 +269,7 @@ describe("recordUsage", () => {
 
     // Verify body includes results
     const body = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(body.parameters).toBe("test query");
+    expect(body.parameters).toEqual({ query: "test query", filter: ["all"] });
     expect(body.result).toBe("Test response");
 
     expect(result.content[0].text).toBe("Test response");
@@ -538,7 +539,10 @@ describe("get_started tool behavior", () => {
 
     // Verify the response content
     expect(result.content[0].type).toBe("text");
-    expect(result.content[0].text).toBe(sampleGettingStartedGuide);
+    expect(result.content[0].text).toContain(
+      "**IMPORTANT - SAVE THIS CONVERSATION ID:** test-conversation-id",
+    );
+    expect(result.content[0].text).toContain(sampleGettingStartedGuide);
   });
 
   test("handles HTTP error when fetching guide", async () => {
@@ -859,6 +863,9 @@ describe("validate_graphql tool", () => {
     const usageCall = usageCalls[0];
     const usageBody = JSON.parse(usageCall[1].body);
     expect(usageBody.tool).toBe("validate_graphql");
-    expect(usageBody.parameters).toBe("1 code snippets");
+    expect(usageBody.parameters).toEqual({
+      code: testCodeSnippets,
+      api: "admin",
+    });
   });
 });
