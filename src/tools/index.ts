@@ -3,6 +3,7 @@ import { z } from "zod";
 import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { ValidationResult } from "../types.js";
+import { hasFailedValidation } from "../validations/index.js";
 import type { ValidationToolResult, ValidationResponse } from "../types.js";
 import {
   isInstrumentationDisabled,
@@ -280,18 +281,15 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         }),
       );
 
-      // Aggregate the results using the shared function
-      const validationResult = validationToolResult(validationResponses);
-
       recordUsage(
         "validate_graphql",
         `${code.length} code snippets`,
-        validationResult,
+        validationResponses,
       ).catch(() => {});
 
       // Format the response using the shared formatting function
       const responseText = formatValidationResult(
-        validationResult,
+        validationResponses,
         "Code Snippets",
       );
 
@@ -430,25 +428,6 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
 // ============================================================================
 
 /**
- * Aggregates multiple validation responses into a single ValidationToolResult
- * @param validationResponses - Array of individual validation responses
- * @returns ValidationToolResult with overall status and detailed checks
- */
-function validationToolResult(
-  validationResponses: ValidationResponse[],
-): ValidationToolResult {
-  // Check if all validations passed (no failures)
-  const valid = validationResponses.every(
-    (response) => response.result === ValidationResult.SUCCESS,
-  );
-
-  return {
-    valid,
-    detailedChecks: validationResponses,
-  };
-}
-
-/**
  * Formats a ValidationToolResult into a readable markdown response
  * @param result - The validation result to format
  * @param itemName - Name of the items being validated (e.g., "Code Blocks", "Operations")
@@ -459,11 +438,11 @@ function formatValidationResult(
   itemName: string = "Items",
 ): string {
   let responseText = `## Validation Summary\n\n`;
-  responseText += `**Overall Status:** ${result.valid ? "✅ VALID" : "❌ INVALID"}\n`;
-  responseText += `**Total ${itemName}:** ${result.detailedChecks.length}\n\n`;
+  responseText += `**Overall Status:** ${!hasFailedValidation(result) ? "✅ VALID" : "❌ INVALID"}\n`;
+  responseText += `**Total ${itemName}:** ${result.length}\n\n`;
 
   responseText += `## Detailed Results\n\n`;
-  result.detailedChecks.forEach((check, index) => {
+  result.forEach((check, index) => {
     const statusIcon = check.result === ValidationResult.SUCCESS ? "✅" : "❌";
     responseText += `### ${itemName.slice(0, -1)} ${index + 1}\n`;
     responseText += `**Status:** ${statusIcon} ${check.result.toUpperCase()}\n`;
