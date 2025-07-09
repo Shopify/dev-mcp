@@ -2,11 +2,11 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { shopifyTools } from "./tools/index.js";
-import { shopifyPrompts } from "./prompts/index.js";
 import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
+import { shopifyPrompts } from "./prompts/index.js";
+import { shopifyTools } from "./tools/index.js";
 
 // Get package.json version
 const __filename = fileURLToPath(import.meta.url);

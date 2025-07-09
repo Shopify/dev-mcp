@@ -1,20 +1,20 @@
 // Import vitest first
-import { describe, test, expect, beforeEach, vi, afterAll } from "vitest";
 import { vol } from "memfs";
+import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("node:fs");
 vi.mock("node:fs/promises");
 
 // Now import the module to test
 import {
-  formatType,
+  filterAndSortItems,
   formatArg,
   formatField,
-  formatSchemaType,
   formatGraphqlOperation,
-  searchShopifyAdminSchema,
-  filterAndSortItems,
+  formatSchemaType,
+  formatType,
   MAX_FIELDS_TO_SHOW,
+  searchShopifyAdminSchema,
 } from "./shopifyAdminSchema.js";
 
 // Mock console.error

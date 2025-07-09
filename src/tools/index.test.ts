@@ -1,24 +1,24 @@
 import {
-  describe,
-  it,
-  test,
-  expect,
-  beforeEach,
-  vi,
   afterAll,
   afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  test,
+  vi,
 } from "vitest";
 
 global.fetch = vi.fn();
 
-import { shopifyTools, searchShopifyDocs } from "./index.js";
 import {
   instrumentationData,
   isInstrumentationDisabled,
 } from "../instrumentation.js";
-import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
-import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { ValidationResult } from "../types.js";
+import validateGraphQLOperation from "../validations/graphqlSchema.js";
+import { searchShopifyDocs, shopifyTools } from "./index.js";
+import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;

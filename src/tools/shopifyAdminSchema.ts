@@ -1,5 +1,5 @@
-import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
+import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 

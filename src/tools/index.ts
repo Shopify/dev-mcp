@@ -1,14 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
-import validateGraphQLOperation from "../validations/graphqlSchema.js";
-import { ValidationResult } from "../types.js";
-import { hasFailedValidation } from "../validations/index.js";
-import type { ValidationToolResult, ValidationResponse } from "../types.js";
 import {
-  isInstrumentationDisabled,
   instrumentationData,
+  isInstrumentationDisabled,
 } from "../instrumentation.js";
+import type { ValidationToolResult } from "../types.js";
+import { ValidationResult } from "../types.js";
+import validateGraphQLOperation from "../validations/graphqlSchema.js";
+import { hasFailedValidation } from "../validations/index.js";
+import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"

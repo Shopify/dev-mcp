@@ -1,8 +1,5 @@
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import zlib from "node:zlib";
-import { parse, validate, buildClientSchema, GraphQLError } from "graphql";
+import { parse, validate, buildClientSchema } from "graphql";
 import { loadSchemaContent } from "../tools/shopifyAdminSchema.js";
 import { ValidationResult } from "../types.js";
 import type { ValidationResponse } from "../types.js";

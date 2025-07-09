@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import validateGraphQLOperation from "./graphqlSchema.js";
-import { ValidationResult } from "../types.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as shopifyAdminSchema from "../tools/shopifyAdminSchema.js";
+import { ValidationResult } from "../types.js";
+import validateGraphQLOperation from "./graphqlSchema.js";
 
 // Only mock for specific error testing scenarios
 const mockLoadSchemaContent = vi.spyOn(shopifyAdminSchema, "loadSchemaContent");
