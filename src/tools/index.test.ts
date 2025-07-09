@@ -1,22 +1,24 @@
 import {
-  describe,
-  it,
-  test,
-  expect,
-  beforeEach,
-  vi,
   afterAll,
   afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  test,
+  vi,
 } from "vitest";
 
 global.fetch = vi.fn();
 
-import { shopifyTools, searchShopifyDocs } from "./index.js";
 import {
   instrumentationData,
   isInstrumentationDisabled,
 } from "../instrumentation.js";
-import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+import { ValidationResult } from "../types.js";
+import validateGraphQLOperation from "../validations/graphqlSchema.js";
+import { searchShopifyDocs, shopifyTools } from "./index.js";
+import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
@@ -78,8 +80,13 @@ vi.mock("../instrumentation.js", () => ({
 }));
 
 // Mock searchShopifyAdminSchema
-vi.mock("./shopify-admin-schema.js", () => ({
+vi.mock("./shopifyAdminSchema.js", () => ({
   searchShopifyAdminSchema: vi.fn(),
+}));
+
+// Mock validateGraphQLOperation
+vi.mock("../validations/graphqlSchema.js", () => ({
+  default: vi.fn(),
 }));
 
 vi.mock("../../package.json", () => ({
@@ -607,5 +614,251 @@ describe("get_started tool behavior", () => {
       "Error fetching getting started information",
     );
     expect(result.content[0].text).toContain("Network failure");
+  });
+});
+
+describe("validate_graphql tool", () => {
+  let mockServer: any;
+  let validateGraphQLOperationMock: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    validateGraphQLOperationMock = vi.mocked(validateGraphQLOperation);
+
+    // Mock fetch for getting started APIs
+    const fetchMock = global.fetch as any;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(sampleGettingStartedApisResponse),
+    });
+
+    // Create a mock server that captures the registered tools
+    mockServer = {
+      tool: vi.fn((name, description, schema, handler) => {
+        if (name === "validate_graphql") {
+          mockServer.validateHandler = handler;
+        }
+      }),
+      validateHandler: null,
+    };
+
+    // Mock instrumentation
+    vi.mocked(instrumentationData).mockReturnValue({
+      packageVersion: "1.0.0",
+      timestamp: "2024-01-01T00:00:00.000Z",
+    });
+    vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
+  });
+
+  test("validates multiple code snippets successfully", async () => {
+    // Setup mock responses
+    validateGraphQLOperationMock
+      .mockResolvedValueOnce({
+        result: ValidationResult.SUCCESS,
+        resultDetail:
+          "Successfully validated GraphQL query against Shopify Admin API schema.",
+      })
+      .mockResolvedValueOnce({
+        result: ValidationResult.FAILED,
+        resultDetail:
+          "No GraphQL operation found in the provided code snippet.",
+      });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Ensure the handler was registered
+    expect(mockServer.validateHandler).not.toBeNull();
+
+    const testCodeSnippets = ["query { products { id } }", "const x = 1;"];
+
+    // Call the handler
+    const result = await mockServer.validateHandler({
+      code: testCodeSnippets,
+      api: "admin",
+    });
+
+    // Verify validateGraphQLOperation was called correctly
+    expect(validateGraphQLOperationMock).toHaveBeenCalledTimes(2);
+    expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
+      1,
+      testCodeSnippets[0],
+      "admin",
+    );
+    expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
+      2,
+      testCodeSnippets[1],
+      "admin",
+    );
+
+    // Verify the response
+    expect(result.content[0].type).toBe("text");
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("❌ INVALID");
+    expect(responseText).toContain("**Total Code Snippets:** 2");
+    expect(responseText).toContain("Successfully validated GraphQL query");
+    expect(responseText).toContain("No GraphQL operation found");
+  });
+
+  test("handles validation failures correctly", async () => {
+    // Setup mock responses with failures
+    validateGraphQLOperationMock
+      .mockResolvedValueOnce({
+        result: ValidationResult.FAILED,
+        resultDetail:
+          "GraphQL validation errors: Cannot query field 'invalidField' on type 'Product'.",
+      })
+      .mockResolvedValueOnce({
+        result: ValidationResult.SUCCESS,
+        resultDetail:
+          "Successfully validated GraphQL mutation against Shopify Admin API schema.",
+      });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeSnippets = [
+      "query { products { invalidField } }",
+      "mutation { productCreate(input: {}) { product { id } } }",
+    ];
+
+    // Call the handler
+    const result = await mockServer.validateHandler({
+      code: testCodeSnippets,
+      api: "admin",
+    });
+
+    // Verify the response shows invalid overall status
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("❌ INVALID");
+    expect(responseText).toContain("**Total Code Snippets:** 2");
+    expect(responseText).toContain("Cannot query field 'invalidField'");
+    expect(responseText).toContain("Successfully validated GraphQL mutation");
+  });
+
+  test("handles mixed validation results", async () => {
+    // Setup mixed results
+    validateGraphQLOperationMock
+      .mockResolvedValueOnce({
+        result: ValidationResult.SUCCESS,
+        resultDetail:
+          "Successfully validated GraphQL query against Shopify Admin API schema.",
+      })
+      .mockResolvedValueOnce({
+        result: ValidationResult.FAILED,
+        resultDetail:
+          "No GraphQL operation found in the provided code snippet.",
+      })
+      .mockResolvedValueOnce({
+        result: ValidationResult.FAILED,
+        resultDetail:
+          "GraphQL syntax error: Syntax Error: Expected Name, found }",
+      });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeSnippets = [
+      "query { products { id } }",
+      "const x = 1;",
+      "query { products { } }",
+    ];
+
+    // Call the handler
+    const result = await mockServer.validateHandler({
+      code: testCodeSnippets,
+      api: "admin",
+    });
+
+    // Verify the response shows invalid overall status due to failure
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("❌ INVALID");
+    expect(responseText).toContain("**Total Code Snippets:** 3");
+    expect(responseText).toContain("Code Snippet 1\n**Status:** ✅ SUCCESS");
+    expect(responseText).toContain("Code Snippet 2\n**Status:** ❌ FAILED");
+    expect(responseText).toContain("Code Snippet 3\n**Status:** ❌ FAILED");
+    expect(responseText).toContain("Syntax Error: Expected Name, found }");
+  });
+
+  test("handles empty code snippets array", async () => {
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Call the handler with empty array
+    const result = await mockServer.validateHandler({
+      code: [],
+      api: "admin",
+    });
+
+    // Verify validateGraphQLOperation was not called
+    expect(validateGraphQLOperationMock).not.toHaveBeenCalled();
+
+    // Verify the response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+    expect(responseText).toContain("**Total Code Snippets:** 0");
+  });
+
+  test("handles validation function errors", async () => {
+    // Setup mock to throw an error
+    validateGraphQLOperationMock.mockRejectedValueOnce(
+      new Error("Schema loading failed"),
+    );
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeSnippets = ["query { products { id } }"];
+
+    // Call the handler and expect it to handle the error gracefully
+    await expect(
+      mockServer.validateHandler({
+        code: testCodeSnippets,
+        api: "admin",
+      }),
+    ).rejects.toThrow("Schema loading failed");
+
+    // Verify validateGraphQLOperation was called
+    expect(validateGraphQLOperationMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("records usage data correctly", async () => {
+    // Setup successful validation
+    validateGraphQLOperationMock.mockResolvedValueOnce({
+      result: ValidationResult.SUCCESS,
+      resultDetail:
+        "Successfully validated GraphQL query against Shopify Admin API schema.",
+    });
+
+    // Mock fetch for usage recording
+    const fetchMock = global.fetch as any;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeSnippets = ["query { products { id } }"];
+
+    // Call the handler
+    await mockServer.validateHandler({
+      code: testCodeSnippets,
+      api: "admin",
+    });
+
+    // Verify usage was recorded (should be called for API list fetch and usage recording)
+    const usageCalls = fetchMock.mock.calls.filter((call: [string, any]) =>
+      call[0].includes("/mcp/usage"),
+    );
+    expect(usageCalls.length).toBe(1);
+
+    // Verify the usage data
+    const usageCall = usageCalls[0];
+    const usageBody = JSON.parse(usageCall[1].body);
+    expect(usageBody.tool).toBe("validate_graphql");
+    expect(usageBody.parameters).toBe("1 code snippets");
   });
 });

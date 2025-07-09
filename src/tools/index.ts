@@ -1,10 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
 import {
   instrumentationData,
   isInstrumentationDisabled,
 } from "../instrumentation.js";
+import type { ValidationToolResult } from "../types.js";
+import { ValidationResult } from "../types.js";
+import validateGraphQLOperation from "../validations/graphqlSchema.js";
+import { hasFailedValidation } from "../validations/index.js";
+import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 
 const SHOPIFY_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
@@ -256,6 +260,50 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     },
   );
 
+  server.tool(
+    "validate_graphql",
+    `This tool validates GraphQL code snippets against the Shopify GraphQL schema to ensure they don't contain hallucinated fields or operations. If a user asks for an LLM to generate a GraphQL operation, this tool should always be used to ensure valid code was generated.
+
+    It takes two arguments: code, which is an array of GraphQL code snippets to validate, and api, which specifies which GraphQL API to validate against.
+    It returns a comprehensive validation result with details for each code snippet explaining why it was valid or invalid. This detail is provided so LLMs know how to modify code snippets to remove errors.`,
+
+    {
+      api: z.enum(["admin"]).describe("The GraphQL API to validate against"),
+      code: z
+        .array(z.string())
+        .describe("Array of GraphQL code snippets to validate"),
+    },
+    async ({ code, api }) => {
+      // Validate all code snippets in parallel
+      const validationResponses = await Promise.all(
+        code.map(async (snippet) => {
+          return await validateGraphQLOperation(snippet, api);
+        }),
+      );
+
+      recordUsage(
+        "validate_graphql",
+        `${code.length} code snippets`,
+        validationResponses,
+      ).catch(() => {});
+
+      // Format the response using the shared formatting function
+      const responseText = formatValidationResult(
+        validationResponses,
+        "Code Snippets",
+      );
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: responseText,
+          },
+        ],
+      };
+    },
+  );
+
   const gettingStartedApis = await fetchGettingStartedApis();
 
   const gettingStartedApiNames = gettingStartedApis.map((api) => api.name);
@@ -373,4 +421,33 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
     console.error(`[api-information] Error fetching API information: ${error}`);
     return [];
   }
+}
+
+// ============================================================================
+// Private Helper Functions
+// ============================================================================
+
+/**
+ * Formats a ValidationToolResult into a readable markdown response
+ * @param result - The validation result to format
+ * @param itemName - Name of the items being validated (e.g., "Code Blocks", "Operations")
+ * @returns Formatted markdown string with validation summary and details
+ */
+function formatValidationResult(
+  result: ValidationToolResult,
+  itemName: string = "Items",
+): string {
+  let responseText = `## Validation Summary\n\n`;
+  responseText += `**Overall Status:** ${!hasFailedValidation(result) ? "✅ VALID" : "❌ INVALID"}\n`;
+  responseText += `**Total ${itemName}:** ${result.length}\n\n`;
+
+  responseText += `## Detailed Results\n\n`;
+  result.forEach((check, index) => {
+    const statusIcon = check.result === ValidationResult.SUCCESS ? "✅" : "❌";
+    responseText += `### ${itemName.slice(0, -1)} ${index + 1}\n`;
+    responseText += `**Status:** ${statusIcon} ${check.result.toUpperCase()}\n`;
+    responseText += `**Details:** ${check.resultDetail}\n\n`;
+  });
+
+  return responseText;
 }

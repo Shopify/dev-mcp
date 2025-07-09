@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
 
 export function shopifyPrompts(server: McpServer) {
   server.prompt(
