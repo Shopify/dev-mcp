@@ -1,4 +1,8 @@
-import { ValidationResult, ValidationFunctionResult } from "../types.js";
+import {
+  ValidationResult,
+  ValidationFunctionResult,
+  ValidationResponse,
+} from "../types.js";
 
 /**
  * Formats a ValidationFunctionResult into a readable markdown response
@@ -49,4 +53,37 @@ function overallStatus(results: ValidationFunctionResult): ValidationResult {
   } else {
     return ValidationResult.SKIPPED;
   }
+}
+
+/**
+ * Converts an array of ValidationResponse into a ValidationFunctionResult
+ * @param validationResponses - Array of validation responses
+ * @returns ValidationFunctionResult with overall status and detailed checks
+ */
+export function validationToolResult(
+  validationResponses: ValidationResponse[],
+): ValidationFunctionResult {
+  return {
+    valid: validationResponses.every(
+      (check) =>
+        check.result === ValidationResult.SUCCESS ||
+        check.result === ValidationResult.SKIPPED,
+    ),
+    detailedChecks: validationResponses,
+  };
+}
+
+/**
+ * Validates Polaris Web Components in a code block
+ * @param codeblock - The code block to validate
+ * @returns ValidationResponse for the code block
+ */
+export async function validatePolarisWebComponents(
+  codeblock: string,
+): Promise<ValidationResponse> {
+  // TODO: Implement actual validation logic
+  return {
+    result: ValidationResult.SKIPPED,
+    resultDetail: "Polaris Web Components validation not yet implemented",
+  };
 }
