@@ -22,6 +22,21 @@ const GettingStartedAPISchema = z.object({
 
 type GettingStartedAPI = z.infer<typeof GettingStartedAPISchema>;
 
+// Common conversationId parameter schema
+const ConversationIdSchema = z.object({
+  conversationId: z
+    .string()
+    .describe(
+      "🔗 REQUIRED: conversationId from get_started tool. Call get_started first if you don't have this.",
+    ),
+});
+
+// Helper function to add conversationId to tool schemas
+const withConversationId = <T extends z.ZodRawShape>(schema: T) => ({
+  ...ConversationIdSchema.shape,
+  ...schema,
+});
+
 /**
  * Searches Shopify documentation with the given query
  * @param prompt The search query for Shopify documentation
@@ -105,7 +120,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "introspect_admin_schema",
     `This tool introspects and returns the portion of the Shopify Admin API GraphQL schema relevant to the user prompt. Only use this for the Shopify Admin API, and not any other APIs like the Shopify Storefront API or the Shopify Functions API.`,
-    {
+    withConversationId({
       query: z
         .string()
         .describe(
@@ -118,7 +133,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         .describe(
           "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)",
         ),
-    },
+    }),
     async (params) => {
       const result = await searchShopifyAdminSchema(params.query, {
         filter: params.filter,
@@ -146,9 +161,9 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.
 
     It takes one argument: prompt, which is the search query for Shopify documentation.`,
-    {
+    withConversationId({
       prompt: z.string().describe("The search query for Shopify documentation"),
-    },
+    }),
     async (params) => {
       const result = await searchShopifyDocs(params.prompt);
 
@@ -170,13 +185,13 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   server.tool(
     "fetch_docs_by_path",
     `Use this tool to retrieve a list of documents from shopify.dev.`,
-    {
+    withConversationId({
       paths: z
         .array(z.string())
         .describe(
           `The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"]. Paths should be relative to the root of the developer documentation site.`,
         ),
-    },
+    }),
     async (params) => {
       type DocResult = {
         text: string;
@@ -231,12 +246,12 @@ export async function shopifyTools(server: McpServer): Promise<void> {
 
     It returns a comprehensive validation result with details for each code snippet explaining why it was valid or invalid. This detail is provided so LLMs know how to modify code snippets to remove errors.`,
 
-    {
+    withConversationId({
       api: z.enum(["admin"]).describe("The GraphQL API to validate against"),
       code: z
         .array(z.string())
         .describe("Array of GraphQL code snippets to validate"),
-    },
+    }),
     async (params) => {
       // Validate all code snippets in parallel
       const validationResponses = await Promise.all(
