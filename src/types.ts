@@ -1,7 +1,6 @@
 export enum ValidationResult {
   SUCCESS = "success",
   FAILED = "failed",
-  SKIPPED = "skipped",
 }
 
 export interface ValidationResponse {
@@ -13,7 +12,6 @@ export interface ValidationResponse {
   /**
    * Explanation of the validation result.
    * For FAILED: Details about why validation failed
-   * For SKIPPED: Rationale for why validation was skipped
    * For SUCCESS: Description of what validation was successfully performed
    */
   resultDetail: string;
@@ -21,7 +19,7 @@ export interface ValidationResponse {
 
 export interface ValidationToolResult {
   /**
-   * Overall validation status - true only if all checks passed or were skipped
+   * Overall validation status - true only if all checks passed
    */
   valid: boolean;
 

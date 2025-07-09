@@ -44,7 +44,7 @@ export default async function validateGraphQLOperation(
     const trimmedCode = graphqlCode.trim();
     if (!trimmedCode) {
       return validationResult(
-        ValidationResult.SKIPPED,
+        ValidationResult.FAILED,
         "No GraphQL operation found in the provided code.",
       );
     }

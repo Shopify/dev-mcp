@@ -51,19 +51,19 @@ describe("validateGraphQLOperation", () => {
   });
 
   describe("GraphQL operation processing", () => {
-    it("should skip empty code", async () => {
+    it("should fail for empty code", async () => {
       const result = await validateGraphQLOperation("", "admin");
 
-      expect(result.result).toBe(ValidationResult.SKIPPED);
+      expect(result.result).toBe(ValidationResult.FAILED);
       expect(result.resultDetail).toBe(
         "No GraphQL operation found in the provided code.",
       );
     });
 
-    it("should skip code with only whitespace", async () => {
+    it("should fail for code with only whitespace", async () => {
       const result = await validateGraphQLOperation("   \n  \n", "admin");
 
-      expect(result.result).toBe(ValidationResult.SKIPPED);
+      expect(result.result).toBe(ValidationResult.FAILED);
       expect(result.resultDetail).toBe(
         "No GraphQL operation found in the provided code.",
       );
@@ -76,8 +76,7 @@ describe("validateGraphQLOperation", () => {
       );
 
       // Should proceed past processing (GraphQL was found and processed)
-      // May succeed or fail based on schema validation, but won't be skipped due to missing GraphQL
-      expect(result.result).not.toBe(ValidationResult.SKIPPED);
+      // May succeed or fail based on schema validation, but won't fail due to missing GraphQL
       expect(result.resultDetail).not.toBe(
         "No GraphQL operation found in the provided code.",
       );
@@ -92,7 +91,6 @@ describe("validateGraphQLOperation", () => {
       );
 
       // Should process the GraphQL and proceed
-      expect(result.result).not.toBe(ValidationResult.SKIPPED);
       expect(result.resultDetail).not.toBe(
         "No GraphQL operation found in the provided code.",
       );
@@ -100,10 +98,10 @@ describe("validateGraphQLOperation", () => {
       expect(typeof result.resultDetail).toBe("string");
     });
 
-    it("should skip empty string input", async () => {
+    it("should fail for empty string input", async () => {
       const result = await validateGraphQLOperation("", "admin");
 
-      expect(result.result).toBe(ValidationResult.SKIPPED);
+      expect(result.result).toBe(ValidationResult.FAILED);
       expect(result.resultDetail).toBe(
         "No GraphQL operation found in the provided code.",
       );

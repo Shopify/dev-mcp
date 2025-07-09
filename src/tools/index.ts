@@ -264,7 +264,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     `This tool validates GraphQL code snippets against the Shopify GraphQL schema to ensure they don't contain hallucinated fields or operations. If a user asks for an LLM to generate a GraphQL operation, this tool should always be used to ensure valid code was generated.
 
     It takes two arguments: code, which is an array of GraphQL code snippets to validate, and api, which specifies which GraphQL API to validate against.
-    It returns a comprehensive validation result with details for each code snippet explaining why it was valid, invalid, or skipped. This detail is provided so LLMs know how to modify code snippets to remove errors.`,
+    It returns a comprehensive validation result with details for each code snippet explaining why it was valid or invalid. This detail is provided so LLMs know how to modify code snippets to remove errors.`,
 
     {
       api: z.enum(["admin"]).describe("The GraphQL API to validate against"),
@@ -437,11 +437,9 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
 function validationToolResult(
   validationResponses: ValidationResponse[],
 ): ValidationToolResult {
-  // Check if all validations passed or were skipped (no failures)
+  // Check if all validations passed (no failures)
   const valid = validationResponses.every(
-    (response) =>
-      response.result === ValidationResult.SUCCESS ||
-      response.result === ValidationResult.SKIPPED,
+    (response) => response.result === ValidationResult.SUCCESS,
   );
 
   return {
@@ -466,12 +464,7 @@ function formatValidationResult(
 
   responseText += `## Detailed Results\n\n`;
   result.detailedChecks.forEach((check, index) => {
-    const statusIcon =
-      check.result === ValidationResult.SUCCESS
-        ? "✅"
-        : check.result === ValidationResult.SKIPPED
-          ? "⏭️"
-          : "❌";
+    const statusIcon = check.result === ValidationResult.SUCCESS ? "✅" : "❌";
     responseText += `### ${itemName.slice(0, -1)} ${index + 1}\n`;
     responseText += `**Status:** ${statusIcon} ${check.result.toUpperCase()}\n`;
     responseText += `**Details:** ${check.resultDetail}\n\n`;

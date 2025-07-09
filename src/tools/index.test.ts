@@ -660,7 +660,7 @@ describe("validate_graphql tool", () => {
           "Successfully validated GraphQL query against Shopify Admin API schema.",
       })
       .mockResolvedValueOnce({
-        result: ValidationResult.SKIPPED,
+        result: ValidationResult.FAILED,
         resultDetail:
           "No GraphQL operation found in the provided code snippet.",
       });
@@ -695,7 +695,7 @@ describe("validate_graphql tool", () => {
     // Verify the response
     expect(result.content[0].type).toBe("text");
     const responseText = result.content[0].text;
-    expect(responseText).toContain("✅ VALID");
+    expect(responseText).toContain("❌ INVALID");
     expect(responseText).toContain("**Total Code Snippets:** 2");
     expect(responseText).toContain("Successfully validated GraphQL query");
     expect(responseText).toContain("No GraphQL operation found");
@@ -746,7 +746,7 @@ describe("validate_graphql tool", () => {
           "Successfully validated GraphQL query against Shopify Admin API schema.",
       })
       .mockResolvedValueOnce({
-        result: ValidationResult.SKIPPED,
+        result: ValidationResult.FAILED,
         resultDetail:
           "No GraphQL operation found in the provided code snippet.",
       })
@@ -775,9 +775,9 @@ describe("validate_graphql tool", () => {
     const responseText = result.content[0].text;
     expect(responseText).toContain("❌ INVALID");
     expect(responseText).toContain("**Total Code Snippets:** 3");
-    expect(responseText).toContain("✅ SUCCESS");
-    expect(responseText).toContain("⏭️ SKIPPED");
-    expect(responseText).toContain("❌ FAILED");
+    expect(responseText).toContain("Code Snippet 1\n**Status:** ✅ SUCCESS");
+    expect(responseText).toContain("Code Snippet 2\n**Status:** ❌ FAILED");
+    expect(responseText).toContain("Code Snippet 3\n**Status:** ❌ FAILED");
     expect(responseText).toContain("Syntax Error: Expected Name, found }");
   });
 
