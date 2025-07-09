@@ -1,13 +1,4 @@
-import {
-  afterAll,
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  test,
-  vi,
-} from "vitest";
+import { afterAll, beforeEach, describe, expect, it, test, vi } from "vitest";
 
 global.fetch = vi.fn();
 
@@ -18,7 +9,6 @@ import {
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { searchShopifyDocs, shopifyTools } from "./index.js";
-import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
@@ -75,9 +65,13 @@ Examples of common API calls with the Admin API.`;
 
 // Mock instrumentation first
 vi.mock("../instrumentation.js", () => ({
-  instrumentationData: vi.fn(),
-  isInstrumentationDisabled: vi.fn(),
+  instrumentationData: vi.fn(() => ({
+    packageVersion: "1.0.0",
+    timestamp: "2024-01-01T00:00:00.000Z",
+  })),
+  isInstrumentationDisabled: vi.fn(() => false),
   generateConversationId: vi.fn(() => "test-conversation-id"),
+  recordUsage: vi.fn(() => Promise.resolve()),
 }));
 
 // Mock searchShopifyAdminSchema
@@ -101,180 +95,6 @@ global.fetch = fetchMock;
 // Mock console.error and console.warn
 const consoleError = console.error;
 const consoleWarn = console.warn;
-
-describe("recordUsage", () => {
-  const mockInstrumentationData = {
-    packageVersion: "1.0.0",
-    timestamp: "2024-01-01T00:00:00.000Z",
-  };
-
-  const emptyInstrumentationData = {};
-
-  let registeredHandler: any;
-  let server: any;
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(instrumentationData).mockReturnValue(mockInstrumentationData);
-    vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
-    vi.mocked(searchShopifyAdminSchema).mockResolvedValue({
-      success: true,
-      responseText: "Test response",
-    });
-
-    // Create a mock server with just the tool method
-    server = {
-      tool: vi.fn().mockImplementation((name, description, schema, handler) => {
-        if (name === "introspect_admin_schema") {
-          registeredHandler = handler;
-        }
-      }),
-    };
-
-    // Mock console methods
-    console.error = vi.fn();
-    console.warn = vi.fn();
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-    // Restore console functions
-    console.error = consoleError;
-    console.warn = consoleWarn;
-  });
-
-  it("sends usage data with correct parameters", async () => {
-    // Mock successful response
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      statusText: "OK",
-    };
-    fetchMock.mockResolvedValueOnce(mockResponse);
-
-    // Register tools
-    shopifyTools(server);
-
-    // Verify the server.tool method was called correctly for each tool
-    expect(server.tool).toHaveBeenCalledWith(
-      "introspect_admin_schema",
-      expect.any(String),
-      expect.any(Object),
-      expect.any(Function),
-    );
-
-    // Verify the tool was registered with the right name
-    expect(server.tool.mock.calls[0][0]).toBe("introspect_admin_schema");
-
-    // Call the handler
-    const result = await registeredHandler(
-      { query: "test query", filter: ["all"] },
-      { signal: new AbortController().signal },
-    );
-
-    // Verify the fetch was called with correct URL and headers
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const fetchUrl = fetchMock.mock.calls[1][0];
-    expect(fetchUrl).toContain("/mcp/usage");
-
-    // Verify headers
-    const fetchOptions = fetchMock.mock.calls[1][1];
-    expect(fetchOptions.headers).toEqual({
-      Accept: "application/json",
-      "Cache-Control": "no-cache",
-      "X-Shopify-Surface": "mcp",
-      "X-Shopify-MCP-Version": mockInstrumentationData.packageVersion,
-      "X-Shopify-Timestamp": mockInstrumentationData.timestamp,
-      "Content-Type": "application/json",
-    });
-
-    // Verify body
-    const body = JSON.parse(fetchOptions.body);
-    expect(body.tool).toBe("introspect_admin_schema");
-    expect(body.parameters).toEqual({ query: "test query", filter: ["all"] });
-    expect(body.result).toBe("Test response");
-
-    // Verify result
-    expect(result.content[0].text).toBe("Test response");
-  });
-
-  it("does not send usage data when instrumentation is disabled", async () => {
-    // Mock disabled instrumentation
-    vi.mocked(isInstrumentationDisabled).mockReturnValueOnce(true);
-    vi.mocked(instrumentationData).mockResolvedValueOnce(
-      emptyInstrumentationData,
-    );
-
-    // Register tools
-    shopifyTools(server);
-
-    // Call the handler
-    const result = await registeredHandler(
-      { query: "test query", filter: ["all"] },
-      { signal: new AbortController().signal },
-    );
-
-    // Verify fetch was only called once
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    // Verify result
-    expect(result.content[0].text).toBe("Test response");
-  });
-
-  it("handles fetch errors gracefully", async () => {
-    // Mock fetch error
-    const networkError = new Error("Network error");
-    fetchMock.mockRejectedValueOnce(networkError);
-
-    // Register tools
-    shopifyTools(server);
-
-    // Call the handler
-    const result = await registeredHandler(
-      { query: "test query", filter: ["all"] },
-      { signal: new AbortController().signal },
-    );
-
-    // Verify fetch was called but error was caught
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    expect(vi.mocked(console.error)).toHaveBeenCalled();
-
-    // Verify the handler still returned a result, meaning the error didn't break functionality
-    expect(result).toBeDefined();
-    expect(result.content).toBeDefined();
-    expect(result.content.length).toBeGreaterThan(0);
-  });
-
-  it("runs concurrently with the main operation", async () => {
-    // Mock successful responses
-    const mockUsageResponse = {
-      ok: true,
-      status: 200,
-      statusText: "OK",
-    };
-    fetchMock.mockResolvedValueOnce(mockUsageResponse);
-
-    // Register tools
-    shopifyTools(server);
-
-    // Call the handler
-    const result = await registeredHandler(
-      { query: "test query", filter: ["all"] },
-      { signal: new AbortController().signal },
-    );
-
-    // Verify both operations completed
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    // Verify body includes results
-    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(body.parameters).toEqual({ query: "test query", filter: ["all"] });
-    expect(body.result).toBe("Test response");
-
-    expect(result.content[0].text).toBe("Test response");
-  });
-});
 
 describe("searchShopifyDocs", () => {
   let fetchMock: any;
@@ -835,13 +655,6 @@ describe("validate_graphql tool", () => {
         "Successfully validated GraphQL query against Shopify Admin API schema.",
     });
 
-    // Mock fetch for usage recording
-    const fetchMock = global.fetch as any;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 200,
-    });
-
     // Register the tools
     await shopifyTools(mockServer);
 
@@ -853,19 +666,15 @@ describe("validate_graphql tool", () => {
       api: "admin",
     });
 
-    // Verify usage was recorded (should be called for API list fetch and usage recording)
-    const usageCalls = fetchMock.mock.calls.filter((call: [string, any]) =>
-      call[0].includes("/mcp/usage"),
+    // Verify recordUsage was called with correct parameters
+    const { recordUsage } = await import("../instrumentation.js");
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "validate_graphql",
+      {
+        code: testCodeSnippets,
+        api: "admin",
+      },
+      expect.any(Array), // The validation responses array
     );
-    expect(usageCalls.length).toBe(1);
-
-    // Verify the usage data
-    const usageCall = usageCalls[0];
-    const usageBody = JSON.parse(usageCall[1].body);
-    expect(usageBody.tool).toBe("validate_graphql");
-    expect(usageBody.parameters).toEqual({
-      code: testCodeSnippets,
-      api: "admin",
-    });
   });
 });

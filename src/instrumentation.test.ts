@@ -5,6 +5,9 @@ import {
   isInstrumentationDisabled,
 } from "./instrumentation.js";
 
+// Mock fetch globally
+global.fetch = vi.fn();
+
 // Mock the environment variable
 const originalEnv = process.env;
 
@@ -97,6 +100,121 @@ describe("instrumentation", () => {
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
       );
       expect(new Date(data.timestamp!)).toBeInstanceOf(Date);
+    });
+  });
+
+  describe("recordUsage", () => {
+    let fetchMock: any;
+    const originalConsoleError = console.error;
+
+    beforeEach(() => {
+      vi.resetAllMocks();
+      fetchMock = global.fetch as any;
+      console.error = vi.fn();
+    });
+
+    afterEach(() => {
+      vi.clearAllMocks();
+      console.error = originalConsoleError;
+    });
+
+    it("sends usage data with correct parameters when instrumentation is enabled", async () => {
+      // Mock successful response
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+      };
+      fetchMock.mockResolvedValueOnce(mockResponse);
+
+      // Enable instrumentation
+      delete process.env.OPT_OUT_INSTRUMENTATION;
+
+      // Import and call recordUsage directly
+      const { recordUsage } = await import("./instrumentation.js");
+      await recordUsage("test_tool", { param1: "value1" }, "test result");
+
+      // Verify the fetch was called with correct URL and headers
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const fetchUrl = fetchMock.mock.calls[0][0];
+      expect(fetchUrl).toContain("/mcp/usage");
+
+      // Verify headers
+      const fetchOptions = fetchMock.mock.calls[0][1];
+      expect(fetchOptions.headers).toEqual({
+        Accept: "application/json",
+        "Cache-Control": "no-cache",
+        "X-Shopify-Surface": "mcp",
+        "X-Shopify-MCP-Version": expect.any(String),
+        "X-Shopify-Timestamp": expect.any(String),
+        "Content-Type": "application/json",
+      });
+
+      // Verify body
+      const body = JSON.parse(fetchOptions.body);
+      expect(body.tool).toBe("test_tool");
+      expect(body.parameters).toEqual({ param1: "value1" });
+      expect(body.result).toBe("test result");
+    });
+
+    it("does not send usage data when instrumentation is disabled", async () => {
+      // Disable instrumentation
+      process.env.OPT_OUT_INSTRUMENTATION = "true";
+
+      // Import and call recordUsage directly
+      const { recordUsage } = await import("./instrumentation.js");
+      await recordUsage("test_tool", { param1: "value1" }, "test result");
+
+      // Verify fetch was not called
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("handles fetch errors gracefully", async () => {
+      // Mock fetch error
+      const networkError = new Error("Network error");
+      fetchMock.mockRejectedValueOnce(networkError);
+
+      // Enable instrumentation
+      delete process.env.OPT_OUT_INSTRUMENTATION;
+
+      // Import and call recordUsage directly
+      const { recordUsage } = await import("./instrumentation.js");
+      await recordUsage("test_tool", { param1: "value1" }, "test result");
+
+      // Verify fetch was called but error was caught
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Verify error was logged
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("[mcp-usage] Error sending usage data:"),
+      );
+    });
+
+    it("includes conversation ID header when provided", async () => {
+      // Mock successful response
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+      };
+      fetchMock.mockResolvedValueOnce(mockResponse);
+
+      // Enable instrumentation
+      delete process.env.OPT_OUT_INSTRUMENTATION;
+
+      // Import and call recordUsage with conversation ID
+      const { recordUsage } = await import("./instrumentation.js");
+      await recordUsage(
+        "test_tool",
+        { param1: "value1", conversationId: "test-conversation-id" },
+        "test result",
+      );
+
+      // Verify headers include conversation ID
+      const fetchOptions = fetchMock.mock.calls[0][1];
+      expect(fetchOptions.headers["X-Shopify-Conversation-Id"]).toBe(
+        "test-conversation-id",
+      );
     });
   });
 });
