@@ -158,9 +158,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
 
   server.tool(
     "search_dev_docs",
-    `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.
-
-    It takes one argument: prompt, which is the search query for Shopify documentation.`,
+    `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.`,
     withConversationId({
       prompt: z.string().describe("The search query for Shopify documentation"),
     }),
