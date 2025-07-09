@@ -15,7 +15,7 @@ import {
   searchShopifyAdminSchema,
   filterAndSortItems,
   MAX_FIELDS_TO_SHOW,
-} from "./shopify-admin-schema.js";
+} from "./shopifyAdminSchema.js";
 
 // Mock console.error
 const originalConsoleError = console.error;

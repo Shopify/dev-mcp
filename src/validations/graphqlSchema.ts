@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 import { parse, validate, buildClientSchema, GraphQLError } from "graphql";
-import { loadSchemaContent } from "../tools/shopify-admin-schema.js";
+import { loadSchemaContent } from "../tools/shopifyAdminSchema.js";
 import { ValidationResult } from "../types.js";
 import type { ValidationResponse } from "../types.js";
 
@@ -27,24 +27,31 @@ type SupportedSchemaName = keyof typeof SCHEMA_MAPPINGS;
 // ============================================================================
 
 /**
- * Validates a GraphQL operation from a markdown code block against the specified schema
+ * Validates a GraphQL operation against the specified schema
  *
- * @param markdownCodeBlock - The markdown code block containing the GraphQL operation
+ * @param graphqlCode - The raw GraphQL operation code
  * @param schemaName - The name of the schema (currently supports 'admin' for Shopify Admin API)
  * @returns ValidationResponse indicating the status of the validation
  */
 export default async function validateGraphQLOperation(
-  markdownCodeBlock: string,
+  graphqlCode: string,
   schemaName: string,
 ): Promise<ValidationResponse> {
   try {
-    return (
-      validateSchemaIsSupported(schemaName) ||
-      skipIfNoGraphQLFound(markdownCodeBlock) ||
-      (await performGraphQLValidation(
-        markdownCodeBlock,
-        schemaName as SupportedSchemaName,
-      ))
+    const schemaValidation = validateSchemaIsSupported(schemaName);
+    if (schemaValidation) return schemaValidation;
+
+    const trimmedCode = graphqlCode.trim();
+    if (!trimmedCode) {
+      return validationResult(
+        ValidationResult.SKIPPED,
+        "No GraphQL operation found in the provided code.",
+      );
+    }
+
+    return await performGraphQLValidation(
+      graphqlCode,
+      schemaName as SupportedSchemaName,
     );
   } catch (error) {
     return validationResult(
@@ -75,16 +82,6 @@ function getSchemaPath(schemaName: SupportedSchemaName): string {
   return SCHEMA_MAPPINGS[schemaName];
 }
 
-function extractGraphQLOperation(markdownCodeBlock: string): string | null {
-  const operation = extractGraphQLFromMarkdown(markdownCodeBlock);
-
-  if (!operation) {
-    return null;
-  }
-
-  return operation;
-}
-
 async function loadAndBuildGraphQLSchema(schemaName: SupportedSchemaName) {
   const schemaPath = getSchemaPath(schemaName);
   const schemaContent = await loadSchemaContent(schemaPath);
@@ -112,17 +109,6 @@ function validateGraphQLAgainstSchema(schema: any, document: any): string[] {
   return validationErrors.map((e) => e.message);
 }
 
-function extractGraphQLFromMarkdown(markdownCodeBlock: string): string {
-  const codeBlockRegex = /^```(?:graphql|gql)?\s*\n?([\s\S]*?)\n?```$/;
-  const match = markdownCodeBlock.trim().match(codeBlockRegex);
-
-  if (match) {
-    return match[1].trim();
-  }
-
-  return markdownCodeBlock.trim();
-}
-
 function getOperationType(document: any): string {
   if (document.definitions.length > 0) {
     const operationDefinition = document.definitions[0];
@@ -146,24 +132,11 @@ function validateSchemaIsSupported(
   return null;
 }
 
-function skipIfNoGraphQLFound(
-  markdownCodeBlock: string,
-): ValidationResponse | null {
-  const operation = extractGraphQLOperation(markdownCodeBlock);
-  if (operation === null) {
-    return validationResult(
-      ValidationResult.SKIPPED,
-      "No GraphQL operation found in the provided markdown code block.",
-    );
-  }
-  return null;
-}
-
 async function performGraphQLValidation(
-  markdownCodeBlock: string,
+  graphqlCode: string,
   schemaName: SupportedSchemaName,
 ): Promise<ValidationResponse> {
-  const operation = extractGraphQLOperation(markdownCodeBlock)!; // We know it exists from previous check
+  const operation = graphqlCode.trim();
   const schema = await loadAndBuildGraphQLSchema(schemaName);
 
   const parseResult = parseGraphQLDocument(operation);

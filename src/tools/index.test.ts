@@ -16,7 +16,7 @@ import {
   instrumentationData,
   isInstrumentationDisabled,
 } from "../instrumentation.js";
-import { searchShopifyAdminSchema } from "./shopify-admin-schema.js";
+import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { ValidationResult } from "../types.js";
 
@@ -80,7 +80,7 @@ vi.mock("../instrumentation.js", () => ({
 }));
 
 // Mock searchShopifyAdminSchema
-vi.mock("./shopify-admin-schema.js", () => ({
+vi.mock("./shopifyAdminSchema.js", () => ({
   searchShopifyAdminSchema: vi.fn(),
 }));
 
@@ -617,7 +617,7 @@ describe("get_started tool behavior", () => {
   });
 });
 
-describe("validate_admin_api_codeblocks tool", () => {
+describe("validate_graphql tool", () => {
   let mockServer: any;
   let validateGraphQLOperationMock: any;
 
@@ -636,7 +636,7 @@ describe("validate_admin_api_codeblocks tool", () => {
     // Create a mock server that captures the registered tools
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
-        if (name === "validate_admin_api_codeblocks") {
+        if (name === "validate_graphql") {
           mockServer.validateHandler = handler;
         }
       }),
@@ -651,7 +651,7 @@ describe("validate_admin_api_codeblocks tool", () => {
     vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
   });
 
-  test("validates multiple code blocks successfully", async () => {
+  test("validates multiple code snippets successfully", async () => {
     // Setup mock responses
     validateGraphQLOperationMock
       .mockResolvedValueOnce({
@@ -662,7 +662,7 @@ describe("validate_admin_api_codeblocks tool", () => {
       .mockResolvedValueOnce({
         result: ValidationResult.SKIPPED,
         resultDetail:
-          "No GraphQL operation found in the provided markdown code block.",
+          "No GraphQL operation found in the provided code snippet.",
       });
 
     // Register the tools
@@ -671,26 +671,24 @@ describe("validate_admin_api_codeblocks tool", () => {
     // Ensure the handler was registered
     expect(mockServer.validateHandler).not.toBeNull();
 
-    const testCodeBlocks = [
-      "```graphql\nquery { products { id } }\n```",
-      "```javascript\nconst x = 1;\n```",
-    ];
+    const testCodeSnippets = ["query { products { id } }", "const x = 1;"];
 
     // Call the handler
     const result = await mockServer.validateHandler({
-      codeblocks: testCodeBlocks,
+      code: testCodeSnippets,
+      api: "admin",
     });
 
     // Verify validateGraphQLOperation was called correctly
     expect(validateGraphQLOperationMock).toHaveBeenCalledTimes(2);
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       1,
-      testCodeBlocks[0],
+      testCodeSnippets[0],
       "admin",
     );
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       2,
-      testCodeBlocks[1],
+      testCodeSnippets[1],
       "admin",
     );
 
@@ -698,7 +696,7 @@ describe("validate_admin_api_codeblocks tool", () => {
     expect(result.content[0].type).toBe("text");
     const responseText = result.content[0].text;
     expect(responseText).toContain("✅ VALID");
-    expect(responseText).toContain("**Total Code Blocks:** 2");
+    expect(responseText).toContain("**Total Code Snippets:** 2");
     expect(responseText).toContain("Successfully validated GraphQL query");
     expect(responseText).toContain("No GraphQL operation found");
   });
@@ -720,20 +718,21 @@ describe("validate_admin_api_codeblocks tool", () => {
     // Register the tools
     await shopifyTools(mockServer);
 
-    const testCodeBlocks = [
-      "```graphql\nquery { products { invalidField } }\n```",
-      "```graphql\nmutation { productCreate(input: {}) { product { id } } }\n```",
+    const testCodeSnippets = [
+      "query { products { invalidField } }",
+      "mutation { productCreate(input: {}) { product { id } } }",
     ];
 
     // Call the handler
     const result = await mockServer.validateHandler({
-      codeblocks: testCodeBlocks,
+      code: testCodeSnippets,
+      api: "admin",
     });
 
     // Verify the response shows invalid overall status
     const responseText = result.content[0].text;
     expect(responseText).toContain("❌ INVALID");
-    expect(responseText).toContain("**Total Code Blocks:** 2");
+    expect(responseText).toContain("**Total Code Snippets:** 2");
     expect(responseText).toContain("Cannot query field 'invalidField'");
     expect(responseText).toContain("Successfully validated GraphQL mutation");
   });
@@ -749,7 +748,7 @@ describe("validate_admin_api_codeblocks tool", () => {
       .mockResolvedValueOnce({
         result: ValidationResult.SKIPPED,
         resultDetail:
-          "No GraphQL operation found in the provided markdown code block.",
+          "No GraphQL operation found in the provided code snippet.",
       })
       .mockResolvedValueOnce({
         result: ValidationResult.FAILED,
@@ -760,34 +759,36 @@ describe("validate_admin_api_codeblocks tool", () => {
     // Register the tools
     await shopifyTools(mockServer);
 
-    const testCodeBlocks = [
-      "```graphql\nquery { products { id } }\n```",
-      "```javascript\nconst x = 1;\n```",
-      "```graphql\nquery { products { } }\n```",
+    const testCodeSnippets = [
+      "query { products { id } }",
+      "const x = 1;",
+      "query { products { } }",
     ];
 
     // Call the handler
     const result = await mockServer.validateHandler({
-      codeblocks: testCodeBlocks,
+      code: testCodeSnippets,
+      api: "admin",
     });
 
     // Verify the response shows invalid overall status due to failure
     const responseText = result.content[0].text;
     expect(responseText).toContain("❌ INVALID");
-    expect(responseText).toContain("**Total Code Blocks:** 3");
+    expect(responseText).toContain("**Total Code Snippets:** 3");
     expect(responseText).toContain("✅ SUCCESS");
     expect(responseText).toContain("⏭️ SKIPPED");
     expect(responseText).toContain("❌ FAILED");
     expect(responseText).toContain("Syntax Error: Expected Name, found }");
   });
 
-  test("handles empty code blocks array", async () => {
+  test("handles empty code snippets array", async () => {
     // Register the tools
     await shopifyTools(mockServer);
 
     // Call the handler with empty array
     const result = await mockServer.validateHandler({
-      codeblocks: [],
+      code: [],
+      api: "admin",
     });
 
     // Verify validateGraphQLOperation was not called
@@ -796,7 +797,7 @@ describe("validate_admin_api_codeblocks tool", () => {
     // Verify the response
     const responseText = result.content[0].text;
     expect(responseText).toContain("✅ VALID");
-    expect(responseText).toContain("**Total Code Blocks:** 0");
+    expect(responseText).toContain("**Total Code Snippets:** 0");
   });
 
   test("handles validation function errors", async () => {
@@ -808,12 +809,13 @@ describe("validate_admin_api_codeblocks tool", () => {
     // Register the tools
     await shopifyTools(mockServer);
 
-    const testCodeBlocks = ["```graphql\nquery { products { id } }\n```"];
+    const testCodeSnippets = ["query { products { id } }"];
 
     // Call the handler and expect it to handle the error gracefully
     await expect(
       mockServer.validateHandler({
-        codeblocks: testCodeBlocks,
+        code: testCodeSnippets,
+        api: "admin",
       }),
     ).rejects.toThrow("Schema loading failed");
 
@@ -839,11 +841,12 @@ describe("validate_admin_api_codeblocks tool", () => {
     // Register the tools
     await shopifyTools(mockServer);
 
-    const testCodeBlocks = ["```graphql\nquery { products { id } }\n```"];
+    const testCodeSnippets = ["query { products { id } }"];
 
     // Call the handler
     await mockServer.validateHandler({
-      codeblocks: testCodeBlocks,
+      code: testCodeSnippets,
+      api: "admin",
     });
 
     // Verify usage was recorded (should be called for API list fetch and usage recording)
@@ -855,7 +858,7 @@ describe("validate_admin_api_codeblocks tool", () => {
     // Verify the usage data
     const usageCall = usageCalls[0];
     const usageBody = JSON.parse(usageCall[1].body);
-    expect(usageBody.tool).toBe("validate_admin_api_codeblocks");
-    expect(usageBody.parameters).toBe("1 code blocks");
+    expect(usageBody.tool).toBe("validate_graphql");
+    expect(usageBody.parameters).toBe("1 code snippets");
   });
 });

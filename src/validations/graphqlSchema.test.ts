@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import validateGraphQLOperation from "./graphqlSchema.js";
 import { ValidationResult } from "../types.js";
-import * as shopifyAdminSchema from "../tools/shopify-admin-schema.js";
+import * as shopifyAdminSchema from "../tools/shopifyAdminSchema.js";
 
 // Only mock for specific error testing scenarios
 const mockLoadSchemaContent = vi.spyOn(shopifyAdminSchema, "loadSchemaContent");
@@ -15,7 +15,7 @@ describe("validateGraphQLOperation", () => {
   describe("schema name validation", () => {
     it("should reject unsupported schema names", async () => {
       const result = await validateGraphQLOperation(
-        "```graphql\nquery { products { id } }\n```",
+        "query { products { id } }",
         "unsupported-schema",
       );
 
@@ -28,7 +28,7 @@ describe("validateGraphQLOperation", () => {
     it("should accept admin schema name", async () => {
       // This test will use the real schema and proceed to validation
       const result = await validateGraphQLOperation(
-        "```graphql\nquery { nonExistentField }\n```",
+        "query { nonExistentField }",
         "admin",
       );
 
@@ -40,7 +40,7 @@ describe("validateGraphQLOperation", () => {
 
     it("should list all supported schemas in error message", async () => {
       const result = await validateGraphQLOperation(
-        "```graphql\nquery { products { id } }\n```",
+        "query { products { id } }",
         "invalid-schema",
       );
 
@@ -50,72 +50,51 @@ describe("validateGraphQLOperation", () => {
     });
   });
 
-  describe("GraphQL operation extraction", () => {
-    it("should skip empty code blocks", async () => {
-      const result = await validateGraphQLOperation(
-        "```graphql\n\n```",
-        "admin",
-      );
+  describe("GraphQL operation processing", () => {
+    it("should skip empty code", async () => {
+      const result = await validateGraphQLOperation("", "admin");
 
       expect(result.result).toBe(ValidationResult.SKIPPED);
       expect(result.resultDetail).toBe(
-        "No GraphQL operation found in the provided markdown code block.",
+        "No GraphQL operation found in the provided code.",
       );
     });
 
-    it("should skip code blocks with only whitespace", async () => {
-      const result = await validateGraphQLOperation(
-        "```graphql\n   \n  \n```",
-        "admin",
-      );
+    it("should skip code with only whitespace", async () => {
+      const result = await validateGraphQLOperation("   \n  \n", "admin");
 
       expect(result.result).toBe(ValidationResult.SKIPPED);
       expect(result.resultDetail).toBe(
-        "No GraphQL operation found in the provided markdown code block.",
+        "No GraphQL operation found in the provided code.",
       );
     });
 
-    it("should extract GraphQL from proper markdown blocks", async () => {
-      const result = await validateGraphQLOperation(
-        "```graphql\nquery { nonExistentField }\n```",
-        "admin",
-      );
-
-      // Should proceed past extraction (GraphQL was found and extracted)
-      // May succeed or fail based on schema validation, but won't be skipped due to missing GraphQL
-      expect(result.result).not.toBe(ValidationResult.SKIPPED);
-      expect(result.resultDetail).not.toBe(
-        "No GraphQL operation found in the provided markdown code block.",
-      );
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
-    });
-
-    it("should handle GraphQL blocks without language specifier", async () => {
-      const result = await validateGraphQLOperation(
-        "```\nquery { nonExistentField }\n```",
-        "admin",
-      );
-
-      // Should proceed past extraction
-      expect(result.result).not.toBe(ValidationResult.SKIPPED);
-      expect(result.resultDetail).not.toBe(
-        "No GraphQL operation found in the provided markdown code block.",
-      );
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
-    });
-
-    it("should handle plain GraphQL without markdown wrapper", async () => {
+    it("should process valid GraphQL code", async () => {
       const result = await validateGraphQLOperation(
         "query { nonExistentField }",
         "admin",
       );
 
-      // Should extract the raw GraphQL and proceed
+      // Should proceed past processing (GraphQL was found and processed)
+      // May succeed or fail based on schema validation, but won't be skipped due to missing GraphQL
       expect(result.result).not.toBe(ValidationResult.SKIPPED);
       expect(result.resultDetail).not.toBe(
-        "No GraphQL operation found in the provided markdown code block.",
+        "No GraphQL operation found in the provided code.",
+      );
+      expect(result.resultDetail).toBeDefined();
+      expect(typeof result.resultDetail).toBe("string");
+    });
+
+    it("should handle GraphQL with extra whitespace", async () => {
+      const result = await validateGraphQLOperation(
+        "  \n  query { nonExistentField }  \n  ",
+        "admin",
+      );
+
+      // Should process the GraphQL and proceed
+      expect(result.result).not.toBe(ValidationResult.SKIPPED);
+      expect(result.resultDetail).not.toBe(
+        "No GraphQL operation found in the provided code.",
       );
       expect(result.resultDetail).toBeDefined();
       expect(typeof result.resultDetail).toBe("string");
@@ -126,7 +105,7 @@ describe("validateGraphQLOperation", () => {
 
       expect(result.result).toBe(ValidationResult.SKIPPED);
       expect(result.resultDetail).toBe(
-        "No GraphQL operation found in the provided markdown code block.",
+        "No GraphQL operation found in the provided code.",
       );
     });
   });
@@ -134,7 +113,7 @@ describe("validateGraphQLOperation", () => {
   describe("GraphQL parsing", () => {
     it("should detect GraphQL syntax errors", async () => {
       const invalidGraphQL =
-        "```graphql\nquery {\n  products {\n    id\n  // Missing closing brace\n```";
+        "query {\n  products {\n    id\n  // Missing closing brace";
 
       const result = await validateGraphQLOperation(invalidGraphQL, "admin");
 
@@ -143,7 +122,7 @@ describe("validateGraphQLOperation", () => {
     });
 
     it("should handle malformed query structures", async () => {
-      const malformedGraphQL = "```graphql\nquery { { { invalid } } }\n```";
+      const malformedGraphQL = "query { { { invalid } } }";
 
       const result = await validateGraphQLOperation(malformedGraphQL, "admin");
 
@@ -152,7 +131,7 @@ describe("validateGraphQLOperation", () => {
     });
 
     it("should parse valid GraphQL syntax", async () => {
-      const validSyntax = "```graphql\nquery { nonExistentField }\n```";
+      const validSyntax = "query { nonExistentField }";
 
       const result = await validateGraphQLOperation(validSyntax, "admin");
 
@@ -165,8 +144,7 @@ describe("validateGraphQLOperation", () => {
 
   describe("GraphQL schema validation", () => {
     it("should fail for operations with non-existent fields", async () => {
-      const queryWithInvalidField =
-        "```graphql\nquery { nonExistentField }\n```";
+      const queryWithInvalidField = "query { nonExistentField }";
 
       const result = await validateGraphQLOperation(
         queryWithInvalidField,
@@ -187,7 +165,6 @@ describe("validateGraphQLOperation", () => {
 
     it("should succeed for valid GraphQL operations", async () => {
       const validQuery = `
-        \`\`\`graphql
         query {
           products(first: 10) {
             edges {
@@ -198,7 +175,6 @@ describe("validateGraphQLOperation", () => {
             }
           }
         }
-        \`\`\`
       `;
 
       const result = await validateGraphQLOperation(validQuery, "admin");
@@ -220,7 +196,6 @@ describe("validateGraphQLOperation", () => {
 
     it("should succeed for valid mutations", async () => {
       const mutation = `
-        \`\`\`graphql
         mutation {
           productCreate(input: {title: "Test Product"}) {
             product {
@@ -229,7 +204,6 @@ describe("validateGraphQLOperation", () => {
             }
           }
         }
-        \`\`\`
       `;
 
       const result = await validateGraphQLOperation(mutation, "admin");
@@ -251,7 +225,6 @@ describe("validateGraphQLOperation", () => {
 
     it("should fail for non-existent mutations", async () => {
       const invalidMutation = `
-        \`\`\`graphql
         mutation {
           nonExistentMutation(input: {title: "Test"}) {
             result {
@@ -259,7 +232,6 @@ describe("validateGraphQLOperation", () => {
             }
           }
         }
-        \`\`\`
       `;
 
       const result = await validateGraphQLOperation(invalidMutation, "admin");
@@ -286,7 +258,6 @@ describe("validateGraphQLOperation", () => {
   describe("real-world scenarios", () => {
     it("should validate the original problem query successfully", async () => {
       const validQuery = `
-        \`\`\`graphql
         query MostRecentProducts {
           products(first: 10, sortKey: CREATED_AT, reverse: true) {
             edges {
@@ -299,7 +270,6 @@ describe("validateGraphQLOperation", () => {
             }
           }
         }
-        \`\`\`
       `;
 
       const result = await validateGraphQLOperation(validQuery, "admin");
@@ -317,7 +287,7 @@ describe("validateGraphQLOperation", () => {
     it("should handle actual GraphQL validation errors", async () => {
       // Test with an invalid query that should fail GraphQL validation
       const result = await validateGraphQLOperation(
-        "```graphql\nquery { products { id } }\n```", // This will fail because products connection needs to specify edges
+        "query { products { id } }", // This will fail because products connection needs to specify edges
         "admin",
       );
 
@@ -329,7 +299,7 @@ describe("validateGraphQLOperation", () => {
       // Our improved schema loading should work reliably
       // Test that the schema loads and processes correctly
       const result = await validateGraphQLOperation(
-        "```graphql\nquery { shop { name } }\n```", // Simple valid query
+        "query { shop { name } }", // Simple valid query
         "admin",
       );
 
@@ -339,7 +309,7 @@ describe("validateGraphQLOperation", () => {
 
     it("should provide clear error messages for invalid operations", async () => {
       const result = await validateGraphQLOperation(
-        "```graphql\nquery { nonExistentField }\n```",
+        "query { nonExistentField }",
         "admin",
       );
 
@@ -357,7 +327,7 @@ describe("validateGraphQLOperation", () => {
 
       for (const schema of supportedSchemas) {
         const result = await validateGraphQLOperation(
-          "```graphql\nquery { shop { name } }\n```",
+          "query { shop { name } }",
           schema,
         );
 
