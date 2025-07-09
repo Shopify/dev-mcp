@@ -17,6 +17,7 @@ import {
 } from "../instrumentation.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
+import validateTypescript from "../validations/typescript.js";
 import { searchShopifyDocs, shopifyTools } from "./index.js";
 
 const originalConsoleError = console.error;
@@ -90,6 +91,11 @@ vi.mock("./introspectGraphqlSchema.js", () => ({
 
 // Mock validateGraphQLOperation
 vi.mock("../validations/graphqlSchema.js", () => ({
+  default: vi.fn(),
+}));
+
+// Mock validateTypescript
+vi.mock("../validations/typescript.js", () => ({
   default: vi.fn(),
 }));
 
@@ -739,5 +745,155 @@ describe("validate_graphql_codeblocks tool", () => {
       },
       expect.any(Array), // The validation responses array
     );
+  });
+});
+
+describe("validate_typescript_codeblocks tool", () => {
+  let mockServer: any;
+  let validateTypescriptMock: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    validateTypescriptMock = vi.mocked(validateTypescript);
+
+    // Create a mock server that captures the registered tools
+    mockServer = {
+      tool: vi.fn((name, description, schema, handler) => {
+        if (name === "validate_typescript_codeblocks") {
+          mockServer.validateTypescriptHandler = handler;
+        }
+      }),
+      validateTypescriptHandler: null,
+    };
+
+    // Mock instrumentation
+    vi.mocked(instrumentationData).mockReturnValue({
+      packageVersion: "1.0.0",
+      timestamp: "2024-01-01T00:00:00.000Z",
+    });
+    vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
+  });
+
+  test("calls validateTypescript with correct parameters", async () => {
+    // Setup mock response
+    validateTypescriptMock.mockReturnValueOnce([
+      {
+        result: ValidationResult.SUCCESS,
+        resultDetail: "Test success message",
+      },
+    ]);
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeBlocks = ["```<s-button>Hello</s-button>```"];
+    const testPackageName = "@shopify/app-bridge-ui-types";
+    const testConversationId = "test-conversation-id";
+
+    // Call the handler
+    await mockServer.validateTypescriptHandler({
+      codeblocks: testCodeBlocks,
+      packageName: testPackageName,
+      conversationId: testConversationId,
+    });
+
+    // Verify validateTypescript was called with correct parameters
+    expect(validateTypescriptMock).toHaveBeenCalledTimes(1);
+    expect(validateTypescriptMock).toHaveBeenCalledWith(
+      testCodeBlocks,
+      testPackageName,
+    );
+  });
+
+  test("formats response correctly", async () => {
+    // Setup mock response
+    validateTypescriptMock.mockReturnValueOnce([
+      {
+        result: ValidationResult.SUCCESS,
+        resultDetail: "Success message",
+      },
+      {
+        result: ValidationResult.FAILED,
+        resultDetail: "Error message",
+      },
+    ]);
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Call the handler
+    const result = await mockServer.validateTypescriptHandler({
+      codeblocks: ["block1", "block2"],
+      packageName: "@shopify/app-bridge-ui-types",
+      conversationId: "test-conversation-id",
+    });
+
+    // Verify response structure and formatting
+    expect(result.content[0].type).toBe("text");
+    const responseText = result.content[0].text;
+
+    // Should contain validation summary
+    expect(responseText).toContain("## Validation Summary");
+    expect(responseText).toContain("❌ INVALID"); // One failure makes it invalid
+    expect(responseText).toContain("**Total Code Blocks:** 2");
+
+    // Should contain detailed results
+    expect(responseText).toContain("## Detailed Results");
+    expect(responseText).toContain("Code Block 1");
+    expect(responseText).toContain("Code Block 2");
+    expect(responseText).toContain("Success message");
+    expect(responseText).toContain("Error message");
+  });
+
+  test("records usage data correctly", async () => {
+    // Setup mock response
+    validateTypescriptMock.mockReturnValueOnce([
+      {
+        result: ValidationResult.SUCCESS,
+        resultDetail: "Test message",
+      },
+    ]);
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testParams = {
+      codeblocks: ["```<s-button>Hello</s-button>```"],
+      packageName: "@shopify/app-bridge-ui-types",
+      conversationId: "test-conversation-id",
+    };
+
+    // Call the handler
+    await mockServer.validateTypescriptHandler(testParams);
+
+    // Verify recordUsage was called with correct parameters
+    const { recordUsage } = await import("../instrumentation.js");
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "validate_typescript_codeblocks",
+      testParams,
+      expect.any(Array), // The validation result array
+    );
+  });
+
+  test("handles validation function errors", async () => {
+    // Setup mock to throw an error
+    validateTypescriptMock.mockImplementation(() => {
+      throw new Error("TypeScript compiler failed");
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Call the handler and expect it to propagate the error
+    await expect(
+      mockServer.validateTypescriptHandler({
+        codeblocks: ["```<s-button>Hello</s-button>```"],
+        packageName: "@shopify/app-bridge-ui-types",
+        conversationId: "test-conversation-id",
+      }),
+    ).rejects.toThrow("TypeScript compiler failed");
+
+    // Verify validateTypescript was called
+    expect(validateTypescriptMock).toHaveBeenCalledTimes(1);
   });
 });
