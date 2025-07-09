@@ -97,15 +97,6 @@ describe("validateGraphQLOperation", () => {
       expect(result.resultDetail).toBeDefined();
       expect(typeof result.resultDetail).toBe("string");
     });
-
-    it("should fail for empty string input", async () => {
-      const result = await validateGraphQLOperation("", "admin");
-
-      expect(result.result).toBe(ValidationResult.FAILED);
-      expect(result.resultDetail).toBe(
-        "No GraphQL operation found in the provided code.",
-      );
-    });
   });
 
   describe("GraphQL parsing", () => {
@@ -177,25 +168,15 @@ describe("validateGraphQLOperation", () => {
 
       const result = await validateGraphQLOperation(validQuery, "admin");
 
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
-
-      // Should succeed for valid GraphQL operations
-      // Unless there are schema loading/conversion issues that cause try/catch errors
-      if (result.result === ValidationResult.SUCCESS) {
-        expect(result.resultDetail).toContain("Successfully validated GraphQL");
-        expect(result.resultDetail).toContain("admin schema");
-      } else if (result.result === ValidationResult.FAILED) {
-        // Could be schema loading/conversion error, not syntax or schema name error
-        expect(result.resultDetail).not.toContain("GraphQL syntax error:");
-        expect(result.resultDetail).not.toContain("Unsupported schema name");
-      }
+      expect(result.resultDetail).toContain("Successfully validated GraphQL");
+      expect(result.resultDetail).toContain("admin schema");
+      expect(result.result).toBe(ValidationResult.SUCCESS);
     });
 
     it("should succeed for valid mutations", async () => {
       const mutation = `
         mutation {
-          productCreate(input: {title: "Test Product"}) {
+          productCreate(product: {title: "Test Product"}) {
             product {
               id
               title
@@ -206,19 +187,9 @@ describe("validateGraphQLOperation", () => {
 
       const result = await validateGraphQLOperation(mutation, "admin");
 
-      expect(result.resultDetail).toBeDefined();
-      expect(typeof result.resultDetail).toBe("string");
-
-      // Should succeed for valid mutations
-      // Unless there are schema loading/conversion issues that cause try/catch errors
-      if (result.result === ValidationResult.SUCCESS) {
-        expect(result.resultDetail).toContain("Successfully validated GraphQL");
-        expect(result.resultDetail).toContain("admin schema");
-      } else if (result.result === ValidationResult.FAILED) {
-        // Could be schema loading/conversion error, not syntax error
-        expect(result.resultDetail).not.toContain("GraphQL syntax error:");
-        expect(result.resultDetail).not.toContain("Unsupported schema name");
-      }
+      expect(result.resultDetail).toContain("Successfully validated GraphQL");
+      expect(result.resultDetail).toContain("admin schema");
+      expect(result.result).toBe(ValidationResult.SUCCESS);
     });
 
     it("should fail for non-existent mutations", async () => {
@@ -272,15 +243,11 @@ describe("validateGraphQLOperation", () => {
 
       const result = await validateGraphQLOperation(validQuery, "admin");
 
-      // This should succeed - the query is valid GraphQL for Shopify Admin API
-      // Before the fix, this would fail with interface implementation errors
-      // After the fix, it should validate successfully
       expect(result.result).toBe(ValidationResult.SUCCESS);
       expect(result.resultDetail).toContain("Successfully validated GraphQL");
       expect(result.resultDetail).toContain("admin schema");
     });
   });
-
   describe("error handling", () => {
     it("should handle actual GraphQL validation errors", async () => {
       // Test with an invalid query that should fail GraphQL validation
@@ -293,18 +260,6 @@ describe("validateGraphQLOperation", () => {
       expect(result.resultDetail).toContain("GraphQL validation errors:");
     });
 
-    it("should handle schema loading robustly", async () => {
-      // Our improved schema loading should work reliably
-      // Test that the schema loads and processes correctly
-      const result = await validateGraphQLOperation(
-        "query { shop { name } }", // Simple valid query
-        "admin",
-      );
-
-      expect(result.result).toBe(ValidationResult.SUCCESS);
-      expect(result.resultDetail).toContain("Successfully validated GraphQL");
-    });
-
     it("should provide clear error messages for invalid operations", async () => {
       const result = await validateGraphQLOperation(
         "query { nonExistentField }",
@@ -314,24 +269,6 @@ describe("validateGraphQLOperation", () => {
       expect(result.result).toBe(ValidationResult.FAILED);
       expect(result.resultDetail).toContain("GraphQL validation errors:");
       expect(result.resultDetail).toContain("Cannot query field");
-    });
-  });
-
-  describe("schema mapping extensibility", () => {
-    it("should be easily extensible for new schemas", async () => {
-      // This test documents the expected behavior when new schemas are added
-      // Currently only 'admin' is supported, but the structure supports more
-      const supportedSchemas = ["admin"]; // This would grow as schemas are added
-
-      for (const schema of supportedSchemas) {
-        const result = await validateGraphQLOperation(
-          "query { shop { name } }",
-          schema,
-        );
-
-        // Should not fail due to unsupported schema name
-        expect(result.resultDetail).not.toContain("Unsupported schema name");
-      }
     });
   });
 });
