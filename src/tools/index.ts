@@ -27,7 +27,7 @@ const ConversationIdSchema = z.object({
   conversationId: z
     .string()
     .describe(
-      "🔗 REQUIRED: conversationId from get_started tool. Call get_started first if you don't have this.",
+      "🔗 REQUIRED: conversationId from learn_shopify_api tool. Call learn_shopify_api first if you don't have this.",
     ),
 });
 
@@ -157,7 +157,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   );
 
   server.tool(
-    "search_dev_docs",
+    "search_docs_chunks",
     `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.`,
     withConversationId({
       prompt: z.string().describe("The search query for Shopify documentation"),
@@ -165,7 +165,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     async (params) => {
       const result = await searchShopifyDocs(params.prompt);
 
-      recordUsage("search_dev_docs", params, result.formattedText).catch(
+      recordUsage("search_docs_chunks", params, result.formattedText).catch(
         () => {},
       );
 
@@ -181,13 +181,13 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   );
 
   server.tool(
-    "fetch_docs_by_path",
-    `Use this tool to retrieve a list of documents from shopify.dev.`,
+    "fetch_full_docs",
+    `Use this tool to retrieve a list of full documentation pages from shopify.dev.`,
     withConversationId({
       paths: z
         .array(z.string())
         .describe(
-          `The paths to the documents to read, i.e. ["/docs/api/app-home", "/docs/api/functions"]. Paths should be relative to the root of the developer documentation site.`,
+          `The paths to the full documentation pages to read, i.e. ["/docs/api/app-home", "/docs/api/functions"]. Paths should be relative to the root of the developer documentation site.`,
         ),
     }),
     async (params) => {
@@ -222,7 +222,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
       const results = await Promise.all(params.paths.map(fetchDocText));
 
       recordUsage(
-        "fetch_docs_by_path",
+        "fetch_full_docs",
         params,
         results.map(({ text }) => text).join("---\n\n"),
       ).catch(() => {});
@@ -284,7 +284,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   const gettingStartedApiNames = gettingStartedApis.map((api) => api.name);
 
   server.tool(
-    "get_started",
+    "learn_shopify_api",
     // This tool is the entrypoint for our MCP server. It has the following responsibilities:
 
     // 1. It teaches the LLM what Shopify APIs are supported with this MCP server. This is done by making a remote request for the latest up-to-date context of each API.
@@ -299,12 +299,12 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
 
     🔄 WORKFLOW:
-    1. Call get_started first
+    1. Call learn_shopify_api first
     2. Extract the conversationId from the response
     3. Pass that same conversationId to ALL other Shopify tools
 
     DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE.
-    PREFER THE USE OF THE fetch_docs_by_path TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
+    PREFER THE USE OF THE fetch_full_docs TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
   `,
     {
       api: z
@@ -314,7 +314,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         .string()
         .optional()
         .describe(
-          "conversationId. If not provided, a new conversation ID will be generated for this conversation. This conversationId should be passed to all subsequent tool calls within the same chat session.",
+          "Optional existing conversation UUID. If not provided, a new conversation ID will be generated for this conversation. This conversationId should be passed to all subsequent tool calls within the same chat session.",
         ),
     },
     async (params) => {
@@ -340,7 +340,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
 
         const text = await response.text();
 
-        recordUsage("get_started", params, text).catch(() => {});
+        recordUsage("learn_shopify_api", params, text).catch(() => {});
 
         // Include the conversation ID in the response
         const responseText = `🔗 **IMPORTANT - SAVE THIS CONVERSATION ID:** ${currentConversationId}

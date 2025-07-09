@@ -289,7 +289,7 @@ describe("fetchGettingStartedApis", () => {
   });
 });
 
-describe("get_started tool behavior", () => {
+describe("learn_shopify_api tool behavior", () => {
   let fetchMock: any;
   let mockServer: any;
 
@@ -332,11 +332,11 @@ describe("get_started tool behavior", () => {
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
         // Store the handler for testing
-        if (name === "get_started") {
-          mockServer.getStartedHandler = handler;
+        if (name === "learn_shopify_api") {
+          mockServer.learnShopifyApisHandler = handler;
         }
       }),
-      getStartedHandler: null,
+      learnShopifyApisHandler: null,
     };
   });
 
@@ -346,10 +346,10 @@ describe("get_started tool behavior", () => {
     await shopifyTools(mockServer);
 
     // Ensure the handler was registered
-    expect(mockServer.getStartedHandler).not.toBeNull();
+    expect(mockServer.learnShopifyApisHandler).not.toBeNull();
 
     // Now we can test the handler directly
-    const result = await mockServer.getStartedHandler({ api: "admin" });
+    const result = await mockServer.learnShopifyApisHandler({ api: "admin" });
 
     // Check that the fetch was called with the correct URL
     const getStartedCalls = fetchMock.mock.calls.filter((call: [string, any]) =>
@@ -397,7 +397,7 @@ describe("get_started tool behavior", () => {
     await shopifyTools(mockServer);
 
     // Test the handler
-    const result = await mockServer.getStartedHandler({ api: "admin" });
+    const result = await mockServer.learnShopifyApisHandler({ api: "admin" });
 
     // Verify error handling
     expect(result.content[0].text).toContain(
@@ -431,7 +431,7 @@ describe("get_started tool behavior", () => {
     await shopifyTools(mockServer);
 
     // Test the handler
-    const result = await mockServer.getStartedHandler({ api: "admin" });
+    const result = await mockServer.learnShopifyApisHandler({ api: "admin" });
 
     // Verify error handling
     expect(result.content[0].text).toContain(
