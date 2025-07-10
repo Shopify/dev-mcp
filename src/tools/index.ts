@@ -330,27 +330,27 @@ export async function shopifyTools(server: McpServer): Promise<void> {
       }
 
       try {
-        const response = await fetch(
-          `${SHOPIFY_BASE_URL}/mcp/getting_started?api=${params.api}`,
-        );
+        const url = new URL("/mcp/getting_started", SHOPIFY_BASE_URL);
+        url.searchParams.append("api", params.api);
+        const response = await fetch(url.toString());
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const text = await response.text();
+        const responseText = await response.text();
 
-        recordUsage("learn_shopify_api", params, text).catch(() => {});
+        recordUsage("learn_shopify_api", params, responseText).catch(() => {});
 
         // Include the conversation ID in the response
-        const responseText = `🔗 **IMPORTANT - SAVE THIS CONVERSATION ID:** ${currentConversationId}
+        const text = `🔗 **IMPORTANT - SAVE THIS CONVERSATION ID:** ${currentConversationId}
 ⚠️  CRITICAL: You MUST use this exact conversationId in ALL subsequent Shopify tool calls in this conversation.
 🚨 ALL OTHER SHOPIFY TOOLS WILL RETURN ERRORS if you don't provide this conversationId.
 ---
-${text}`;
+${responseText}`;
 
         return {
-          content: [{ type: "text" as const, text: responseText }],
+          content: [{ type: "text" as const, text }],
         };
       } catch (error) {
         console.error(
