@@ -11,31 +11,31 @@ function isValidationSuccessful(responses: ValidationResponse[]): boolean {
 
 describe("validateTypescript", () => {
   describe("package validation", () => {
-    it("should fail for unsupported package", () => {
+    it("should work with any package - validate JSX components", () => {
       const codeBlock = "```<s-button>Hello, World</s-button>```";
       const validationResults = validateTypescript(
         [codeBlock],
         "unsupported-package",
       );
-      expect(isValidationSuccessful(validationResults)).toBe(false);
+      expect(isValidationSuccessful(validationResults)).toBe(true);
       expect(validationResults).toHaveLength(1);
-      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
+      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
       expect(validationResults[0].resultDetail).toContain(
-        'Package "unsupported-package" is not supported',
+        "Code block successfully validated against unsupported-package types",
       );
     });
 
-    it("should only support @shopify/app-bridge-ui-types package", () => {
-      const codeBlock = "```<s-button>Hello, World</s-button>```";
+    it("should work with any UI component package", () => {
+      const codeBlock = "```<CustomButton>Hello, World</CustomButton>```";
       const validationResults = validateTypescript(
         [codeBlock],
         "some-other-package",
       );
-      expect(isValidationSuccessful(validationResults)).toBe(false);
+      expect(isValidationSuccessful(validationResults)).toBe(true);
       expect(validationResults).toHaveLength(1);
-      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
+      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
       expect(validationResults[0].resultDetail).toContain(
-        'Only "@shopify/app-bridge-ui-types" is currently supported',
+        "Code block successfully validated against some-other-package types",
       );
     });
 
@@ -307,7 +307,7 @@ describe("validateTypescript", () => {
       );
       expect(isValidationSuccessful(validationResults)).toBe(true);
       expect(validationResults[0].resultDetail).toContain(
-        "Codeblock that included Polaris web components was validated with the Typescript compiler with the Polaris types.",
+        "Code block successfully validated against @shopify/app-bridge-ui-types types",
       );
     });
 
