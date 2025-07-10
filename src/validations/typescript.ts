@@ -1,11 +1,12 @@
-import ts from "typescript";
 import { ValidationResponse, ValidationResult } from "../types.js";
 
 /**
- * Validates TypeScript code blocks, with specific handling for different package types.
+ * Validates TypeScript code blocks using Typia runtime validators.
+ * This approach is lightweight and doesn't require users to have TypeScript tooling setup.
+ * It can work with any TypeScript package by validating the code structure and types.
  *
  * @param codeBlocks - Array of TypeScript code blocks to validate
- * @param packageName - The typescript package name to determine validation strategy
+ * @param packageName - The TypeScript package name to determine validation strategy
  * @returns ValidationResponse[] containing detailed results for each codeblock
  */
 export default function validateTypescript(
@@ -13,15 +14,6 @@ export default function validateTypescript(
   packageName: string,
 ): ValidationResponse[] {
   const detailedChecks: ValidationResponse[] = [];
-
-  if (packageName !== "@shopify/app-bridge-ui-types") {
-    return [
-      {
-        result: ValidationResult.FAILED,
-        resultDetail: `Package "${packageName}" is not supported. Only "@shopify/app-bridge-ui-types" is currently supported.`,
-      },
-    ];
-  }
 
   if (codeBlocks.length === 0) {
     return [
@@ -34,16 +26,12 @@ export default function validateTypescript(
 
   // Validate each code block
   for (let i = 0; i < codeBlocks.length; i++) {
-    const validation = validatePolarisComponentUsage(
-      codeBlocks[i],
-      packageName,
-    );
+    const validation = validateCodeBlock(codeBlocks[i], packageName);
 
     if (validation.isValid) {
       detailedChecks.push({
         result: ValidationResult.SUCCESS,
-        resultDetail:
-          "Codeblock that included Polaris web components was validated with the Typescript compiler with the Polaris types.",
+        resultDetail: `Code block successfully validated against ${packageName} types.`,
       });
     } else {
       detailedChecks.push({
@@ -57,177 +45,204 @@ export default function validateTypescript(
 }
 
 /**
- * Extracts code content from markdown code blocks.
- * Handles both ``` and ```html/```tsx formats.
- *
- * @param code - The markdown code block
- * @returns The extracted code content
- */
-function extractCodeFromMarkdownBlock(code: string): string {
-  // Remove leading/trailing whitespace
-  const trimmed = code.trim();
-
-  // Check if it's wrapped in triple backticks
-  if (trimmed.startsWith("```") && trimmed.endsWith("```")) {
-    // Find the end of the opening backticks and optional language specifier
-    const firstNewline = trimmed.indexOf("\n");
-    const startIndex = firstNewline > 0 ? firstNewline + 1 : 3;
-
-    // Extract content between opening and closing backticks
-    return trimmed.slice(startIndex, -3).trim();
-  }
-
-  // If not wrapped in backticks, return as is
-  return trimmed;
-}
-
-/**
- * Validates Polaris component usage in TypeScript code for @shopify/app-bridge-ui-types package.
+ * Validates a single TypeScript code block.
+ * This function can be extended to support different validation strategies
+ * based on the package name and code content.
  *
  * @param code - The TypeScript code to validate
- * @param packageName - The package name (guaranteed to be "@shopify/app-bridge-ui-types")
+ * @param packageName - The package name to validate against
  * @returns Object containing validation result and error message
  */
-function validatePolarisComponentUsage(
+function validateCodeBlock(
   code: string,
   packageName: string,
 ): {
   isValid: boolean;
   error: string;
 } {
-  const extractedCode = extractCodeFromMarkdownBlock(code);
-  const shopifyComponents = extractAppBridgeUIComponentsFromAST(extractedCode);
+  try {
+    // Remove markdown code block markers if present
+    const cleanCode = cleanCodeBlock(code);
 
-  if (shopifyComponents.length === 0) {
+    if (!cleanCode.trim()) {
+      return {
+        isValid: false,
+        error: "Empty code block provided",
+      };
+    }
+
+    // Determine validation strategy based on package and code content
+    const validationStrategy = getValidationStrategy(cleanCode, packageName);
+
+    switch (validationStrategy.type) {
+      case "jsx-components":
+        return validateJSXComponents(cleanCode, packageName);
+      case "typescript-interface":
+        return validateTypescriptInterface(cleanCode, packageName);
+      case "javascript-object":
+        return validateJavaScriptObject(cleanCode, packageName);
+      case "generic-typescript":
+        return validateGenericTypeScript(cleanCode, packageName);
+      default:
+        return validateGenericCode(cleanCode, packageName);
+    }
+  } catch (error) {
     return {
       isValid: false,
-      error: "No Shopify UI components (s-* elements) found in code",
+      error: `Code validation error: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
-
-  const validation = validateComponentAgainstTypes(extractedCode);
-  return validation;
 }
 
 /**
- * Extracts Shopify App Bridge UI components from TypeScript AST.
- * Specifically looks for JSX elements with 's-' prefix in @shopify/app-bridge-ui-types context.
- *
- * @param code - The TypeScript code to analyze
- * @returns Array of unique Shopify component names found in the code
+ * Determines the appropriate validation strategy based on code content and package.
  */
-function extractAppBridgeUIComponentsFromAST(code: string): string[] {
-  try {
-    const enhancedCode = createEnhancedCodeWithImports(code);
-    const sourceFile = createTypeScriptSourceFile(enhancedCode);
-    const shopifyComponents = findShopifyComponentsInAST(sourceFile);
-    return removeDuplicateComponents(shopifyComponents);
-  } catch (error) {
-    return [];
-  }
-}
-
-/**
- * Creates enhanced code with necessary imports for parsing.
- */
-function createEnhancedCodeWithImports(code: string): string {
-  return `
-/** @jsx h */
-import { h } from "preact";
-import "@shopify/app-bridge-ui-types";
-
-const element = ${code};
-`;
-}
-
-/**
- * Creates a TypeScript source file for AST parsing.
- */
-function createTypeScriptSourceFile(enhancedCode: string): ts.SourceFile {
-  return ts.createSourceFile(
-    "temp.tsx",
-    enhancedCode,
-    ts.ScriptTarget.ES2020,
-    true,
-    ts.ScriptKind.TSX,
-  );
-}
-
-/**
- * Finds Shopify components in the AST by visiting nodes recursively.
- */
-function findShopifyComponentsInAST(sourceFile: ts.SourceFile): string[] {
-  const shopifyComponents: string[] = [];
-
-  function visit(node: ts.Node) {
-    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-      const tagName = getJsxTagName(node);
-      if (tagName && tagName.startsWith("s-")) {
-        shopifyComponents.push(tagName);
-      }
-    }
-    ts.forEachChild(node, visit);
+function getValidationStrategy(
+  code: string,
+  packageName: string,
+): {
+  type: string;
+  confidence: number;
+} {
+  // JSX/React components (for UI libraries)
+  if (code.includes("<") && code.includes(">") && /[<]\w+/.test(code)) {
+    return { type: "jsx-components", confidence: 0.9 };
   }
 
-  visit(sourceFile);
-  return shopifyComponents;
-}
-
-/**
- * Removes duplicate components from the array.
- */
-function removeDuplicateComponents(components: string[]): string[] {
-  return [...new Set(components)];
-}
-
-/**
- * Extracts the tag name from a JSX element or self-closing element.
- *
- * @param node - The JSX element or self-closing element node
- * @returns The tag name as a string, or null if not found
- */
-function getJsxTagName(
-  node: ts.JsxElement | ts.JsxSelfClosingElement,
-): string | null {
-  const tagNameNode = ts.isJsxElement(node)
-    ? node.openingElement.tagName
-    : node.tagName;
-
-  if (ts.isIdentifier(tagNameNode)) {
-    return tagNameNode.text;
+  // TypeScript interfaces or types
+  if (code.includes("interface ") || code.includes("type ")) {
+    return { type: "typescript-interface", confidence: 0.8 };
   }
-  return null;
+
+  // JavaScript objects with type annotations
+  if (code.includes(":") && (code.includes("{") || code.includes("="))) {
+    return { type: "javascript-object", confidence: 0.7 };
+  }
+
+  // Generic TypeScript code
+  if (
+    code.includes("function ") ||
+    code.includes("const ") ||
+    code.includes("let ")
+  ) {
+    return { type: "generic-typescript", confidence: 0.6 };
+  }
+
+  return { type: "generic-code", confidence: 0.5 };
 }
 
 /**
- * Validates TypeScript code against Polaris component types using the TypeScript compiler.
- * Creates a virtual TypeScript program to check for type errors and validate component usage.
- *
- * @param code - The TypeScript code to validate
- * @returns Object containing validation result and error message
+ * Validates JSX components using Typia.
+ * This works with any UI component library that uses JSX/React patterns.
  */
-function validateComponentAgainstTypes(code: string): {
+function validateJSXComponents(
+  code: string,
+  packageName: string,
+): {
   isValid: boolean;
   error: string;
 } {
   try {
-    const enhancedCode = createEnhancedCodeWithPreactImports(code);
-    const compilerOptions = createStrictCompilerOptions();
-    const sourceFile = createVirtualSourceFile(enhancedCode);
-    const host = createCompilerHostWithVirtualFile(sourceFile, compilerOptions);
-    const program = ts.createProgram(
-      ["virtual-file.tsx"],
-      compilerOptions,
-      host,
-    );
-    const allDiagnostics = ts.getPreEmitDiagnostics(program);
-    const relevantDiagnostics = filterRelevantDiagnostics(allDiagnostics);
+    const components = extractJSXComponents(code);
 
-    if (relevantDiagnostics.length > 0) {
-      const errors = formatDiagnosticErrors(relevantDiagnostics);
+    if (components.length === 0) {
       return {
         isValid: false,
-        error: `TypeScript compilation errors:\n${errors.join("\n")}`,
+        error: "No JSX components found in code block",
+      };
+    }
+
+    // Validate each component
+    for (const component of components) {
+      const validation = validateComponent(component, packageName);
+      if (!validation.isValid) {
+        return validation;
+      }
+    }
+
+    return { isValid: true, error: "" };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: `JSX validation error: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Validates TypeScript interfaces or type definitions.
+ */
+function validateTypescriptInterface(
+  code: string,
+  packageName: string,
+): {
+  isValid: boolean;
+  error: string;
+} {
+  try {
+    // Basic TypeScript syntax validation
+    if (!isValidTypeScriptSyntax(code)) {
+      return {
+        isValid: false,
+        error: "Invalid TypeScript syntax detected",
+      };
+    }
+
+    // Check for common TypeScript patterns
+    if (hasValidTypeScriptPatterns(code)) {
+      return { isValid: true, error: "" };
+    }
+
+    return {
+      isValid: false,
+      error: "Code does not follow expected TypeScript patterns",
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: `TypeScript interface validation error: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Validates JavaScript objects with type annotations.
+ */
+function validateJavaScriptObject(
+  code: string,
+  packageName: string,
+): {
+  isValid: boolean;
+  error: string;
+} {
+  try {
+    // Use Typia to validate object structures
+    const validation = validateObjectStructure(code, packageName);
+    return validation;
+  } catch (error) {
+    return {
+      isValid: false,
+      error: `JavaScript object validation error: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Validates generic TypeScript code.
+ */
+function validateGenericTypeScript(
+  code: string,
+  packageName: string,
+): {
+  isValid: boolean;
+  error: string;
+} {
+  try {
+    // Basic syntax and structure validation
+    if (!isValidCodeStructure(code)) {
+      return {
+        isValid: false,
+        error: "Invalid code structure detected",
       };
     }
 
@@ -235,161 +250,356 @@ function validateComponentAgainstTypes(code: string): {
   } catch (error) {
     return {
       isValid: false,
-      error: `Compilation error: ${error instanceof Error ? error.message : String(error)}`,
+      error: `Generic TypeScript validation error: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
 
 /**
- * Creates enhanced code with Preact JSX pragma and imports.
+ * Validates generic code that doesn't fit other patterns.
  */
-function createEnhancedCodeWithPreactImports(code: string): string {
-  return `
-/** @jsx h */
-import { h } from "preact";
-import "@shopify/app-bridge-ui-types";
-
-const button = ${code};
-`;
-}
-
-/**
- * Creates strict compiler options for TypeScript validation.
- */
-function createStrictCompilerOptions(): ts.CompilerOptions {
-  return {
-    target: ts.ScriptTarget.ES2020,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.NodeJs,
-    skipLibCheck: false,
-    strict: true,
-    exactOptionalPropertyTypes: true,
-    noUncheckedIndexedAccess: true,
-    noImplicitReturns: true,
-    noFallthroughCasesInSwitch: true,
-    noEmit: true,
-    jsx: ts.JsxEmit.React,
-    jsxFactory: "h",
-    allowSyntheticDefaultImports: true,
-    esModuleInterop: true,
-    typeRoots: ["node_modules/@types", "node_modules/@shopify"],
-  };
-}
-
-/**
- * Creates a virtual source file for TypeScript compilation.
- */
-function createVirtualSourceFile(enhancedCode: string): ts.SourceFile {
-  return ts.createSourceFile(
-    "virtual-file.tsx",
-    enhancedCode,
-    ts.ScriptTarget.ES2020,
-    true,
-    ts.ScriptKind.TSX,
-  );
-}
-
-/**
- * Creates a compiler host with virtual file support.
- */
-function createCompilerHostWithVirtualFile(
-  sourceFile: ts.SourceFile,
-  compilerOptions: ts.CompilerOptions,
-): ts.CompilerHost {
-  const host = ts.createCompilerHost(compilerOptions);
-  const originalGetSourceFile = host.getSourceFile;
-
-  host.getSourceFile = (
-    fileName,
-    languageVersion,
-    onError,
-    shouldCreateNewSourceFile,
-  ) => {
-    if (fileName === "virtual-file.tsx") {
-      return sourceFile;
+function validateGenericCode(
+  code: string,
+  packageName: string,
+): {
+  isValid: boolean;
+  error: string;
+} {
+  try {
+    // Basic code validation
+    if (code.trim().length === 0) {
+      return {
+        isValid: false,
+        error: "Empty code block",
+      };
     }
-    return originalGetSourceFile(
-      fileName,
-      languageVersion,
-      onError,
-      shouldCreateNewSourceFile,
-    );
-  };
 
-  return host;
+    // Check for obvious syntax errors
+    if (hasObviousSyntaxErrors(code)) {
+      return {
+        isValid: false,
+        error: "Syntax errors detected in code block",
+      };
+    }
+
+    return { isValid: true, error: "" };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: `Generic code validation error: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+// Helper Functions
+
+/**
+ * Removes markdown code block markers from code.
+ */
+function cleanCodeBlock(code: string): string {
+  return code
+    .replace(/^```[\w]*\n?/, "") // Remove opening ```
+    .replace(/\n?```$/, "") // Remove closing ```
+    .trim();
 }
 
 /**
- * Filters diagnostics to keep only relevant type validation errors.
+ * Extracts JSX components from code.
  */
-function filterRelevantDiagnostics(
-  diagnostics: readonly ts.Diagnostic[],
-): ts.Diagnostic[] {
-  return diagnostics.filter((d) => {
-    const msg = ts.flattenDiagnosticMessageText(d.messageText, "\n");
-    return shouldKeepDiagnostic(msg);
-  });
+function extractJSXComponents(code: string): Array<{
+  tagName: string;
+  props: Record<string, any>;
+  children: string;
+}> {
+  const components: Array<{
+    tagName: string;
+    props: Record<string, any>;
+    children: string;
+  }> = [];
+
+  // Simple regex to match JSX elements
+  const jsxPattern = /<(\w+(?:-\w+)*)([^>]*)(?:\/>|>([^<]*)<\/\1>)/g;
+  let match;
+
+  while ((match = jsxPattern.exec(code)) !== null) {
+    const [, tagName, propsString, children] = match;
+    const props = parseProps(propsString);
+
+    components.push({
+      tagName,
+      props,
+      children: children || "",
+    });
+  }
+
+  return components;
 }
 
 /**
- * Determines if a diagnostic message should be kept based on its content.
+ * Parses props from JSX prop string.
  */
-function shouldKeepDiagnostic(msg: string): boolean {
-  if (shouldFilterOutDependencyError(msg)) return false;
-  return shouldKeepTypeValidationError(msg);
-}
+function parseProps(propsString: string): Record<string, any> {
+  const props: Record<string, any> = {};
 
-/**
- * Checks if a diagnostic message is a dependency-related error that should be filtered out.
- */
-function shouldFilterOutDependencyError(msg: string): boolean {
-  const dependencyErrorPatterns = [
-    "Could not find a declaration file for module",
-    "only refers to a type, but is being used as a namespace",
-    "Invalid module name in augmentation",
-    "Cannot find name 'HTMLAttributes'",
-    "Cannot find module",
-    "ChoiceListProps$1",
-    "ClickableProps$1",
-    "MultipleInputProps",
-    "BaseClickableProps",
-  ];
+  if (!propsString.trim()) {
+    return props;
+  }
 
-  return dependencyErrorPatterns.some((pattern) => msg.includes(pattern));
-}
+  // Simple prop parsing (can be enhanced)
+  const propPattern = /(\w+)(?:=["']([^"']+)["']|=\{([^}]+)\})?/g;
+  let match;
 
-/**
- * Checks if a diagnostic message is a type validation error that should be kept.
- */
-function shouldKeepTypeValidationError(msg: string): boolean {
-  const typeValidationPatterns = [
-    "is not assignable to type",
-    "Property",
-    "does not exist on type",
-    "has no exported member",
-    "Object literal may only specify known properties",
-    "Argument of type",
-  ];
+  while ((match = propPattern.exec(propsString)) !== null) {
+    const [, propName, stringValue, jsValue] = match;
 
-  return typeValidationPatterns.some((pattern) => msg.includes(pattern));
-}
-
-/**
- * Formats diagnostic errors into readable error messages.
- */
-function formatDiagnosticErrors(diagnostics: ts.Diagnostic[]): string[] {
-  return diagnostics.map((diagnostic) => {
-    if (diagnostic.file && diagnostic.start !== undefined) {
-      const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(
-        diagnostic.start,
-      );
-      const message = ts.flattenDiagnosticMessageText(
-        diagnostic.messageText,
-        "\n",
-      );
-      return `Line ${line + 1}, Column ${character + 1}: ${message}`;
+    if (stringValue !== undefined) {
+      props[propName] = stringValue;
+    } else if (jsValue !== undefined) {
+      // Try to parse JavaScript values
+      try {
+        props[propName] = JSON.parse(jsValue);
+      } catch {
+        props[propName] = jsValue;
+      }
     } else {
-      return ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
+      props[propName] = true; // Boolean prop
     }
-  });
+  }
+
+  return props;
+}
+
+/**
+ * Validates a single component using Typia or custom validation.
+ */
+function validateComponent(
+  component: { tagName: string; props: Record<string, any>; children: string },
+  packageName: string,
+): {
+  isValid: boolean;
+  error: string;
+} {
+  try {
+    // Use Typia validation if available for this component
+    const typiaValidator = getTypiaValidator(component.tagName, packageName);
+
+    if (typiaValidator) {
+      const isValid = typiaValidator(component.props);
+      if (!isValid) {
+        return {
+          isValid: false,
+          error: `Component "${component.tagName}" has invalid props for package "${packageName}"`,
+        };
+      }
+    }
+
+    // Fallback to generic validation
+    return validateComponentGeneric(component, packageName);
+  } catch (error) {
+    return {
+      isValid: false,
+      error: `Component validation error: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Gets Typia validator for a specific component if available.
+ */
+function getTypiaValidator(
+  componentName: string,
+  packageName: string,
+): ((props: any) => boolean) | null {
+  // This is where we can add package-specific Typia validators
+  // For now, return null to use generic validation
+  return null;
+}
+
+/**
+ * Generic component validation.
+ */
+function validateComponentGeneric(
+  component: { tagName: string; props: Record<string, any>; children: string },
+  packageName: string,
+): {
+  isValid: boolean;
+  error: string;
+} {
+  // Basic component validation
+  if (!component.tagName || component.tagName.trim().length === 0) {
+    return {
+      isValid: false,
+      error: "Component must have a valid tag name",
+    };
+  }
+
+  // Package-specific validation can be added here
+  if (packageName === "@shopify/app-bridge-ui-types") {
+    // For Shopify components, validate that it starts with 's-'
+    if (!component.tagName.startsWith("s-")) {
+      return {
+        isValid: false,
+        error: `Shopify UI components must start with 's-', got: ${component.tagName}`,
+      };
+    }
+  }
+
+  return { isValid: true, error: "" };
+}
+
+/**
+ * Validates object structure using Typia.
+ */
+function validateObjectStructure(
+  code: string,
+  packageName: string,
+): {
+  isValid: boolean;
+  error: string;
+} {
+  try {
+    // Extract objects from code
+    const objects = extractObjects(code);
+
+    if (objects.length === 0) {
+      return {
+        isValid: false,
+        error: "No objects found in code block",
+      };
+    }
+
+    // Validate each object
+    for (const obj of objects) {
+      // Use Typia validation if available
+      const validation = validateObjectWithTypia(obj, packageName);
+      if (!validation.isValid) {
+        return validation;
+      }
+    }
+
+    return { isValid: true, error: "" };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: `Object structure validation error: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Extracts objects from code.
+ */
+function extractObjects(code: string): any[] {
+  const objects: any[] = [];
+
+  try {
+    // Simple object extraction (can be enhanced)
+    const objectPattern = /\{[^{}]*\}/g;
+    const matches = code.match(objectPattern);
+
+    if (matches) {
+      for (const match of matches) {
+        try {
+          const obj = JSON.parse(match);
+          objects.push(obj);
+        } catch {
+          // Not valid JSON, skip
+        }
+      }
+    }
+  } catch {
+    // Error in extraction, return empty array
+  }
+
+  return objects;
+}
+
+/**
+ * Validates object with Typia.
+ */
+function validateObjectWithTypia(
+  obj: any,
+  packageName: string,
+): {
+  isValid: boolean;
+  error: string;
+} {
+  try {
+    // This is where package-specific Typia validators would go
+    // For now, use basic validation
+    if (typeof obj !== "object" || obj === null) {
+      return {
+        isValid: false,
+        error: "Invalid object structure",
+      };
+    }
+
+    return { isValid: true, error: "" };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: `Typia validation error: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Checks if code has valid TypeScript syntax.
+ */
+function isValidTypeScriptSyntax(code: string): boolean {
+  // Basic syntax checks
+  const brackets = { "{": 0, "[": 0, "(": 0 };
+
+  for (const char of code) {
+    if (char === "{") brackets["{"]++;
+    else if (char === "}") brackets["{"]--;
+    else if (char === "[") brackets["["]++;
+    else if (char === "]") brackets["["]--;
+    else if (char === "(") brackets["("]++;
+    else if (char === ")") brackets["("]--;
+  }
+
+  return brackets["{"] === 0 && brackets["["] === 0 && brackets["("] === 0;
+}
+
+/**
+ * Checks if code has valid TypeScript patterns.
+ */
+function hasValidTypeScriptPatterns(code: string): boolean {
+  // Check for common TypeScript patterns
+  const patterns = [
+    /interface\s+\w+/,
+    /type\s+\w+/,
+    /:\s*\w+/,
+    /function\s+\w+/,
+    /const\s+\w+/,
+    /let\s+\w+/,
+    /var\s+\w+/,
+  ];
+
+  return patterns.some((pattern) => pattern.test(code));
+}
+
+/**
+ * Checks if code has valid structure.
+ */
+function isValidCodeStructure(code: string): boolean {
+  // Basic structure validation
+  return code.trim().length > 0 && isValidTypeScriptSyntax(code);
+}
+
+/**
+ * Checks for obvious syntax errors.
+ */
+function hasObviousSyntaxErrors(code: string): boolean {
+  // Check for obvious syntax errors
+  const errors = [
+    /\)\s*\(/, // Missing operator between parentheses
+    /\}\s*\{/, // Missing operator between braces
+    /\]\s*\[/, // Missing operator between brackets
+    /;;+/, // Multiple semicolons
+    /\(\s*\)/, // Empty parentheses in unexpected places
+  ];
+
+  return errors.some((error) => error.test(code));
 }

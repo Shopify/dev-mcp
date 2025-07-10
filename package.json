@@ -3,15 +3,15 @@
   "version": "1.1.0",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
-    "build:watch": "tsc --watch",
+    "build": "tspc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+    "build:watch": "tspc --watch",
     "changeset": "changeset",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:fix": "prettier --write --ignore-unknown .",
     "lint": "prettier --check --cache --ignore-unknown .",
     "inspector": "npm run build && npm exec @modelcontextprotocol/inspector dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tspc --noEmit"
   },
   "author": "",
   "license": "ISC",
@@ -22,6 +22,7 @@
     "@shopify/theme-check-docs-updater": "^3.20.0",
     "@shopify/theme-check-node": "^3.20.0",
     "graphql": "^16.11.0",
+    "typia": "^9.4.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -34,6 +35,7 @@
     "@vitest/coverage-v8": "^3.0.9",
     "memfs": "^4.17.0",
     "prettier": "^3.5.3",
+    "ts-patch": "^3.3.0",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
   },
