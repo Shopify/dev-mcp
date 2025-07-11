@@ -234,6 +234,7 @@ describe("searchShopifyDocs", () => {
     expect(fetchOptions.headers).toEqual({
       Accept: "application/json",
       "Cache-Control": "no-cache",
+      "X-Shopify-Surface": "mcp",
       "X-Shopify-MCP-Version": "",
       "X-Shopify-Timestamp": "",
     });

@@ -15,6 +15,63 @@ import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 const polarisUnifiedEnabled =
   process.env.POLARIS_UNIFIED === "true" || process.env.POLARIS_UNIFIED === "1";
 
+/**
+ * Helper function to make requests to the Shopify dev server
+ * @param path The API path (e.g., "/mcp/search", "/mcp/getting_started")
+ * @param options Request options including parameters and headers
+ * @returns The fetch response
+ */
+async function shopifyDevFetch(
+  path: string,
+  options?: {
+    parameters?: Record<string, string>;
+    headers?: Record<string, string>;
+    method?: string;
+  },
+): Promise<Response> {
+  const url = new URL(path, SHOPIFY_BASE_URL);
+  const instrumentation = instrumentationData();
+
+  // Add query parameters
+  if (options?.parameters) {
+    Object.entries(options.parameters).forEach(([key, value]) => {
+      url.searchParams.append(key, value);
+    });
+  }
+
+  // Add polaris_unified only for specific endpoints that support it
+  const polarisEndpoints = ["/mcp/search", "/mcp/getting_started_apis"];
+  if (
+    polarisUnifiedEnabled &&
+    polarisEndpoints.some((endpoint) => path.startsWith(endpoint)) &&
+    !url.searchParams.has("polaris_unified")
+  ) {
+    url.searchParams.append("polaris_unified", "true");
+  }
+
+  console.error(
+    `[shopify-dev] Making ${options?.method || "GET"} request to: ${url.toString()}`,
+  );
+
+  const response = await fetch(url.toString(), {
+    method: options?.method || "GET",
+    headers: {
+      Accept: "application/json",
+      "Cache-Control": "no-cache",
+      "X-Shopify-Surface": "mcp",
+      "X-Shopify-MCP-Version": instrumentation.packageVersion || "",
+      "X-Shopify-Timestamp": instrumentation.timestamp || "",
+      ...options?.headers,
+    },
+  });
+
+  console.error(
+    `[shopify-dev] Response status: ${response.status} ${response.statusText}`,
+  );
+
+  return response;
+}
+
 const GettingStartedAPISchema = z.object({
   name: z.string(),
   description: z.string(),
@@ -40,35 +97,26 @@ const withConversationId = <T extends z.ZodRawShape>(schema: T) => ({
 /**
  * Searches Shopify documentation with the given query
  * @param prompt The search query for Shopify documentation
+ * @param options Optional search options
  * @returns The formatted response or error message
  */
-export async function searchShopifyDocs(prompt: string) {
+export async function searchShopifyDocs(
+  prompt: string,
+  options?: { max_num_results?: number },
+) {
   try {
-    const instrumentation = instrumentationData();
+    // Prepare parameters
+    const parameters: Record<string, string> = {
+      query: prompt,
+    };
 
-    // Prepare the URL with query parameters
-    const url = new URL("/mcp/search", SHOPIFY_BASE_URL);
-    url.searchParams.append("query", prompt);
-
-    if (polarisUnifiedEnabled) {
-      url.searchParams.append("polaris_unified", "true");
+    if (options?.max_num_results !== undefined) {
+      parameters.max_num_results = String(options.max_num_results);
     }
 
-    console.error(`[shopify-docs] Making GET request to: ${url.toString()}`);
-
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "Cache-Control": "no-cache",
-        "X-Shopify-MCP-Version": instrumentation.packageVersion || "",
-        "X-Shopify-Timestamp": instrumentation.timestamp || "",
-      },
+    const response = await shopifyDevFetch("/mcp/search", {
+      parameters,
     });
-
-    console.error(
-      `[shopify-docs] Response status: ${response.status} ${response.statusText}`,
-    );
 
     if (!response.ok) {
       console.error(`[shopify-docs] HTTP error status: ${response.status}`);
@@ -161,9 +209,17 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     `This tool will take in the user prompt, search shopify.dev, and return relevant documentation and code examples that will help answer the user's question.`,
     withConversationId({
       prompt: z.string().describe("The search query for Shopify documentation"),
+      max_num_results: z
+        .number()
+        .optional()
+        .describe(
+          "Maximum number of results to return from the search. Do not pass this when calling the tool for the first time, only use this when you want to limit the number of results deal with small context window issues.",
+        ),
     }),
     async (params) => {
-      const result = await searchShopifyDocs(params.prompt);
+      const result = await searchShopifyDocs(params.prompt, {
+        max_num_results: params.max_num_results,
+      });
 
       recordUsage("search_docs_chunks", params, result.formattedText).catch(
         () => {},
@@ -200,8 +256,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
       async function fetchDocText(path: string): Promise<DocResult> {
         try {
           const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
-          const url = new URL(appendedPath, SHOPIFY_BASE_URL);
-          const response = await fetch(url.toString());
+          const response = await shopifyDevFetch(appendedPath);
 
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -330,9 +385,9 @@ export async function shopifyTools(server: McpServer): Promise<void> {
       }
 
       try {
-        const url = new URL("/mcp/getting_started", SHOPIFY_BASE_URL);
-        url.searchParams.append("api", params.api);
-        const response = await fetch(url.toString());
+        const response = await shopifyDevFetch("/mcp/getting_started", {
+          parameters: { api: params.api },
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -375,26 +430,7 @@ ${responseText}`;
  */
 async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
   try {
-    const url = new URL("/mcp/getting_started_apis", SHOPIFY_BASE_URL);
-    if (polarisUnifiedEnabled) {
-      url.searchParams.append("polaris_unified", "true");
-    }
-
-    console.error(`[api-information] Making GET request to: ${url.toString()}`);
-
-    // Make the GET request
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "Cache-Control": "no-cache",
-        "X-Shopify-Surface": "mcp",
-      },
-    });
-
-    console.error(
-      `[api-information] Response status: ${response.status} ${response.statusText}`,
-    );
+    const response = await shopifyDevFetch("/mcp/getting_started_apis");
 
     if (!response.ok) {
       console.error(`[api-information] HTTP error status: ${response.status}`);
