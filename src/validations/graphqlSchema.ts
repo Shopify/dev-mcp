@@ -1,11 +1,14 @@
-import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import zlib from "node:zlib";
-import { parse, validate, buildClientSchema, GraphQLError } from "graphql";
+import { parse, validate, buildClientSchema } from "graphql";
 import { loadSchemaContent } from "../tools/shopify-admin-schema.js";
 import { ValidationResult, ValidationFunctionResult } from "../types.js";
 import type { ValidationResponse } from "../types.js";
+import {
+  createFailedResult,
+  createValidationResult,
+  extractCodeblocksWithRegex,
+  validationResult,
+} from "./validationUtils.js";
 
 /**
  * Mapping of schema names to their file paths
@@ -95,33 +98,6 @@ async function validateAllCodeblocks(
   return createValidationResult(validationResponses);
 }
 
-function createFailedResult(
-  detailedChecks: ValidationResponse[],
-): ValidationFunctionResult {
-  return {
-    valid: false,
-    detailedChecks,
-  };
-}
-
-function createValidationResult(
-  validationResponses: ValidationResponse[],
-): ValidationFunctionResult {
-  return {
-    valid: validationResponses.every(
-      (response) => response.result === ValidationResult.SUCCESS,
-    ),
-    detailedChecks: validationResponses,
-  };
-}
-
-function validationResult(
-  result: ValidationResult,
-  resultDetail: string,
-): ValidationResponse {
-  return { result, resultDetail };
-}
-
 function validateSchemaName(
   schemaName: string,
 ): schemaName is SupportedSchemaName {
@@ -152,23 +128,6 @@ function extractWithFallbackRegex(markdownResponse: string): string[] {
   return extractCodeblocksWithRegex(markdownResponse, fallbackRegex).filter(
     (codeblock) => isLikelyGraphQLOperation(codeblock),
   );
-}
-
-function extractCodeblocksWithRegex(
-  markdownResponse: string,
-  regex: RegExp,
-): string[] {
-  const codeblocks: string[] = [];
-  let match;
-
-  while ((match = regex.exec(markdownResponse)) !== null) {
-    const operation = match[1].trim();
-    if (operation) {
-      codeblocks.push(operation);
-    }
-  }
-
-  return codeblocks;
 }
 
 function isLikelyGraphQLOperation(content: string): boolean {
