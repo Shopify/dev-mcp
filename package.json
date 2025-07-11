@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+    "build": "tsc && cp -r data dist/ && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
     "build:watch": "tsc --watch",
     "changeset": "changeset",
     "test": "vitest run",
@@ -18,6 +18,9 @@
   "description": "A command line tool for setting up Shopify Dev MCP server",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
+    "@shopify/theme-check-common": "^3.19.0",
+    "@shopify/theme-check-docs-updater": "^3.19.0",
+    "@shopify/theme-check-node": "^3.19.0",
     "graphql": "^16.11.0",
     "zod": "^3.24.2"
   },
@@ -42,6 +45,7 @@
     "dist/**/*.js",
     "!dist/**/*.test.*",
     "data/**/*.json.gz",
+    "data/**/*.txt",
     "LICENSE",
     "README.md",
     "package.json"
