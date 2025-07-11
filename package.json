@@ -21,9 +21,10 @@
     "@shopify/theme-check-common": "^3.20.0",
     "@shopify/theme-check-docs-updater": "^3.20.0",
     "@shopify/theme-check-node": "^3.20.0",
+    "@shopify/app-bridge-ui-types": "^0.2.0",
     "graphql": "^16.11.0",
     "typia": "^9.4.0",
-    "zod": "^3.24.2"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.1",

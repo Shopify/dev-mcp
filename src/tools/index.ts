@@ -503,7 +503,10 @@ ${responseText}`;
     }),
     async ({ codeblocks, packageName, conversationId }) => {
       // Validate all code blocks using the updated validateTypescript function
-      const validationResult = validateTypescript(codeblocks, packageName);
+      const validationResult = await validateTypescript(
+        codeblocks,
+        packageName,
+      );
 
       recordUsage(
         "validate_typescript_codeblocks",
