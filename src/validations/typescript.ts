@@ -1,334 +1,362 @@
+import { readFile } from "fs/promises";
+import { resolve } from "path";
 import { ValidationResponse, ValidationResult } from "../types.js";
 
 /**
- * Validates TypeScript code blocks using Typia runtime validators.
- * This approach is lightweight and doesn't require users to have TypeScript tooling setup.
- * It can work with any TypeScript package by validating the code structure and types.
- *
- * @param codeBlocks - Array of TypeScript code blocks to validate
- * @param packageName - The TypeScript package name to determine validation strategy
- * @returns ValidationResponse[] containing detailed results for each codeblock
+ * Component information extracted from code blocks
  */
-export default function validateTypescript(
+interface ComponentInfo {
+  tagName: string;
+  props: Record<string, any>;
+  content: string;
+}
+
+interface ComponentValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+interface PackageComponentInfo {
+  name: string;
+  props: Set<string>;
+  tagName: string;
+}
+
+/**
+ * Package cache to avoid repeated parsing
+ */
+const packageCache = new Map<
+  string,
+  {
+    components: Map<string, PackageComponentInfo>;
+    packageExists: boolean;
+  }
+>();
+
+// ============================================================================
+// Main Validation Function
+// ============================================================================
+
+/**
+ * Main validation function that validates components against actual TypeScript packages
+ */
+export default async function validateTypescript(
   codeBlocks: string[],
   packageName: string,
-): ValidationResponse[] {
-  const detailedChecks: ValidationResponse[] = [];
-
+): Promise<ValidationResponse[]> {
+  // Handle empty array case
   if (codeBlocks.length === 0) {
     return [
       {
         result: ValidationResult.FAILED,
-        resultDetail: "No code blocks provided for validation.",
+        resultDetail: "No code blocks provided for validation",
       },
     ];
   }
 
-  // Validate each code block
-  for (let i = 0; i < codeBlocks.length; i++) {
-    const validation = validateCodeBlock(codeBlocks[i], packageName);
+  // Process all code blocks in parallel
+  const results = await Promise.all(
+    codeBlocks.map(async (block, index) => {
+      try {
+        // Parse HTML-like components from the code block
+        const components = parseComponents(block);
 
-    if (validation.isValid) {
-      detailedChecks.push({
-        result: ValidationResult.SUCCESS,
-        resultDetail: `Code block successfully validated against ${packageName} types.`,
-      });
-    } else {
-      detailedChecks.push({
-        result: ValidationResult.FAILED,
-        resultDetail: validation.error,
-      });
-    }
-  }
+        if (components.length === 0) {
+          return {
+            result: ValidationResult.SUCCESS,
+            resultDetail:
+              "No components found in code block - validation passed.",
+          };
+        }
 
-  return detailedChecks;
+        // Validate each component against the actual TypeScript package
+        return await validateComponentsForPackage(components, packageName);
+      } catch (error) {
+        return {
+          result: ValidationResult.FAILED,
+          resultDetail: `Validation error: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }),
+  );
+
+  return results;
 }
 
+// ============================================================================
+// TypeScript Definition Parsing
+// ============================================================================
+
 /**
- * Validates a single TypeScript code block.
- * This function can be extended to support different validation strategies
- * based on the package name and code content.
- *
- * @param code - The TypeScript code to validate
- * @param packageName - The package name to validate against
- * @returns Object containing validation result and error message
+ * Validates components against a specific TypeScript package
  */
-function validateCodeBlock(
-  code: string,
+async function validateComponentsForPackage(
+  components: ComponentInfo[],
   packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
+): Promise<ValidationResponse> {
   try {
-    // Remove markdown code block markers if present
-    const cleanCode = cleanCodeBlock(code);
-
-    if (!cleanCode.trim()) {
-      return {
-        isValid: false,
-        error: "Empty code block provided",
-      };
-    }
-
-    // Determine validation strategy based on package and code content
-    const validationStrategy = getValidationStrategy(cleanCode, packageName);
-
-    switch (validationStrategy.type) {
-      case "jsx-components":
-        return validateJSXComponents(cleanCode, packageName);
-      case "typescript-interface":
-        return validateTypescriptInterface(cleanCode, packageName);
-      case "javascript-object":
-        return validateJavaScriptObject(cleanCode, packageName);
-      case "generic-typescript":
-        return validateGenericTypeScript(cleanCode, packageName);
-      default:
-        return validateGenericCode(cleanCode, packageName);
-    }
-  } catch (error) {
-    return {
-      isValid: false,
-      error: `Code validation error: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-/**
- * Determines the appropriate validation strategy based on code content and package.
- */
-function getValidationStrategy(
-  code: string,
-  packageName: string,
-): {
-  type: string;
-  confidence: number;
-} {
-  // JSX/React components (for UI libraries)
-  if (code.includes("<") && code.includes(">") && /[<]\w+/.test(code)) {
-    return { type: "jsx-components", confidence: 0.9 };
-  }
-
-  // TypeScript interfaces or types
-  if (code.includes("interface ") || code.includes("type ")) {
-    return { type: "typescript-interface", confidence: 0.8 };
-  }
-
-  // JavaScript objects with type annotations
-  if (code.includes(":") && (code.includes("{") || code.includes("="))) {
-    return { type: "javascript-object", confidence: 0.7 };
-  }
-
-  // Generic TypeScript code
-  if (
-    code.includes("function ") ||
-    code.includes("const ") ||
-    code.includes("let ")
-  ) {
-    return { type: "generic-typescript", confidence: 0.6 };
-  }
-
-  return { type: "generic-code", confidence: 0.5 };
-}
-
-/**
- * Validates JSX components using Typia.
- * This works with any UI component library that uses JSX/React patterns.
- */
-function validateJSXComponents(
-  code: string,
-  packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
-  try {
-    const components = extractJSXComponents(code);
-
-    if (components.length === 0) {
-      return {
-        isValid: false,
-        error: "No JSX components found in code block",
-      };
-    }
+    // Parse the TypeScript definitions to get actual component information
+    const packageInfo = await parseTypeScriptDefinitions(packageName);
 
     // Validate each component
-    for (const component of components) {
-      const validation = validateComponent(component, packageName);
-      if (!validation.isValid) {
-        return validation;
-      }
-    }
+    const validationResults = components.map((component) =>
+      validateSingleComponent(component, packageInfo, packageName),
+    );
 
-    return { isValid: true, error: "" };
-  } catch (error) {
-    return {
-      isValid: false,
-      error: `JSX validation error: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
+    // Check for failures
+    const failures = validationResults.filter((result) => !result.isValid);
 
-/**
- * Validates TypeScript interfaces or type definitions.
- */
-function validateTypescriptInterface(
-  code: string,
-  packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
-  try {
-    // Basic TypeScript syntax validation
-    if (!isValidTypeScriptSyntax(code)) {
+    if (failures.length > 0) {
+      const errorDetails = failures
+        .map((failure) => failure.errors.join("; "))
+        .join(" | ");
       return {
-        isValid: false,
-        error: "Invalid TypeScript syntax detected",
+        result: ValidationResult.FAILED,
+        resultDetail: `Component validation failed: ${errorDetails}`,
       };
     }
 
-    // Check for common TypeScript patterns
-    if (hasValidTypeScriptPatterns(code)) {
-      return { isValid: true, error: "" };
-    }
+    // Collect warnings
+    const warnings = validationResults.flatMap((result) => result.warnings);
+    const warningText =
+      warnings.length > 0 ? ` (Warnings: ${warnings.join("; ")})` : "";
 
     return {
-      isValid: false,
-      error: "Code does not follow expected TypeScript patterns",
+      result: ValidationResult.SUCCESS,
+      resultDetail: `Code block successfully validated against ${packageName} types.${warningText}`,
     };
   } catch (error) {
     return {
-      isValid: false,
-      error: `TypeScript interface validation error: ${error instanceof Error ? error.message : String(error)}`,
+      result: ValidationResult.FAILED,
+      resultDetail: `Package validation error: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
 
 /**
- * Validates JavaScript objects with type annotations.
+ * Parses TypeScript definition files to extract component information
  */
-function validateJavaScriptObject(
-  code: string,
-  packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
-  try {
-    // Use Typia to validate object structures
-    const validation = validateObjectStructure(code, packageName);
-    return validation;
-  } catch (error) {
-    return {
-      isValid: false,
-      error: `JavaScript object validation error: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-/**
- * Validates generic TypeScript code.
- */
-function validateGenericTypeScript(
-  code: string,
-  packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
-  try {
-    // Basic syntax and structure validation
-    if (!isValidCodeStructure(code)) {
-      return {
-        isValid: false,
-        error: "Invalid code structure detected",
-      };
-    }
-
-    return { isValid: true, error: "" };
-  } catch (error) {
-    return {
-      isValid: false,
-      error: `Generic TypeScript validation error: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-/**
- * Validates generic code that doesn't fit other patterns.
- */
-function validateGenericCode(
-  code: string,
-  packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
-  try {
-    // Basic code validation
-    if (code.trim().length === 0) {
-      return {
-        isValid: false,
-        error: "Empty code block",
-      };
-    }
-
-    // Check for obvious syntax errors
-    if (hasObviousSyntaxErrors(code)) {
-      return {
-        isValid: false,
-        error: "Syntax errors detected in code block",
-      };
-    }
-
-    return { isValid: true, error: "" };
-  } catch (error) {
-    return {
-      isValid: false,
-      error: `Generic code validation error: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-// Helper Functions
-
-/**
- * Removes markdown code block markers from code.
- */
-function cleanCodeBlock(code: string): string {
-  return code
-    .replace(/^```[\w]*\n?/, "") // Remove opening ```
-    .replace(/\n?```$/, "") // Remove closing ```
-    .trim();
-}
-
-/**
- * Extracts JSX components from code.
- */
-function extractJSXComponents(code: string): Array<{
-  tagName: string;
-  props: Record<string, any>;
-  children: string;
+async function parseTypeScriptDefinitions(packageName: string): Promise<{
+  components: Map<string, PackageComponentInfo>;
+  packageExists: boolean;
 }> {
-  const components: Array<{
-    tagName: string;
-    props: Record<string, any>;
-    children: string;
-  }> = [];
+  // Check cache first
+  if (packageCache.has(packageName)) {
+    return packageCache.get(packageName)!;
+  }
 
-  // Simple regex to match JSX elements
-  const jsxPattern = /<(\w+(?:-\w+)*)([^>]*)(?:\/>|>([^<]*)<\/\1>)/g;
-  let match;
+  const result = {
+    components: new Map<string, PackageComponentInfo>(),
+    packageExists: false,
+  };
 
-  while ((match = jsxPattern.exec(code)) !== null) {
-    const [, tagName, propsString, children] = match;
-    const props = parseProps(propsString);
+  try {
+    // Try to find TypeScript definitions in common locations
+    const definitionsContent =
+      await findAndReadTypeScriptDefinitions(packageName);
+    result.packageExists = true;
 
-    components.push({
-      tagName,
+    // Parse the TypeScript definitions to extract component information
+    const components = parseComponentsFromDefinitions(
+      definitionsContent,
+      packageName,
+    );
+    result.components = components;
+
+    // Cache the result
+    packageCache.set(packageName, result);
+    return result;
+  } catch (error) {
+    // Package definitions don't exist or can't be read
+    console.warn(
+      `Package definitions for '${packageName}' could not be loaded: ${error}`,
+    );
+    packageCache.set(packageName, result);
+    return result;
+  }
+}
+
+/**
+ * Attempts to find and read TypeScript definitions from common locations
+ */
+async function findAndReadTypeScriptDefinitions(
+  packageName: string,
+): Promise<string> {
+  const commonPaths = [
+    // Common TypeScript definition file locations
+    `node_modules/${packageName}/dist/app-bridge-ui.d.ts`, // Shopify specific
+    `node_modules/${packageName}/dist/index.d.ts`, // Most common
+    `node_modules/${packageName}/lib/index.d.ts`, // Alternative lib folder
+    `node_modules/${packageName}/types/index.d.ts`, // Types folder
+    `node_modules/${packageName}/index.d.ts`, // Root level
+    `node_modules/${packageName}/${packageName}.d.ts`, // Package name
+    `node_modules/${packageName}/dist/${packageName}.d.ts`, // Package name in dist
+  ];
+
+  // Try each path until one works
+  for (const relativePath of commonPaths) {
+    try {
+      const fullPath = resolve(process.cwd(), relativePath);
+      const content = await readFile(fullPath, "utf-8");
+      console.log(`Found TypeScript definitions at: ${relativePath}`);
+      return content;
+    } catch {
+      // Continue to next path
+    }
+  }
+
+  // If no standard paths work, try to read package.json to find types entry
+  try {
+    const packageJsonPath = resolve(
+      process.cwd(),
+      `node_modules/${packageName}/package.json`,
+    );
+    const packageJsonContent = await readFile(packageJsonPath, "utf-8");
+    const packageJson = JSON.parse(packageJsonContent);
+
+    // Check for types or typings field
+    const typesEntry = packageJson.types || packageJson.typings;
+    if (typesEntry) {
+      const typesPath = resolve(
+        process.cwd(),
+        `node_modules/${packageName}/${typesEntry}`,
+      );
+      const content = await readFile(typesPath, "utf-8");
+      console.log(
+        `Found TypeScript definitions via package.json types field: ${typesEntry}`,
+      );
+      return content;
+    }
+  } catch {
+    // Package.json approach failed
+  }
+
+  throw new Error(
+    `No TypeScript definitions found for package '${packageName}' in any common location`,
+  );
+}
+
+/**
+ * Parses component information from TypeScript definitions content
+ */
+function parseComponentsFromDefinitions(
+  content: string,
+  packageName?: string,
+): Map<string, PackageComponentInfo> {
+  const components = new Map<string, PackageComponentInfo>();
+
+  // Dynamically discover components from TypeScript definitions
+  // Look for interface declarations that likely represent component props
+  const interfaceRegex =
+    /interface\s+(\w+Props\$?\d*)\s+extends[^{]*{([^}]*)}/gs;
+  const tagNameRegex = /(?:const\s+)?tagName\$?\w*\s*=\s*["']([^"']+)["']/g;
+  const declarationRegex = /declare\s+class\s+(\w+)\s+extends[^{]*{/g;
+
+  // First pass: Find all component interfaces
+  const interfaceMatches = [...content.matchAll(interfaceRegex)];
+  const componentInterfaces = new Map<string, string>();
+
+  for (const match of interfaceMatches) {
+    const interfaceName = match[1];
+    const interfaceBody = match[2];
+
+    // Extract component name from interface name
+    // e.g., "ButtonProps$1" -> "Button"
+    const componentName = interfaceName.replace(/Props\$?\d*$/, "");
+
+    if (componentName) {
+      componentInterfaces.set(componentName, interfaceName);
+    }
+  }
+
+  // Second pass: Find tag names (e.g., "s-button", "s-link")
+  const tagNameMatches = [...content.matchAll(tagNameRegex)];
+  const tagNameMap = new Map<string, string>();
+
+  for (const match of tagNameMatches) {
+    const tagName = match[1];
+    // Try to infer component name from tag name
+    // e.g., "s-button" -> "Button"
+    const componentName = tagName
+      .replace(/^[a-z]+-/, "")
+      .replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())
+      .replace(/^[a-z]/, (letter) => letter.toUpperCase());
+    tagNameMap.set(componentName, tagName);
+  }
+
+  // Third pass: Find declared classes to validate component names
+  const classMatches = [...content.matchAll(declarationRegex)];
+  const validComponents = new Set<string>();
+
+  for (const match of classMatches) {
+    const className = match[1];
+    validComponents.add(className);
+  }
+
+  // Combine the information to build component mappings
+  for (const [componentName, interfaceName] of componentInterfaces) {
+    // Only include if we have a valid component class
+    if (validComponents.has(componentName)) {
+      const tagName =
+        tagNameMap.get(componentName) ||
+        inferTagName(componentName, packageName);
+      const props = extractPropsFromInterface(content, interfaceName);
+
+      components.set(tagName, {
+        name: componentName,
+        props,
+        tagName,
+      });
+    }
+  }
+
+  // If no components found dynamically, try a fallback approach
+  if (components.size === 0) {
+    console.warn(
+      "No components found via dynamic parsing, trying fallback approach...",
+    );
+    return parseComponentsWithFallback(content, packageName);
+  }
+
+  return components;
+}
+
+/**
+ * Fallback parsing approach for packages with different structures
+ */
+function parseComponentsWithFallback(
+  content: string,
+  packageName?: string,
+): Map<string, PackageComponentInfo> {
+  const components = new Map<string, PackageComponentInfo>();
+
+  // Look for any interface that might be component props
+  const allInterfaceRegex =
+    /interface\s+(\w+)\s*(?:extends[^{]*)?\s*{([^}]*)}/gs;
+  const matches = [...content.matchAll(allInterfaceRegex)];
+
+  for (const match of matches) {
+    const interfaceName = match[1];
+    const interfaceBody = match[2];
+
+    // Skip if this doesn't look like a component props interface
+    if (
+      !interfaceName.includes("Props") &&
+      !interfaceBody.includes("children")
+    ) {
+      continue;
+    }
+
+    // Infer component name and tag name
+    const componentName = interfaceName.replace(/Props\$?\d*$/, "");
+    const tagName = inferTagName(componentName, packageName);
+    const props = extractPropsFromInterface(content, interfaceName);
+
+    components.set(tagName, {
+      name: componentName,
       props,
-      children: children || "",
+      tagName,
     });
   }
 
@@ -336,270 +364,403 @@ function extractJSXComponents(code: string): Array<{
 }
 
 /**
- * Parses props from JSX prop string.
+ * Infers tag name from component name using common conventions
  */
-function parseProps(propsString: string): Record<string, any> {
-  const props: Record<string, any> = {};
+function inferTagName(componentName: string, packageName?: string): string {
+  // Convert PascalCase to kebab-case
+  const kebabCase = componentName
+    .replace(/([A-Z])/g, "-$1")
+    .toLowerCase()
+    .replace(/^-/, "");
 
-  if (!propsString.trim()) {
-    return props;
+  // Infer prefix from package name patterns
+  const prefix = inferPrefixFromPackageName(packageName);
+
+  return `${prefix}-${kebabCase}`;
+}
+
+/**
+ * Infers the component prefix from package name patterns
+ */
+function inferPrefixFromPackageName(packageName?: string): string {
+  if (!packageName) return "s"; // Default fallback
+
+  // Common package name patterns and their prefixes
+  const patterns = [
+    { pattern: /shopify/i, prefix: "s" },
+    { pattern: /polaris/i, prefix: "p" },
+    { pattern: /material/i, prefix: "m" },
+    { pattern: /ant-design/i, prefix: "a" },
+    { pattern: /chakra/i, prefix: "c" },
+    { pattern: /semantic/i, prefix: "sem" },
+    { pattern: /bootstrap/i, prefix: "b" },
+    { pattern: /tailwind/i, prefix: "t" },
+    { pattern: /ui-kit/i, prefix: "ui" },
+    { pattern: /design-system/i, prefix: "ds" },
+    { pattern: /components/i, prefix: "comp" },
+  ];
+
+  // Check each pattern
+  for (const { pattern, prefix } of patterns) {
+    if (pattern.test(packageName)) {
+      return prefix;
+    }
   }
 
-  // Simple prop parsing (can be enhanced)
-  const propPattern = /(\w+)(?:=["']([^"']+)["']|=\{([^}]+)\})?/g;
-  let match;
+  // If no pattern matches, try to extract from package name
+  const nameParts = packageName.split("/");
+  const packageBaseName = nameParts[nameParts.length - 1];
 
-  while ((match = propPattern.exec(propsString)) !== null) {
-    const [, propName, stringValue, jsValue] = match;
-
-    if (stringValue !== undefined) {
-      props[propName] = stringValue;
-    } else if (jsValue !== undefined) {
-      // Try to parse JavaScript values
-      try {
-        props[propName] = JSON.parse(jsValue);
-      } catch {
-        props[propName] = jsValue;
-      }
-    } else {
-      props[propName] = true; // Boolean prop
+  // Use first few characters of package name
+  if (packageBaseName.length >= 2) {
+    const firstTwo = packageBaseName.substring(0, 2).toLowerCase();
+    if (/^[a-z]{2}$/.test(firstTwo)) {
+      return firstTwo;
     }
+  }
+
+  // Final fallback
+  return "ui";
+}
+
+/**
+ * Extracts props from a TypeScript interface definition
+ */
+function extractPropsFromInterface(
+  content: string,
+  interfaceName: string,
+): Set<string> {
+  const props = new Set<string>();
+
+  // Common props that all components inherit
+  const commonProps = [
+    "id",
+    "children",
+    "className",
+    "class",
+    "style",
+    "title",
+    "aria-label",
+    "data-testid",
+    "key",
+    "ref",
+    "slot",
+    "accessibilityLabel",
+    "accessibilityVisibility",
+    "background",
+    "display",
+    "padding",
+    "paddingBlock",
+    "paddingBlockStart",
+    "paddingBlockEnd",
+    "paddingInline",
+    "paddingInlineStart",
+    "paddingInlineEnd",
+    "blockSize",
+    "minBlockSize",
+    "maxBlockSize",
+    "inlineSize",
+    "minInlineSize",
+    "maxInlineSize",
+    "border",
+    "borderWidth",
+    "borderStyle",
+    "borderColor",
+    "borderRadius",
+    "overflow",
+  ];
+
+  commonProps.forEach((prop) => props.add(prop));
+
+  // Find the interface definition - handle multiline interfaces
+  const interfaceRegex = new RegExp(
+    `interface\\s+${interfaceName}(?:\\s+extends\\s+[^{]*)?\\s*{([^}]*)}`,
+    "s",
+  );
+  const match = content.match(interfaceRegex);
+
+  if (match) {
+    const interfaceBody = match[1];
+
+    // Extract property names from the interface - improved regex
+    // Match property names that start at the beginning of a line (after whitespace)
+    const propRegex = /^\s*\/\*\*[\s\S]*?\*\/\s*([a-zA-Z][a-zA-Z0-9]*)\??:/gm;
+    let propMatch;
+
+    while ((propMatch = propRegex.exec(interfaceBody)) !== null) {
+      const propName = propMatch[1];
+      props.add(propName);
+    }
+
+    // Also try without comments for props that don't have documentation
+    const simplePropRegex = /^\s*([a-zA-Z][a-zA-Z0-9]*)\??:/gm;
+    let simplePropMatch;
+
+    while ((simplePropMatch = simplePropRegex.exec(interfaceBody)) !== null) {
+      const propName = simplePropMatch[1];
+      props.add(propName);
+    }
+  }
+
+  // Add common clickable props if this is a clickable component
+  if (
+    interfaceName.includes("Button") ||
+    interfaceName.includes("Link") ||
+    interfaceName.includes("Clickable")
+  ) {
+    const clickableProps = [
+      "href",
+      "target",
+      "download",
+      "onClick",
+      "onFocus",
+      "onBlur",
+      "disabled",
+      "loading",
+      "type",
+      "commandFor",
+      "command",
+      "variant",
+      "tone",
+      "icon",
+      "accessibilityLabel",
+    ];
+    clickableProps.forEach((prop) => props.add(prop));
+  }
+
+  // Add common field props if this is a form field
+  if (
+    interfaceName.includes("Field") ||
+    interfaceName.includes("Input") ||
+    interfaceName.includes("TextArea")
+  ) {
+    const fieldProps = [
+      "name",
+      "value",
+      "defaultValue",
+      "placeholder",
+      "required",
+      "disabled",
+      "readOnly",
+      "onChange",
+      "onInput",
+      "onFocus",
+      "onBlur",
+      "error",
+      "label",
+      "details",
+      "maxLength",
+      "minLength",
+      "max",
+      "min",
+      "step",
+      "autocomplete",
+      "prefix",
+      "suffix",
+      "icon",
+      "accessory",
+    ];
+    fieldProps.forEach((prop) => props.add(prop));
+  }
+
+  // Add common display props for components that can have visual variants
+  if (
+    interfaceName.includes("Badge") ||
+    interfaceName.includes("Banner") ||
+    interfaceName.includes("Button") ||
+    interfaceName.includes("Text")
+  ) {
+    const displayProps = [
+      "variant",
+      "size",
+      "tone",
+      "color",
+      "appearance",
+      "level",
+      "weight",
+      "align",
+      "decoration",
+    ];
+    displayProps.forEach((prop) => props.add(prop));
   }
 
   return props;
 }
 
 /**
- * Validates a single component using Typia or custom validation.
+ * Validates a single component against package information
  */
-function validateComponent(
-  component: { tagName: string; props: Record<string, any>; children: string },
+function validateSingleComponent(
+  component: ComponentInfo,
+  packageInfo: {
+    components: Map<string, PackageComponentInfo>;
+    packageExists: boolean;
+  },
   packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
-  try {
-    // Use Typia validation if available for this component
-    const typiaValidator = getTypiaValidator(component.tagName, packageName);
+): ComponentValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
-    if (typiaValidator) {
-      const isValid = typiaValidator(component.props);
-      if (!isValid) {
-        return {
-          isValid: false,
-          error: `Component "${component.tagName}" has invalid props for package "${packageName}"`,
-        };
+  // Check if package exists
+  if (!packageInfo.packageExists) {
+    warnings.push(
+      `Package '${packageName}' could not be loaded - using basic validation`,
+    );
+    return validateBasicComponent(component);
+  }
+
+  // Check if component is exported from the package
+  if (!packageInfo.components.has(component.tagName)) {
+    errors.push(
+      `Component '${component.tagName}' is not exported from package '${packageName}'. Available components: ${Array.from(packageInfo.components.keys()).join(", ") || "none"}`,
+    );
+  } else {
+    // Component exists - validate its props
+    const componentInfo = packageInfo.components.get(component.tagName)!;
+
+    for (const propName of Object.keys(component.props)) {
+      if (!componentInfo.props.has(propName)) {
+        errors.push(
+          `Property '${propName}' is not valid for component '${component.tagName}'. Valid props include: ${Array.from(componentInfo.props).slice(0, 10).join(", ")}${componentInfo.props.size > 10 ? "..." : ""}`,
+        );
       }
     }
-
-    // Fallback to generic validation
-    return validateComponentGeneric(component, packageName);
-  } catch (error) {
-    return {
-      isValid: false,
-      error: `Component validation error: ${error instanceof Error ? error.message : String(error)}`,
-    };
   }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  };
 }
 
 /**
- * Gets Typia validator for a specific component if available.
+ * Fallback validation when package can't be loaded
  */
-function getTypiaValidator(
+function validateBasicComponent(
+  component: ComponentInfo,
+): ComponentValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Basic validation: check for reasonable component tag name
+  if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(component.tagName)) {
+    errors.push(
+      `Invalid component tag name '${component.tagName}' - should start with a letter and contain only letters, numbers, and hyphens`,
+    );
+  }
+
+  // Basic validation: check for reasonable prop names
+  for (const propName of Object.keys(component.props)) {
+    if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(propName)) {
+      errors.push(
+        `Invalid prop name '${propName}' for component '${component.tagName}' - should start with a letter and contain only letters, numbers, and hyphens`,
+      );
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+// ============================================================================
+// Component Parsing
+// ============================================================================
+
+/**
+ * Parses HTML-like components from code blocks
+ */
+function parseComponents(codeBlock: string): ComponentInfo[] {
+  const components: ComponentInfo[] = [];
+
+  // Match HTML-like tags: <tag-name prop="value">content</tag-name>
+  const tagRegex = /<([a-zA-Z][a-zA-Z0-9-]*)[^>]*>(.*?)<\/\1>/gis;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagRegex.exec(codeBlock)) !== null) {
+    const [fullMatch, tagName, content] = match;
+
+    // Extract props from the opening tag
+    const props = parseProps(fullMatch);
+
+    components.push({
+      tagName,
+      props,
+      content: content.trim(),
+    });
+  }
+
+  return components;
+}
+
+/**
+ * Parses props from a tag string
+ */
+function parseProps(tagString: string): Record<string, any> {
+  const props: Record<string, any> = {};
+
+  // Match prop="value" or prop={value} patterns
+  const propRegex =
+    /([a-zA-Z][a-zA-Z0-9-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|\{([^}]*)\})/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = propRegex.exec(tagString)) !== null) {
+    const [, propName, doubleQuotedValue, singleQuotedValue, bracesValue] =
+      match;
+
+    // Determine the prop value
+    let propValue: any;
+    if (doubleQuotedValue !== undefined) {
+      propValue = doubleQuotedValue;
+    } else if (singleQuotedValue !== undefined) {
+      propValue = singleQuotedValue;
+    } else if (bracesValue !== undefined) {
+      // Try to parse as JSON/JavaScript expression
+      try {
+        propValue = JSON.parse(bracesValue);
+      } catch {
+        // If it can't be parsed as JSON, treat as string
+        propValue = bracesValue;
+      }
+    }
+
+    props[propName] = propValue;
+  }
+
+  return props;
+}
+
+// ============================================================================
+// Public API
+// ============================================================================
+
+/**
+ * Gets the list of discovered components for a package
+ */
+export async function getDiscoveredComponents(
+  packageName: string,
+): Promise<string[]> {
+  const packageInfo = await parseTypeScriptDefinitions(packageName);
+  return Array.from(packageInfo.components.keys());
+}
+
+/**
+ * Checks if a component is supported by a package
+ */
+export async function isComponentSupported(
   componentName: string,
   packageName: string,
-): ((props: any) => boolean) | null {
-  // This is where we can add package-specific Typia validators
-  // For now, return null to use generic validation
-  return null;
+): Promise<boolean> {
+  const packageInfo = await parseTypeScriptDefinitions(packageName);
+  return packageInfo.components.has(componentName);
 }
 
 /**
- * Generic component validation.
+ * Clears the package cache
  */
-function validateComponentGeneric(
-  component: { tagName: string; props: Record<string, any>; children: string },
-  packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
-  // Basic component validation
-  if (!component.tagName || component.tagName.trim().length === 0) {
-    return {
-      isValid: false,
-      error: "Component must have a valid tag name",
-    };
-  }
-
-  // Package-specific validation can be added here
-  if (packageName === "@shopify/app-bridge-ui-types") {
-    // For Shopify components, validate that it starts with 's-'
-    if (!component.tagName.startsWith("s-")) {
-      return {
-        isValid: false,
-        error: `Shopify UI components must start with 's-', got: ${component.tagName}`,
-      };
-    }
-  }
-
-  return { isValid: true, error: "" };
-}
-
-/**
- * Validates object structure using Typia.
- */
-function validateObjectStructure(
-  code: string,
-  packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
-  try {
-    // Extract objects from code
-    const objects = extractObjects(code);
-
-    if (objects.length === 0) {
-      return {
-        isValid: false,
-        error: "No objects found in code block",
-      };
-    }
-
-    // Validate each object
-    for (const obj of objects) {
-      // Use Typia validation if available
-      const validation = validateObjectWithTypia(obj, packageName);
-      if (!validation.isValid) {
-        return validation;
-      }
-    }
-
-    return { isValid: true, error: "" };
-  } catch (error) {
-    return {
-      isValid: false,
-      error: `Object structure validation error: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-/**
- * Extracts objects from code.
- */
-function extractObjects(code: string): any[] {
-  const objects: any[] = [];
-
-  try {
-    // Simple object extraction (can be enhanced)
-    const objectPattern = /\{[^{}]*\}/g;
-    const matches = code.match(objectPattern);
-
-    if (matches) {
-      for (const match of matches) {
-        try {
-          const obj = JSON.parse(match);
-          objects.push(obj);
-        } catch {
-          // Not valid JSON, skip
-        }
-      }
-    }
-  } catch {
-    // Error in extraction, return empty array
-  }
-
-  return objects;
-}
-
-/**
- * Validates object with Typia.
- */
-function validateObjectWithTypia(
-  obj: any,
-  packageName: string,
-): {
-  isValid: boolean;
-  error: string;
-} {
-  try {
-    // This is where package-specific Typia validators would go
-    // For now, use basic validation
-    if (typeof obj !== "object" || obj === null) {
-      return {
-        isValid: false,
-        error: "Invalid object structure",
-      };
-    }
-
-    return { isValid: true, error: "" };
-  } catch (error) {
-    return {
-      isValid: false,
-      error: `Typia validation error: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-/**
- * Checks if code has valid TypeScript syntax.
- */
-function isValidTypeScriptSyntax(code: string): boolean {
-  // Basic syntax checks
-  const brackets = { "{": 0, "[": 0, "(": 0 };
-
-  for (const char of code) {
-    if (char === "{") brackets["{"]++;
-    else if (char === "}") brackets["{"]--;
-    else if (char === "[") brackets["["]++;
-    else if (char === "]") brackets["["]--;
-    else if (char === "(") brackets["("]++;
-    else if (char === ")") brackets["("]--;
-  }
-
-  return brackets["{"] === 0 && brackets["["] === 0 && brackets["("] === 0;
-}
-
-/**
- * Checks if code has valid TypeScript patterns.
- */
-function hasValidTypeScriptPatterns(code: string): boolean {
-  // Check for common TypeScript patterns
-  const patterns = [
-    /interface\s+\w+/,
-    /type\s+\w+/,
-    /:\s*\w+/,
-    /function\s+\w+/,
-    /const\s+\w+/,
-    /let\s+\w+/,
-    /var\s+\w+/,
-  ];
-
-  return patterns.some((pattern) => pattern.test(code));
-}
-
-/**
- * Checks if code has valid structure.
- */
-function isValidCodeStructure(code: string): boolean {
-  // Basic structure validation
-  return code.trim().length > 0 && isValidTypeScriptSyntax(code);
-}
-
-/**
- * Checks for obvious syntax errors.
- */
-function hasObviousSyntaxErrors(code: string): boolean {
-  // Check for obvious syntax errors
-  const errors = [
-    /\)\s*\(/, // Missing operator between parentheses
-    /\}\s*\{/, // Missing operator between braces
-    /\]\s*\[/, // Missing operator between brackets
-    /;;+/, // Multiple semicolons
-    /\(\s*\)/, // Empty parentheses in unexpected places
-  ];
-
-  return errors.some((error) => error.test(code));
+export function clearPackageCache(): void {
+  packageCache.clear();
 }
