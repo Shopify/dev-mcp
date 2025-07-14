@@ -48,7 +48,7 @@ describe("validateTypescript", () => {
       expect(validationResults).toHaveLength(1);
       expect(validationResults[0].result).toBe(ValidationResult.FAILED);
       expect(validationResults[0].resultDetail).toContain(
-        "No code blocks provided for validation",
+        "At least one code block is required",
       );
     });
   });

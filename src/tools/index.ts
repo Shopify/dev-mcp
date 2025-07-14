@@ -6,11 +6,9 @@ import {
   instrumentationData,
   recordUsage,
 } from "../instrumentation.js";
-import type { ValidationToolResult } from "../types.js";
-import { ValidationResult } from "../types.js";
+import { formatValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
-import { hasFailedValidation } from "../validations/index.js";
-import validateTypescript from "../validations/typescript.js";
+import { validateTypescriptWithFormatting } from "../validations/typescript.js";
 import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 
 const polarisUnifiedEnabled =
@@ -389,32 +387,46 @@ ${text}`;
         ),
     }),
     async ({ codeblocks, packageName, conversationId }) => {
-      // Validate all code blocks using the updated validateTypescript function
-      const validationResult = await validateTypescript(
-        codeblocks,
-        packageName,
-      );
+      try {
+        // Use the comprehensive validation function with formatting
+        const { formattedResponse } = await validateTypescriptWithFormatting(
+          codeblocks,
+          packageName,
+          "Code Blocks",
+        );
 
-      recordUsage(
-        "validate_typescript_codeblocks",
-        { codeblocks, packageName, conversationId },
-        validationResult,
-      ).catch(() => {});
+        recordUsage(
+          "validate_typescript_codeblocks",
+          { codeblocks, packageName, conversationId },
+          formattedResponse,
+        ).catch(() => {});
 
-      // Format the response using the shared formatting function
-      const responseText = formatValidationResult(
-        validationResult,
-        "Code Blocks",
-      );
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formattedResponse,
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = `TypeScript validation failed: ${error instanceof Error ? error.message : String(error)}`;
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: responseText,
-          },
-        ],
-      };
+        recordUsage(
+          "validate_typescript_codeblocks",
+          { codeblocks, packageName, conversationId },
+          errorMessage,
+        ).catch(() => {});
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: errorMessage,
+            },
+          ],
+        };
+      }
     },
   );
 }
@@ -478,28 +490,3 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
 // ============================================================================
 // Private Helper Functions
 // ============================================================================
-
-/**
- * Formats a ValidationToolResult into a readable markdown response
- * @param result - The validation result to format
- * @param itemName - Name of the items being validated (e.g., "Code Blocks", "Operations")
- * @returns Formatted markdown string with validation summary and details
- */
-function formatValidationResult(
-  result: ValidationToolResult,
-  itemName: string = "Items",
-): string {
-  let responseText = `## Validation Summary\n\n`;
-  responseText += `**Overall Status:** ${!hasFailedValidation(result) ? "✅ VALID" : "❌ INVALID"}\n`;
-  responseText += `**Total ${itemName}:** ${result.length}\n\n`;
-
-  responseText += `## Detailed Results\n\n`;
-  result.forEach((check, index) => {
-    const statusIcon = check.result === ValidationResult.SUCCESS ? "✅" : "❌";
-    responseText += `### ${itemName.slice(0, -1)} ${index + 1}\n`;
-    responseText += `**Status:** ${statusIcon} ${check.result.toUpperCase()}\n`;
-    responseText += `**Details:** ${check.resultDetail}\n\n`;
-  });
-
-  return responseText;
-}
