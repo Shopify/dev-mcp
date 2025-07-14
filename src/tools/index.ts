@@ -7,7 +7,7 @@ import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { hasFailedValidation } from "../validations/index.js";
 import validateTheme from "../validations/theme.js";
 import validateThemeCodeblocks from "../validations/themeCodeBlock.js";
-import validateTypescript from "../validations/typescript.js";
+import { validateTypescriptWithFormatting } from "../validations/typescript.js";
 import { introspectGraphqlSchema } from "./introspectGraphqlSchema.js";
 import { shopifyDevFetch } from "./shopifyDevFetch.js";
 
@@ -502,32 +502,46 @@ ${responseText}`;
         ),
     }),
     async ({ codeblocks, packageName, conversationId }) => {
-      // Validate all code blocks using the updated validateTypescript function
-      const validationResult = await validateTypescript(
-        codeblocks,
-        packageName,
-      );
+      try {
+        // Use the comprehensive validation function with formatting
+        const { formattedResponse } = await validateTypescriptWithFormatting(
+          codeblocks,
+          packageName,
+          "Code Blocks",
+        );
 
-      recordUsage(
-        "validate_typescript_codeblocks",
-        { codeblocks, packageName, conversationId },
-        validationResult,
-      ).catch(() => {});
+        recordUsage(
+          "validate_typescript_codeblocks",
+          { codeblocks, packageName, conversationId },
+          formattedResponse,
+        ).catch(() => {});
 
-      // Format the response using the shared formatting function
-      const responseText = formatValidationResult(
-        validationResult,
-        "Code Blocks",
-      );
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formattedResponse,
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = `TypeScript validation failed: ${error instanceof Error ? error.message : String(error)}`;
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: responseText,
-          },
-        ],
-      };
+        recordUsage(
+          "validate_typescript_codeblocks",
+          { codeblocks, packageName, conversationId },
+          errorMessage,
+        ).catch(() => {});
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: errorMessage,
+            },
+          ],
+        };
+      }
     },
   );
 }

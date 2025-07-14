@@ -1,6 +1,185 @@
 import { readFile } from "fs/promises";
 import { resolve } from "path";
+import { z } from "zod";
 import { ValidationResponse, ValidationResult } from "../types.js";
+
+// ============================================================================
+// Main Validation Function
+// ============================================================================
+
+/**
+ * Processes a single code block and validates its components
+ */
+async function processCodeBlock(
+  block: string,
+  packageName: string,
+  index: number,
+): Promise<ValidationResponse> {
+  try {
+    // Additional validation for individual code blocks
+    const validatedBlock = validateCodeBlock(block);
+
+    // Parse HTML-like components from the code block
+    const components = parseComponents(validatedBlock);
+
+    if (components.length === 0) {
+      return {
+        result: ValidationResult.SUCCESS,
+        resultDetail: "No components found in code block - validation passed.",
+      };
+    }
+
+    // Validate each component against the actual TypeScript package
+    return await validateComponentsForPackage(components, packageName);
+  } catch (error) {
+    return {
+      result: ValidationResult.FAILED,
+      resultDetail: `Validation error for code block ${index + 1}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Handles empty code blocks array case
+ */
+function handleEmptyCodeBlocks(): ValidationResponse[] {
+  return [
+    {
+      result: ValidationResult.FAILED,
+      resultDetail: "No code blocks provided for validation",
+    },
+  ];
+}
+
+/**
+ * Main validation function that validates components against actual TypeScript packages
+ * All inputs are validated using Zod schemas before processing
+ */
+export default async function validateTypescript(
+  codeBlocks: unknown,
+  packageName: unknown,
+): Promise<ValidationResponse[]> {
+  try {
+    // Validate inputs using Zod schemas
+    const validatedInputs = validateInputs(codeBlocks, packageName);
+
+    // Handle empty array case (though Zod should catch this)
+    if (validatedInputs.codeblocks.length === 0) {
+      return handleEmptyCodeBlocks();
+    }
+
+    // Process all code blocks in parallel
+    const results = await Promise.all(
+      validatedInputs.codeblocks.map((block, index) =>
+        processCodeBlock(block, validatedInputs.packageName, index),
+      ),
+    );
+
+    return results;
+  } catch (error) {
+    // Handle input validation errors
+    return [
+      {
+        result: ValidationResult.FAILED,
+        resultDetail: `Input validation failed: ${error instanceof Error ? error.message : String(error)}`,
+      },
+    ];
+  }
+}
+
+// ============================================================================
+// Zod Input Validation Schemas
+// ============================================================================
+
+/**
+ * Schema for validating TypeScript validation inputs
+ */
+const TypeScriptValidationInputSchema = z.object({
+  codeblocks: z
+    .array(z.string())
+    .min(1, "At least one code block is required")
+    .describe(
+      "Array of markdown code blocks containing HTML with custom elements to validate",
+    ),
+  packageName: z
+    .string()
+    .min(1, "Package name is required")
+    .describe(
+      "TypeScript package name to validate against (e.g., '@shopify/app-bridge-ui-types')",
+    ),
+});
+
+/**
+ * Schema for individual code blocks
+ */
+const CodeBlockSchema = z.string().min(1, "Code block cannot be empty");
+
+/**
+ * Schema for package names
+ */
+const PackageNameSchema = z.string().min(1, "Package name cannot be empty");
+
+/**
+ * Type definitions for validated inputs
+ */
+type TypeScriptValidationInput = z.infer<
+  typeof TypeScriptValidationInputSchema
+>;
+
+// ============================================================================
+// Zod Validation Functions
+// ============================================================================
+
+/**
+ * Validates and sanitizes inputs for TypeScript validation
+ */
+function validateInputs(
+  codeBlocks: unknown,
+  packageName: unknown,
+): TypeScriptValidationInput {
+  try {
+    return TypeScriptValidationInputSchema.parse({
+      codeblocks: codeBlocks,
+      packageName: packageName,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const errorMessages = error.errors
+        .map((err) => `${err.path.join(".")}: ${err.message}`)
+        .join("; ");
+      throw new Error(`Invalid input parameters: ${errorMessages}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Validates a single code block
+ */
+function validateCodeBlock(codeBlock: unknown): string {
+  try {
+    return CodeBlockSchema.parse(codeBlock);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(`Invalid code block: ${error.errors[0].message}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Validates a package name
+ */
+function validatePackageName(packageName: unknown): string {
+  try {
+    return PackageNameSchema.parse(packageName);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(`Invalid package name: ${error.errors[0].message}`);
+    }
+    throw error;
+  }
+}
 
 /**
  * Component information extracted from code blocks
@@ -33,56 +212,6 @@ const packageCache = new Map<
     packageExists: boolean;
   }
 >();
-
-// ============================================================================
-// Main Validation Function
-// ============================================================================
-
-/**
- * Main validation function that validates components against actual TypeScript packages
- */
-export default async function validateTypescript(
-  codeBlocks: string[],
-  packageName: string,
-): Promise<ValidationResponse[]> {
-  // Handle empty array case
-  if (codeBlocks.length === 0) {
-    return [
-      {
-        result: ValidationResult.FAILED,
-        resultDetail: "No code blocks provided for validation",
-      },
-    ];
-  }
-
-  // Process all code blocks in parallel
-  const results = await Promise.all(
-    codeBlocks.map(async (block, index) => {
-      try {
-        // Parse HTML-like components from the code block
-        const components = parseComponents(block);
-
-        if (components.length === 0) {
-          return {
-            result: ValidationResult.SUCCESS,
-            resultDetail:
-              "No components found in code block - validation passed.",
-          };
-        }
-
-        // Validate each component against the actual TypeScript package
-        return await validateComponentsForPackage(components, packageName);
-      } catch (error) {
-        return {
-          result: ValidationResult.FAILED,
-          resultDetail: `Validation error: ${error instanceof Error ? error.message : String(error)}`,
-        };
-      }
-    }),
-  );
-
-  return results;
-}
 
 // ============================================================================
 // TypeScript Definition Parsing
@@ -178,12 +307,10 @@ async function parseTypeScriptDefinitions(packageName: string): Promise<{
 }
 
 /**
- * Attempts to find and read TypeScript definitions from common locations
+ * Gets common TypeScript definition file paths for a package
  */
-async function findAndReadTypeScriptDefinitions(
-  packageName: string,
-): Promise<string> {
-  const commonPaths = [
+function getCommonDefinitionPaths(packageName: string): string[] {
+  return [
     // Common TypeScript definition file locations
     `node_modules/${packageName}/dist/app-bridge-ui.d.ts`, // Shopify specific
     `node_modules/${packageName}/dist/index.d.ts`, // Most common
@@ -193,8 +320,16 @@ async function findAndReadTypeScriptDefinitions(
     `node_modules/${packageName}/${packageName}.d.ts`, // Package name
     `node_modules/${packageName}/dist/${packageName}.d.ts`, // Package name in dist
   ];
+}
 
-  // Try each path until one works
+/**
+ * Attempts to read TypeScript definitions from common paths
+ */
+async function tryCommonDefinitionPaths(
+  packageName: string,
+): Promise<string | null> {
+  const commonPaths = getCommonDefinitionPaths(packageName);
+
   for (const relativePath of commonPaths) {
     try {
       const fullPath = resolve(process.cwd(), relativePath);
@@ -206,7 +341,15 @@ async function findAndReadTypeScriptDefinitions(
     }
   }
 
-  // If no standard paths work, try to read package.json to find types entry
+  return null;
+}
+
+/**
+ * Attempts to read TypeScript definitions via package.json types field
+ */
+async function tryPackageJsonTypesField(
+  packageName: string,
+): Promise<string | null> {
   try {
     const packageJsonPath = resolve(
       process.cwd(),
@@ -232,28 +375,38 @@ async function findAndReadTypeScriptDefinitions(
     // Package.json approach failed
   }
 
+  return null;
+}
+
+/**
+ * Attempts to find and read TypeScript definitions from common locations
+ */
+async function findAndReadTypeScriptDefinitions(
+  packageName: string,
+): Promise<string> {
+  // Try common paths first
+  const commonPathContent = await tryCommonDefinitionPaths(packageName);
+  if (commonPathContent) {
+    return commonPathContent;
+  }
+
+  // If no standard paths work, try package.json fallback
+  const packageJsonContent = await tryPackageJsonTypesField(packageName);
+  if (packageJsonContent) {
+    return packageJsonContent;
+  }
+
   throw new Error(
     `No TypeScript definitions found for package '${packageName}' in any common location`,
   );
 }
 
 /**
- * Parses component information from TypeScript definitions content
+ * First pass: Find all component interfaces from TypeScript definitions
  */
-function parseComponentsFromDefinitions(
-  content: string,
-  packageName?: string,
-): Map<string, PackageComponentInfo> {
-  const components = new Map<string, PackageComponentInfo>();
-
-  // Dynamically discover components from TypeScript definitions
-  // Look for interface declarations that likely represent component props
+function findComponentInterfaces(content: string): Map<string, string> {
   const interfaceRegex =
     /interface\s+(\w+Props\$?\d*)\s+extends[^{]*{([^}]*)}/gs;
-  const tagNameRegex = /(?:const\s+)?tagName\$?\w*\s*=\s*["']([^"']+)["']/g;
-  const declarationRegex = /declare\s+class\s+(\w+)\s+extends[^{]*{/g;
-
-  // First pass: Find all component interfaces
   const interfaceMatches = [...content.matchAll(interfaceRegex)];
   const componentInterfaces = new Map<string, string>();
 
@@ -270,7 +423,14 @@ function parseComponentsFromDefinitions(
     }
   }
 
-  // Second pass: Find tag names (e.g., "s-button", "s-link")
+  return componentInterfaces;
+}
+
+/**
+ * Second pass: Find tag names from TypeScript definitions
+ */
+function findTagNames(content: string): Map<string, string> {
+  const tagNameRegex = /(?:const\s+)?tagName\$?\w*\s*=\s*["']([^"']+)["']/g;
   const tagNameMatches = [...content.matchAll(tagNameRegex)];
   const tagNameMap = new Map<string, string>();
 
@@ -285,7 +445,14 @@ function parseComponentsFromDefinitions(
     tagNameMap.set(componentName, tagName);
   }
 
-  // Third pass: Find declared classes to validate component names
+  return tagNameMap;
+}
+
+/**
+ * Third pass: Find declared classes to validate component names
+ */
+function findValidComponents(content: string): Set<string> {
+  const declarationRegex = /declare\s+class\s+(\w+)\s+extends[^{]*{/g;
   const classMatches = [...content.matchAll(declarationRegex)];
   const validComponents = new Set<string>();
 
@@ -294,7 +461,21 @@ function parseComponentsFromDefinitions(
     validComponents.add(className);
   }
 
-  // Combine the information to build component mappings
+  return validComponents;
+}
+
+/**
+ * Combines component information to build final component mappings
+ */
+function buildComponentMappings(
+  componentInterfaces: Map<string, string>,
+  tagNameMap: Map<string, string>,
+  validComponents: Set<string>,
+  content: string,
+  packageName?: string,
+): Map<string, PackageComponentInfo> {
+  const components = new Map<string, PackageComponentInfo>();
+
   for (const [componentName, interfaceName] of componentInterfaces) {
     // Only include if we have a valid component class
     if (validComponents.has(componentName)) {
@@ -310,6 +491,34 @@ function parseComponentsFromDefinitions(
       });
     }
   }
+
+  return components;
+}
+
+/**
+ * Parses component information from TypeScript definitions content
+ */
+function parseComponentsFromDefinitions(
+  content: string,
+  packageName?: string,
+): Map<string, PackageComponentInfo> {
+  // First pass: Find all component interfaces
+  const componentInterfaces = findComponentInterfaces(content);
+
+  // Second pass: Find tag names (e.g., "s-button", "s-link")
+  const tagNameMap = findTagNames(content);
+
+  // Third pass: Find declared classes to validate component names
+  const validComponents = findValidComponents(content);
+
+  // Combine the information to build component mappings
+  const components = buildComponentMappings(
+    componentInterfaces,
+    tagNameMap,
+    validComponents,
+    content,
+    packageName,
+  );
 
   // If no components found dynamically, try a fallback approach
   if (components.size === 0) {
@@ -424,16 +633,10 @@ function inferPrefixFromPackageName(packageName?: string): string {
 }
 
 /**
- * Extracts props from a TypeScript interface definition
+ * Gets common props that all components inherit
  */
-function extractPropsFromInterface(
-  content: string,
-  interfaceName: string,
-): Set<string> {
-  const props = new Set<string>();
-
-  // Common props that all components inherit
-  const commonProps = [
+function getCommonProps(): string[] {
+  return [
     "id",
     "children",
     "className",
@@ -469,8 +672,16 @@ function extractPropsFromInterface(
     "borderRadius",
     "overflow",
   ];
+}
 
-  commonProps.forEach((prop) => props.add(prop));
+/**
+ * Extracts props directly from interface definition body
+ */
+function extractInterfaceProps(
+  content: string,
+  interfaceName: string,
+): Set<string> {
+  const props = new Set<string>();
 
   // Find the interface definition - handle multiline interfaces
   const interfaceRegex = new RegExp(
@@ -502,13 +713,19 @@ function extractPropsFromInterface(
     }
   }
 
-  // Add common clickable props if this is a clickable component
+  return props;
+}
+
+/**
+ * Gets clickable component props if the interface represents a clickable component
+ */
+function getClickableProps(interfaceName: string): string[] {
   if (
     interfaceName.includes("Button") ||
     interfaceName.includes("Link") ||
     interfaceName.includes("Clickable")
   ) {
-    const clickableProps = [
+    return [
       "href",
       "target",
       "download",
@@ -525,16 +742,20 @@ function extractPropsFromInterface(
       "icon",
       "accessibilityLabel",
     ];
-    clickableProps.forEach((prop) => props.add(prop));
   }
+  return [];
+}
 
-  // Add common field props if this is a form field
+/**
+ * Gets form field props if the interface represents a form field
+ */
+function getFieldProps(interfaceName: string): string[] {
   if (
     interfaceName.includes("Field") ||
     interfaceName.includes("Input") ||
     interfaceName.includes("TextArea")
   ) {
-    const fieldProps = [
+    return [
       "name",
       "value",
       "defaultValue",
@@ -560,17 +781,21 @@ function extractPropsFromInterface(
       "icon",
       "accessory",
     ];
-    fieldProps.forEach((prop) => props.add(prop));
   }
+  return [];
+}
 
-  // Add common display props for components that can have visual variants
+/**
+ * Gets display props if the interface represents a component with visual variants
+ */
+function getDisplayProps(interfaceName: string): string[] {
   if (
     interfaceName.includes("Badge") ||
     interfaceName.includes("Banner") ||
     interfaceName.includes("Button") ||
     interfaceName.includes("Text")
   ) {
-    const displayProps = [
+    return [
       "variant",
       "size",
       "tone",
@@ -581,8 +806,30 @@ function extractPropsFromInterface(
       "align",
       "decoration",
     ];
-    displayProps.forEach((prop) => props.add(prop));
   }
+  return [];
+}
+
+/**
+ * Extracts props from a TypeScript interface definition
+ */
+function extractPropsFromInterface(
+  content: string,
+  interfaceName: string,
+): Set<string> {
+  const props = new Set<string>();
+
+  // Add common props that all components inherit
+  getCommonProps().forEach((prop) => props.add(prop));
+
+  // Extract props directly from interface definition
+  const interfaceProps = extractInterfaceProps(content, interfaceName);
+  interfaceProps.forEach((prop) => props.add(prop));
+
+  // Add component-type-specific props
+  getClickableProps(interfaceName).forEach((prop) => props.add(prop));
+  getFieldProps(interfaceName).forEach((prop) => props.add(prop));
+  getDisplayProps(interfaceName).forEach((prop) => props.add(prop));
 
   return props;
 }
@@ -763,4 +1010,63 @@ export async function isComponentSupported(
  */
 export function clearPackageCache(): void {
   packageCache.clear();
+}
+
+// ============================================================================
+// Validation Result Formatting
+// ============================================================================
+
+/**
+ * Formats validation results into a readable response
+ */
+export function formatValidationResults(
+  results: ValidationResponse[],
+  itemName: string = "Code Blocks",
+): string {
+  const hasFailures = results.some(
+    (result) => result.result === ValidationResult.FAILED,
+  );
+
+  let responseText = `## Validation Summary\n\n`;
+  responseText += `**Overall Status:** ${!hasFailures ? "✅ VALID" : "❌ INVALID"}\n`;
+  responseText += `**Total ${itemName}:** ${results.length}\n\n`;
+
+  responseText += `## Detailed Results\n\n`;
+  results.forEach((check, index) => {
+    const statusIcon = check.result === ValidationResult.SUCCESS ? "✅" : "❌";
+    responseText += `### ${itemName.slice(0, -1)} ${index + 1}\n`;
+    responseText += `**Status:** ${statusIcon} ${check.result.toUpperCase()}\n`;
+    responseText += `**Details:** ${check.resultDetail}\n\n`;
+  });
+
+  return responseText;
+}
+
+/**
+ * Validates inputs and formats results in a single function call
+ * This is the main entry point for external tools
+ */
+export async function validateTypescriptWithFormatting(
+  codeBlocks: unknown,
+  packageName: unknown,
+  itemName: string = "Code Blocks",
+): Promise<{
+  validationResults: ValidationResponse[];
+  formattedResponse: string;
+  isValid: boolean;
+}> {
+  const validationResults = await validateTypescript(codeBlocks, packageName);
+  const formattedResponse = formatValidationResults(
+    validationResults,
+    itemName,
+  );
+  const isValid = validationResults.every(
+    (result) => result.result === ValidationResult.SUCCESS,
+  );
+
+  return {
+    validationResults,
+    formattedResponse,
+    isValid,
+  };
 }
