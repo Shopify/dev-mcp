@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ValidationResponse, ValidationResult } from "../types.js";
-import { validateTypeScriptCodeBlocks } from "./typescript.js";
+import { validateTypeScriptCodeBlock } from "./typescript.js";
 
 // Helper function to check if validation response is successful
 function isValidationSuccessful(response: ValidationResponse): boolean {
@@ -12,11 +12,25 @@ async function validateTypescript(
   codeBlocks: string[],
   packageName: string,
 ): Promise<ValidationResponse[]> {
-  const result = validateTypeScriptCodeBlocks({
-    codeblocks: codeBlocks,
-    packageName: packageName,
+  // Handle empty array case like the tool would
+  if (codeBlocks.length === 0) {
+    return [
+      {
+        result: ValidationResult.FAILED,
+        resultDetail: "No code blocks provided for validation",
+      },
+    ];
+  }
+
+  // Validate each code block individually (like the tool does)
+  const results = codeBlocks.map((code) => {
+    return validateTypeScriptCodeBlock({
+      code,
+      packageName,
+    });
   });
-  return [result];
+
+  return results;
 }
 
 describe("validateTypescript", () => {
@@ -87,9 +101,11 @@ describe("validateTypescript", () => {
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );
+      expect(validationResults).toHaveLength(2);
       expect(isValidationSuccessful(validationResults[0])).toBe(true);
-      expect(validationResults).toHaveLength(1);
+      expect(isValidationSuccessful(validationResults[1])).toBe(true);
       expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+      expect(validationResults[1].result).toBe(ValidationResult.SUCCESS);
     });
 
     it("should validate multiple codeblocks with s- components", async () => {
@@ -102,9 +118,13 @@ describe("validateTypescript", () => {
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );
+      expect(validationResults).toHaveLength(3);
       expect(isValidationSuccessful(validationResults[0])).toBe(true);
-      expect(validationResults).toHaveLength(1);
+      expect(isValidationSuccessful(validationResults[1])).toBe(true);
+      expect(isValidationSuccessful(validationResults[2])).toBe(true);
       expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+      expect(validationResults[1].result).toBe(ValidationResult.SUCCESS);
+      expect(validationResults[2].result).toBe(ValidationResult.SUCCESS);
     });
 
     it("should validate all codeblocks with s- components", async () => {
@@ -116,9 +136,11 @@ describe("validateTypescript", () => {
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );
+      expect(validationResults).toHaveLength(2);
       expect(isValidationSuccessful(validationResults[0])).toBe(true);
-      expect(validationResults).toHaveLength(1);
+      expect(isValidationSuccessful(validationResults[1])).toBe(true);
       expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+      expect(validationResults[1].result).toBe(ValidationResult.SUCCESS);
     });
   });
 
