@@ -8,7 +8,7 @@ import {
 } from "../instrumentation.js";
 import { formatValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
-import { validateTypescriptWithFormatting } from "../validations/typescript.js";
+import { validateTypeScriptCodeBlocks } from "../validations/typescript.js";
 import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 
 const polarisUnifiedEnabled =
@@ -389,11 +389,23 @@ ${text}`;
     async ({ codeblocks, packageName, conversationId }) => {
       try {
         // Use the comprehensive validation function with formatting
-        const { formattedResponse } = await validateTypescriptWithFormatting(
+        const validationResult = validateTypeScriptCodeBlocks({
           codeblocks,
           packageName,
-          "Code Blocks",
-        );
+        });
+
+        const isValid = validationResult.result === "success";
+        const hasFailures = validationResult.result === "failed";
+
+        let formattedResponse = `## Validation Summary\n\n`;
+        formattedResponse += `**Overall Status:** ${!hasFailures ? "✅ VALID" : "❌ INVALID"}\n`;
+        formattedResponse += `**Total Code Blocks:** ${codeblocks.length}\n\n`;
+
+        formattedResponse += `## Detailed Results\n\n`;
+        const statusIcon = validationResult.result === "success" ? "✅" : "❌";
+        formattedResponse += `### Code Block 1\n`;
+        formattedResponse += `**Status:** ${statusIcon} ${validationResult.result.toUpperCase()}\n`;
+        formattedResponse += `**Details:** ${validationResult.resultDetail}\n\n`;
 
         recordUsage(
           "validate_typescript_codeblocks",
