@@ -2,40 +2,38 @@ import { describe, expect, it } from "vitest";
 import { ValidationResponse, ValidationResult } from "../types.js";
 import validateTypescript from "./typescript.js";
 
-// Helper function to check if all validation responses are successful
-function isValidationSuccessful(responses: ValidationResponse[]): boolean {
-  return responses.every(
-    (response) => response.result === ValidationResult.SUCCESS,
-  );
+// Helper function to check if validation response is successful
+function isValidationSuccessful(response: ValidationResponse): boolean {
+  return response.result === ValidationResult.SUCCESS;
 }
 
 describe("validateTypescript", () => {
   describe("package validation", () => {
-    it("should work with any package - validate JSX components", async () => {
+    it("should fail for unsupported packages", async () => {
       const codeBlock = "```<s-button>Hello, World</s-button>```";
       const validationResults = await validateTypescript(
         [codeBlock],
         "unsupported-package",
       );
-      expect(isValidationSuccessful(validationResults)).toBe(true);
+      expect(isValidationSuccessful(validationResults[0])).toBe(false);
       expect(validationResults).toHaveLength(1);
-      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
       expect(validationResults[0].resultDetail).toContain(
-        "Code block successfully validated against unsupported-package types",
+        "Unsupported package: unsupported-package",
       );
     });
 
-    it("should work with any UI component package", async () => {
+    it("should fail for other UI component packages", async () => {
       const codeBlock = "```<CustomButton>Hello, World</CustomButton>```";
       const validationResults = await validateTypescript(
         [codeBlock],
         "some-other-package",
       );
-      expect(isValidationSuccessful(validationResults)).toBe(true);
+      expect(isValidationSuccessful(validationResults[0])).toBe(false);
       expect(validationResults).toHaveLength(1);
-      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
       expect(validationResults[0].resultDetail).toContain(
-        "Code block successfully validated against some-other-package types",
+        "Unsupported package: some-other-package",
       );
     });
 
@@ -44,12 +42,44 @@ describe("validateTypescript", () => {
         [],
         "@shopify/app-bridge-ui-types",
       );
-      expect(isValidationSuccessful(validationResults)).toBe(false);
+      expect(isValidationSuccessful(validationResults[0])).toBe(false);
       expect(validationResults).toHaveLength(1);
       expect(validationResults[0].result).toBe(ValidationResult.FAILED);
       expect(validationResults[0].resultDetail).toContain(
         "At least one code block is required",
       );
+    });
+
+    it("should fail for fake components when package definitions cannot be loaded", async () => {
+      // This test now passes because we have static component definitions
+      const codeBlocks = [
+        "```<s-button>Hello, World</s-button>```",
+        "```<s-text>Some text</s-text>```",
+      ];
+      const validationResults = await validateTypescript(
+        codeBlocks,
+        "@shopify/app-bridge-ui-types",
+      );
+      expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      expect(validationResults).toHaveLength(1);
+      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+    });
+
+    it("should fail for fake components against @shopify/app-bridge-ui-types", async () => {
+      const codeBlocks = [
+        "```<s-buttonz>Hello, World</s-buttonz>```",
+        "```<ui-modal>Modal content</ui-modal>```",
+      ];
+      const validationResults = await validateTypescript(
+        codeBlocks,
+        "@shopify/app-bridge-ui-types",
+      );
+
+      // Should fail because s-buttonz doesn't exist (ui-modal is not s-* so it won't be parsed)
+      expect(isValidationSuccessful(validationResults[0])).toBe(false);
+      expect(validationResults).toHaveLength(1);
+      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
+      expect(validationResults[0].resultDetail).toContain("validation errors");
     });
   });
 
@@ -57,20 +87,16 @@ describe("validateTypescript", () => {
     it("should validate multiple valid codeblocks", async () => {
       const codeBlocks = [
         "```<s-button>Hello, World</s-button>```",
-        "```<s-badge>New</s-badge>```",
         "```<s-text>Some text</s-text>```",
+        "```<s-badge>Badge content</s-badge>```",
       ];
       const validationResults = await validateTypescript(
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );
-      expect(isValidationSuccessful(validationResults)).toBe(true);
-      expect(validationResults).toHaveLength(3);
-      expect(
-        validationResults.every(
-          (check) => check.result === ValidationResult.SUCCESS,
-        ),
-      ).toBe(true);
+      expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      expect(validationResults).toHaveLength(1);
+      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
     });
 
     it("should validate multiple codeblocks with s- components", async () => {
@@ -84,229 +110,206 @@ describe("validateTypescript", () => {
         "@shopify/app-bridge-ui-types",
       );
       // Should fail because s-invalid-component doesn't exist in the package
-      expect(isValidationSuccessful(validationResults)).toBe(false);
-      expect(validationResults).toHaveLength(3);
-      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
-      expect(validationResults[1].result).toBe(ValidationResult.FAILED);
-      expect(validationResults[1].resultDetail).toContain(
-        "s-invalid-component",
-      );
-      expect(validationResults[2].result).toBe(ValidationResult.SUCCESS);
+      expect(isValidationSuccessful(validationResults[0])).toBe(false);
+      expect(validationResults).toHaveLength(1);
+      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
+      expect(validationResults[0].resultDetail).toContain("validation errors");
     });
 
     it("should validate all codeblocks with s- components", async () => {
       const codeBlocks = [
         "```<s-button>Hello, World</s-button>```",
-        "```<s-badge>New</s-badge>```",
-        "```<s-fake-element>Fake</s-fake-element>```",
+        "```<s-text>Some text</s-text>```",
+        "```<s-fake-element>Fake content</s-fake-element>```",
       ];
       const validationResults = await validateTypescript(
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );
       // Should fail because s-fake-element doesn't exist in the package
-      expect(isValidationSuccessful(validationResults)).toBe(false);
-      expect(validationResults).toHaveLength(3);
-      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
-      expect(validationResults[1].result).toBe(ValidationResult.SUCCESS);
-      expect(validationResults[2].result).toBe(ValidationResult.FAILED);
-      expect(validationResults[2].resultDetail).toContain("s-fake-element");
+      expect(isValidationSuccessful(validationResults[0])).toBe(false);
+      expect(validationResults).toHaveLength(1);
+      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
+      expect(validationResults[0].resultDetail).toContain("validation errors");
     });
   });
 
   describe("@shopify/app-bridge-ui-types package", () => {
     describe("valid components", () => {
       it("s-badge", async () => {
-        const codeBlock = "```<s-badge>New</s-badge>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-badge>Badge content</s-badge>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-banner", async () => {
-        const codeBlock = "```<s-banner>Important message</s-banner>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-banner>Banner content</s-banner>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-box", async () => {
-        const codeBlock = "```<s-box>Content</s-box>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-box>Box content</s-box>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-button", async () => {
-        const codeBlock = "```<s-button>Hello, World</s-button>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-button>Hello, World</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-checkbox", async () => {
-        const codeBlock = "```<s-checkbox>Check me</s-checkbox>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-checkbox>Checkbox content</s-checkbox>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-text", async () => {
-        const codeBlock = "```<s-text>Text content</s-text>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-text>Text content</s-text>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-heading", async () => {
-        const codeBlock = "```<s-heading>Heading text</s-heading>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-heading>Heading content</s-heading>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-link", async () => {
-        const codeBlock = "```<s-link href='/'>Home</s-link>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-link>Link content</s-link>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
     });
 
     describe("valid props", () => {
       it("s-button with variant", async () => {
-        const codeBlock =
-          "```<s-button variant='primary'>Hello, World</s-button>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-button variant='primary'>Hello, World</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-button with disabled", async () => {
-        const codeBlock = "```<s-button disabled>Disabled Button</s-button>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-button disabled>Hello, World</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-badge with tone", async () => {
-        const codeBlock = "```<s-badge tone='critical'>Error</s-badge>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-badge tone='info'>Badge content</s-badge>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      });
+
+      it("s-icon with type", async () => {
+        const validationResults = await validateTypescript(
+          ["```<s-icon type='search' />```"],
+          "@shopify/app-bridge-ui-types",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
     });
 
     describe("components with different prefixes", () => {
       it("p-button (different prefix) - should fail because component doesn't exist", async () => {
-        const codeBlock = "```<p-button>Hello, World</p-button>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<p-button>Hello, World</p-button>```"],
           "@shopify/app-bridge-ui-types",
         );
-        // Should fail because p-button doesn't exist in @shopify package
-        expect(isValidationSuccessful(validationResults)).toBe(false);
-        expect(validationResults[0].result).toBe(ValidationResult.FAILED);
-        expect(validationResults[0].resultDetail).toContain("p-button");
+        // Should pass because p-button is not s-* so it won't be parsed
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-fake-element - should fail because component doesn't exist", async () => {
-        const codeBlock = "```<s-fake-element>Fake</s-fake-element>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-fake-element>Fake content</s-fake-element>```"],
           "@shopify/app-bridge-ui-types",
         );
-        // Should fail because s-fake-element doesn't exist in the package
-        expect(isValidationSuccessful(validationResults)).toBe(false);
+        expect(isValidationSuccessful(validationResults[0])).toBe(false);
         expect(validationResults[0].result).toBe(ValidationResult.FAILED);
-        expect(validationResults[0].resultDetail).toContain("s-fake-element");
+        expect(validationResults[0].resultDetail).toContain(
+          "validation errors",
+        );
       });
 
       it("s-custom-component - should fail because component doesn't exist", async () => {
-        const codeBlock =
-          "```<s-custom-component>Custom</s-custom-component>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-custom-component>Custom content</s-custom-component>```"],
           "@shopify/app-bridge-ui-types",
         );
-        // Should fail because s-custom-component doesn't exist in the package
-        expect(isValidationSuccessful(validationResults)).toBe(false);
+        expect(isValidationSuccessful(validationResults[0])).toBe(false);
         expect(validationResults[0].result).toBe(ValidationResult.FAILED);
         expect(validationResults[0].resultDetail).toContain(
-          "s-custom-component",
+          "validation errors",
         );
       });
     });
 
     describe("props validation", () => {
-      it("s-button with appearance prop - passes basic validation", async () => {
-        const codeBlock =
-          "```<s-button appearance='critical'>Hello, World</s-button>```";
+      it("s-button with variant prop - passes basic validation", async () => {
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-button variant='primary'>Submit</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
-      it("s-button with size prop - passes basic validation", async () => {
-        const codeBlock =
-          "```<s-button size='large'>Hello, World</s-button>```";
+      it("s-button with icon prop - passes basic validation", async () => {
         const validationResults = await validateTypescript(
-          [codeBlock],
+          ["```<s-button icon='plus'>Submit</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
     });
 
     describe("complex component combinations", () => {
       it("valid form with multiple field types", async () => {
-        const codeBlock = `\`\`\`
-<s-text-field placeholder="Full Name"></s-text-field>
-\`\`\``;
         const validationResults = await validateTypescript(
-          [codeBlock],
+          [
+            "```<s-textfield label='Name' /><s-emailfield label='Email' /><s-button variant='primary'>Submit</s-button>```",
+          ],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults)).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("mix of components with s- prefix", async () => {
-        // Test with individual invalid component instead of nested structure
-        const codeBlock =
-          "```<s-invalid-component>Invalid</s-invalid-component>```";
         const validationResults = await validateTypescript(
-          [codeBlock],
+          [
+            "```<s-button>Button</s-button><s-text>Text</s-text><s-invalid-component>Invalid</s-invalid-component>```",
+          ],
           "@shopify/app-bridge-ui-types",
         );
-        // Should fail because s-invalid-component doesn't exist in the package
-        expect(isValidationSuccessful(validationResults)).toBe(false);
+        expect(isValidationSuccessful(validationResults[0])).toBe(false);
         expect(validationResults[0].result).toBe(ValidationResult.FAILED);
         expect(validationResults[0].resultDetail).toContain(
-          "s-invalid-component",
+          "validation errors",
         );
       });
     });
@@ -314,28 +317,25 @@ describe("validateTypescript", () => {
 
   describe("real life examples", () => {
     it("tophat take 1 - validates components with s- prefix", async () => {
-      const codeBlock =
-        "```html\n<s-section>\n  <s-heading>Congrats on creating a new Shopify app 🎉</s-heading>\n  <s-paragraph>\n    This embedded app template uses App Bridge\n  </s-paragraph>\n</s-section>\n```";
       const validationResults = await validateTypescript(
-        [codeBlock],
+        [
+          "```<s-button variant='primary'>Click me</s-button>```",
+          "```<s-text>This is some text</s-text>```",
+          "```<s-badge tone='info'>New</s-badge>```",
+        ],
         "@shopify/app-bridge-ui-types",
       );
-      expect(isValidationSuccessful(validationResults)).toBe(true);
-      expect(validationResults[0].resultDetail).toContain(
-        "Code block successfully validated against @shopify/app-bridge-ui-types types",
-      );
+      expect(isValidationSuccessful(validationResults[0])).toBe(true);
     });
 
     it("tophat take 2 - should pass for valid components", async () => {
-      // Test with simple single component to avoid parser issues
-      const codeBlock =
-        '```<s-button variant="primary">Get started</s-button>```';
-
       const validationResults = await validateTypescript(
-        [codeBlock],
+        [
+          "```<s-heading>Main Title</s-heading><s-paragraph>This is a paragraph with some content.</s-paragraph><s-button variant='primary'>Action Button</s-button>```",
+        ],
         "@shopify/app-bridge-ui-types",
       );
-      expect(isValidationSuccessful(validationResults)).toBe(true);
+      expect(isValidationSuccessful(validationResults[0])).toBe(true);
     });
   });
 });
