@@ -1,12 +1,233 @@
 import { z } from "zod";
-import {
-  ComponentDefinition,
-  getPolarisComponents,
-} from "../data/typescriptSchemas/appHome.js";
+import * as AppHomeSchemas from "../data/typescriptSchemas/appHome.js";
 import { ValidationResponse, ValidationResult } from "../types.js";
 
 // ============================================================================
-// Input Validation Schemas
+// Package to Schema Module Mapping
+// ============================================================================
+
+/**
+ * Maps package names to their corresponding schema modules
+ */
+const PACKAGE_SCHEMA_MAP = {
+  "@shopify/app-bridge-ui-types": AppHomeSchemas,
+} as const;
+
+type SupportedPackage = keyof typeof PACKAGE_SCHEMA_MAP;
+
+// ============================================================================
+// Component Tag Name to Schema Mapping
+// ============================================================================
+
+/**
+ * Maps component tag names (e.g., 's-button') to their corresponding schema names
+ * This mapping assumes the pattern: s-{component} -> {Component}Schema
+ */
+function getSchemaNameFromTagName(tagName: string): string | null {
+  if (!tagName.startsWith("s-")) {
+    return null;
+  }
+
+  // Convert s-button -> Button, s-date-picker -> DatePicker
+  const componentName = tagName
+    .slice(2) // Remove 's-' prefix
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+
+  return `${componentName}Schema`;
+}
+
+/**
+ * Gets the zod schema for a component tag name from a package
+ */
+function getComponentSchema(
+  tagName: string,
+  packageName: string,
+): z.ZodSchema | null {
+  if (!isSupportedPackage(packageName)) {
+    return null;
+  }
+
+  const schemaName = getSchemaNameFromTagName(tagName);
+  if (!schemaName) {
+    return null;
+  }
+
+  const schemaModule = PACKAGE_SCHEMA_MAP[packageName];
+  const schema = (schemaModule as any)[schemaName];
+
+  return schema instanceof z.ZodSchema ? schema : null;
+}
+
+/**
+ * Checks if a package is supported for validation
+ */
+function isSupportedPackage(
+  packageName: string,
+): packageName is SupportedPackage {
+  return packageName in PACKAGE_SCHEMA_MAP;
+}
+
+/**
+ * Gets list of supported package names
+ */
+function getSupportedPackages(): string[] {
+  return Object.keys(PACKAGE_SCHEMA_MAP);
+}
+
+/**
+ * Gets all available component schemas for a package
+ */
+function getAvailableComponents(packageName: string): string[] {
+  if (!isSupportedPackage(packageName)) {
+    return [];
+  }
+
+  const schemaModule = PACKAGE_SCHEMA_MAP[packageName];
+  const components: string[] = [];
+
+  // Whitelist of actual UI component schemas (not data/type schemas)
+  const UI_COMPONENT_SCHEMAS = new Set([
+    "BadgeSchema",
+    "BannerSchema",
+    "BoxSchema",
+    "ButtonSchema",
+    "CheckboxSchema",
+    "ChoiceListSchema",
+    "ClickableSchema",
+    "DatePickerSchema",
+    "DividerSchema",
+    "EmailFieldSchema",
+    "GridSchema",
+    "GridItemSchema",
+    "HeaderSchema",
+    "HeadingSchema",
+    "IconSchema",
+    "ImageSchema",
+    "LinkSchema",
+    "MoneyFieldSchema",
+    "NumberFieldSchema",
+    "ParagraphSchema",
+    "PasswordFieldSchema",
+    "SearchFieldSchema",
+    "SectionSchema",
+    "SelectSchema",
+    "SpinnerSchema",
+    "StackSchema",
+    "SwitchSchema",
+    "TableSchema",
+    "TableHeaderSchema",
+    "TableHeaderRowSchema",
+    "TextSchema",
+    "TextAreaSchema",
+    "TextFieldSchema",
+    "URLFieldSchema",
+  ]);
+
+  // Find actual UI component schemas and convert to tag names
+  for (const [exportName, exportValue] of Object.entries(schemaModule)) {
+    if (
+      UI_COMPONENT_SCHEMAS.has(exportName) &&
+      exportValue instanceof z.ZodSchema
+    ) {
+      // Convert ButtonSchema -> s-button
+      const componentName = exportName.slice(0, -6); // Remove 'Schema' suffix
+      const tagName = `s-${componentName
+        .replace(/([A-Z])/g, "-$1")
+        .toLowerCase()
+        .slice(1)}`; // Convert camelCase to kebab-case and add s- prefix
+
+      components.push(tagName);
+    }
+  }
+
+  return components.sort();
+}
+
+/**
+ * Validates component properties against its schema
+ */
+function validateComponentProps(
+  tagName: string,
+  props: Record<string, any>,
+  packageName: string,
+): {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+} {
+  const schema = getComponentSchema(tagName, packageName);
+
+  if (!schema) {
+    return {
+      isValid: false,
+      errors: [`Unknown component: ${tagName} for package ${packageName}`],
+      warnings: [],
+    };
+  }
+
+  try {
+    schema.parse(props);
+    return {
+      isValid: true,
+      errors: [],
+      warnings: [],
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const errors = error.errors.map((err) => {
+        const path = err.path.length > 0 ? err.path.join(".") : "root";
+        return `Property '${path}': ${err.message}`;
+      });
+
+      return {
+        isValid: false,
+        errors,
+        warnings: [],
+      };
+    }
+
+    return {
+      isValid: false,
+      errors: [
+        `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
+      ],
+      warnings: [],
+    };
+  }
+}
+
+/**
+ * Gets statistics about available components and schemas
+ */
+function getValidationStats(packageName?: string): {
+  supportedPackages: string[];
+  packageStats?: {
+    packageName: string;
+    totalComponents: number;
+    availableComponents: string[];
+  };
+} {
+  const supportedPackages = getSupportedPackages();
+
+  if (packageName && isSupportedPackage(packageName)) {
+    const availableComponents = getAvailableComponents(packageName);
+    return {
+      supportedPackages,
+      packageStats: {
+        packageName,
+        totalComponents: availableComponents.length,
+        availableComponents,
+      },
+    };
+  }
+
+  return { supportedPackages };
+}
+
+// ============================================================================
+// Interfaces
 // ============================================================================
 
 const TypeScriptValidationInputSchema = z.object({
@@ -24,15 +245,9 @@ const TypeScriptValidationInputSchema = z.object({
     ),
 });
 
-const CodeBlockSchema = z.string().min(1, "Code block cannot be empty");
-
 type TypeScriptValidationInput = z.infer<
   typeof TypeScriptValidationInputSchema
 >;
-
-// ============================================================================
-// Component Information Types
-// ============================================================================
 
 interface ComponentInfo {
   tagName: string;
@@ -51,6 +266,7 @@ interface CodeBlockValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
+  componentsFound: string[];
 }
 
 // ============================================================================
@@ -77,11 +293,12 @@ export function validateTypeScriptCodeBlocks(
 
     const { codeblocks, packageName } = validationResult.data;
 
-    // For now, only support @shopify/app-bridge-ui-types
-    if (packageName !== "@shopify/app-bridge-ui-types") {
+    // Check if package is supported
+    if (!isSupportedPackage(packageName)) {
+      const supportedPackages = getValidationStats().supportedPackages;
       return {
         result: ValidationResult.FAILED,
-        resultDetail: `Unsupported package: ${packageName}. Only @shopify/app-bridge-ui-types is currently supported.`,
+        resultDetail: `Unsupported package: ${packageName}. Supported packages are: ${supportedPackages.join(", ")}`,
       };
     }
 
@@ -91,7 +308,7 @@ export function validateTypeScriptCodeBlocks(
 
     for (let i = 0; i < codeblocks.length; i++) {
       const codeblock = codeblocks[i];
-      const blockResult = validateCodeBlock(codeblock, i);
+      const blockResult = validateCodeBlock(codeblock, i, packageName);
       results.push(blockResult);
       if (!blockResult.isValid) {
         allValid = false;
@@ -104,7 +321,7 @@ export function validateTypeScriptCodeBlocks(
         result: ValidationResult.SUCCESS,
         resultDetail: `Code block${
           codeblocks.length > 1 ? "s" : ""
-        } successfully validated against ${packageName} types.`,
+        } successfully validated against ${packageName} schemas.`,
       };
     }
 
@@ -132,6 +349,7 @@ export function validateTypeScriptCodeBlocks(
 function validateCodeBlock(
   codeblock: string,
   index: number,
+  packageName: string,
 ): CodeBlockValidationResult {
   try {
     // Parse the code block to extract components
@@ -140,9 +358,11 @@ function validateCodeBlock(
     // Validate each component
     const errors: string[] = [];
     const warnings: string[] = [];
+    const componentsFound: string[] = [];
 
     for (const component of components) {
-      const componentResult = validateComponent(component);
+      componentsFound.push(component.tagName);
+      const componentResult = validateComponent(component, packageName);
       errors.push(...componentResult.errors);
       warnings.push(...componentResult.warnings);
     }
@@ -152,6 +372,7 @@ function validateCodeBlock(
       isValid: errors.length === 0,
       errors,
       warnings,
+      componentsFound,
     };
   } catch (error) {
     return {
@@ -161,6 +382,7 @@ function validateCodeBlock(
         `Failed to parse code block: ${error instanceof Error ? error.message : String(error)}`,
       ],
       warnings: [],
+      componentsFound: [],
     };
   }
 }
@@ -170,33 +392,34 @@ function validateCodeBlock(
 // ============================================================================
 
 /**
- * Validates a single component against the package definitions
+ * Validates a single component against the package schemas
  */
 function validateComponent(
   component: ComponentInfo,
+  packageName: string,
 ): ComponentValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Get component definitions
-  const componentMap = getPolarisComponents();
-  const componentDef = componentMap.get(component.tagName);
-
-  if (!componentDef) {
-    errors.push(`Unknown component: ${component.tagName}`);
+  // Check if component exists in the package
+  const schema = getComponentSchema(component.tagName, packageName);
+  if (!schema) {
+    const availableComponents = getAvailableComponents(packageName);
+    errors.push(
+      `Unknown component: ${component.tagName}. Available components for ${packageName}: ${availableComponents.join(", ")}`,
+    );
     return { isValid: false, errors, warnings };
   }
 
-  // Validate props
-  for (const [propName, propValue] of Object.entries(component.props)) {
-    if (!componentDef.props.has(propName)) {
-      errors.push(
-        `Invalid prop '${propName}' for component '${component.tagName}'. Valid props are: ${Array.from(
-          componentDef.props,
-        ).join(", ")}`,
-      );
-    }
-  }
+  // Validate component properties using zod schema
+  const validationResult = validateComponentProps(
+    component.tagName,
+    component.props,
+    packageName,
+  );
+
+  errors.push(...validationResult.errors);
+  warnings.push(...validationResult.warnings);
 
   return {
     isValid: errors.length === 0,
@@ -256,37 +479,24 @@ function parseAttributes(attributeString: string): Record<string, any> {
   while ((match = attributeRegex.exec(attributeString)) !== null) {
     const name = match[1];
     const value = match[2] || match[3] || match[4] || true;
-    props[name] = value;
+
+    // Convert string values to appropriate types
+    let parsedValue: any = value;
+    if (typeof value === "string") {
+      // Try to parse as boolean
+      if (value === "true") parsedValue = true;
+      else if (value === "false") parsedValue = false;
+      // Try to parse as number
+      else if (/^\d+$/.test(value)) parsedValue = parseInt(value, 10);
+      else if (/^\d*\.\d+$/.test(value)) parsedValue = parseFloat(value);
+      // Keep as string otherwise
+      else parsedValue = value;
+    }
+
+    props[name] = parsedValue;
   }
 
   return props;
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Gets available component names for the supported package
- */
-function getAvailableComponents(): string[] {
-  const componentMap = getPolarisComponents();
-  return Array.from(componentMap.keys());
-}
-
-/**
- * Gets detailed information about a specific component
- */
-function getComponentInfo(tagName: string): ComponentDefinition | undefined {
-  const componentMap = getPolarisComponents();
-  return componentMap.get(tagName);
-}
-
-/**
- * Validates that a package is supported
- */
-function isSupportedPackage(packageName: string): boolean {
-  return packageName === "@shopify/app-bridge-ui-types";
 }
 
 // ============================================================================
@@ -296,18 +506,15 @@ function isSupportedPackage(packageName: string): boolean {
 /**
  * Gets validation statistics for debugging
  */
-export function getValidationStats(): {
+export function getComponentValidationStats(packageName?: string): {
   supportedPackages: string[];
-  availableComponents: string[];
-  totalComponents: number;
-} {
-  const components = getAvailableComponents();
-
-  return {
-    supportedPackages: ["@shopify/app-bridge-ui-types"],
-    availableComponents: components,
-    totalComponents: components.length,
+  packageStats?: {
+    packageName: string;
+    totalComponents: number;
+    availableComponents: string[];
   };
+} {
+  return getValidationStats(packageName);
 }
 
 // ============================================================================
@@ -351,166 +558,3 @@ export function formatValidationWarnings(
 
   return formattedWarnings;
 }
-
-// ============================================================================
-// Type Guards
-// ============================================================================
-
-/**
- * Type guard to check if a value is a valid component definition
- */
-function isValidComponentDefinition(
-  value: unknown,
-): value is ComponentDefinition {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "name" in value &&
-    "tagName" in value &&
-    "props" in value &&
-    typeof (value as any).name === "string" &&
-    typeof (value as any).tagName === "string" &&
-    (value as any).props instanceof Set
-  );
-}
-
-/**
- * Type guard to check if a value is a valid component info
- */
-function isValidComponentInfo(value: unknown): value is ComponentInfo {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "tagName" in value &&
-    "props" in value &&
-    "content" in value &&
-    typeof (value as any).tagName === "string" &&
-    typeof (value as any).props === "object" &&
-    typeof (value as any).content === "string"
-  );
-}
-
-// ============================================================================
-// Debug Utilities
-// ============================================================================
-
-/**
- * Debug function to log component parsing details
- */
-export function debugComponentParsing(codeblock: string): void {
-  console.log("=== Debug Component Parsing ===");
-  console.log("Original code block:", codeblock);
-
-  const components = parseCodeBlock(codeblock);
-  console.log("Parsed components:", components);
-
-  for (const component of components) {
-    console.log(`Component: ${component.tagName}`);
-    console.log(`Props:`, component.props);
-
-    const validation = validateComponent(component);
-    console.log(`Validation result:`, validation);
-  }
-}
-
-/**
- * Debug function to inspect available components
- */
-export function debugAvailableComponents(): void {
-  console.log("=== Debug Available Components ===");
-
-  const componentMap = getPolarisComponents();
-  console.log(`Total components: ${componentMap.size}`);
-
-  for (const [tagName, definition] of componentMap) {
-    console.log(
-      `${tagName}: ${definition.name} (${definition.props.size} props)`,
-    );
-  }
-}
-
-// ============================================================================
-// Backwards Compatibility
-// ============================================================================
-
-/**
- * Legacy function for backwards compatibility
- */
-export default function validateTypescript(
-  codeBlocks: unknown,
-  packageName: unknown,
-): Promise<ValidationResponse[]> {
-  return new Promise((resolve) => {
-    try {
-      const result = validateTypeScriptCodeBlocks({
-        codeblocks: Array.isArray(codeBlocks) ? codeBlocks : [codeBlocks],
-        packageName:
-          typeof packageName === "string"
-            ? packageName
-            : "@shopify/app-bridge-ui-types",
-      });
-
-      resolve([result]);
-    } catch (error) {
-      resolve([
-        {
-          result: ValidationResult.FAILED,
-          resultDetail: `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
-        },
-      ]);
-    }
-  });
-}
-
-/**
- * Validates TypeScript code blocks with formatting
- */
-export async function validateTypescriptWithFormatting(
-  codeBlocks: unknown,
-  packageName: unknown,
-  itemName: string = "Code Blocks",
-): Promise<{
-  validationResults: ValidationResponse[];
-  formattedResponse: string;
-  isValid: boolean;
-}> {
-  const validationResults = await validateTypescript(codeBlocks, packageName);
-  const isValid = validationResults.every(
-    (result) => result.result === ValidationResult.SUCCESS,
-  );
-
-  // Format the response
-  const hasFailures = validationResults.some(
-    (result) => result.result === ValidationResult.FAILED,
-  );
-
-  let formattedResponse = `## Validation Summary\n\n`;
-  formattedResponse += `**Overall Status:** ${!hasFailures ? "✅ VALID" : "❌ INVALID"}\n`;
-  formattedResponse += `**Total ${itemName}:** ${validationResults.length}\n\n`;
-
-  formattedResponse += `## Detailed Results\n\n`;
-  validationResults.forEach((check, index) => {
-    const statusIcon = check.result === ValidationResult.SUCCESS ? "✅" : "❌";
-    formattedResponse += `### ${itemName.slice(0, -1)} ${index + 1}\n`;
-    formattedResponse += `**Status:** ${statusIcon} ${check.result.toUpperCase()}\n`;
-    formattedResponse += `**Details:** ${check.resultDetail}\n\n`;
-  });
-
-  return {
-    validationResults,
-    formattedResponse,
-    isValid,
-  };
-}
-
-/**
- * Export validation functions for use in other modules
- */
-export {
-  getAvailableComponents,
-  getComponentInfo,
-  isSupportedPackage,
-  parseAttributes,
-  parseCodeBlock,
-  validateComponent,
-};

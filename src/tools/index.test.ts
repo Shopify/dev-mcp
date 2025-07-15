@@ -95,8 +95,7 @@ vi.mock("../validations/graphqlSchema.js", () => ({
 
 // Mock validateTypescript
 vi.mock("../validations/typescript.js", () => ({
-  default: vi.fn(),
-  validateTypescriptWithFormatting: vi.fn(),
+  validateTypeScriptCodeBlocks: vi.fn(),
 }));
 
 vi.mock("../../package.json", () => ({
@@ -750,16 +749,14 @@ describe("validate_graphql_codeblocks tool", () => {
 
 describe("validate_typescript_codeblocks tool", () => {
   let mockServer: any;
-  let validateTypescriptWithFormattingMock: any;
+  let validateTypeScriptCodeBlocksMock: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const { validateTypescriptWithFormatting } = await import(
+    const { validateTypeScriptCodeBlocks } = await import(
       "../validations/typescript.js"
     );
-    validateTypescriptWithFormattingMock = vi.mocked(
-      validateTypescriptWithFormatting,
-    );
+    validateTypeScriptCodeBlocksMock = vi.mocked(validateTypeScriptCodeBlocks);
 
     // Create a mock server that captures the registered tools
     mockServer = {
@@ -780,99 +777,120 @@ describe("validate_typescript_codeblocks tool", () => {
   });
 
   test("calls validateTypescriptWithFormatting with correct parameters", async () => {
-    // Setup mock response
-    validateTypescriptWithFormattingMock.mockReturnValueOnce({
-      validationResults: [
-        {
-          result: ValidationResult.SUCCESS,
-          resultDetail: "Test success message",
-        },
-      ],
-      formattedResponse:
-        "## Validation Summary\n\n**Overall Status:** ✅ VALID",
-      isValid: true,
+    // Mock the validation function to return a successful result
+    validateTypeScriptCodeBlocksMock.mockReturnValueOnce({
+      result: "success",
+      resultDetail: "All code blocks are valid",
+      validationResults: [],
     });
 
     // Register the tools
     await shopifyTools(mockServer);
 
-    const testCodeBlocks = ["```<s-button>Hello</s-button>```"];
-    const testPackageName = "@shopify/app-bridge-ui-types";
-    const testConversationId = "test-conversation-id";
-
-    // Call the handler
-    await mockServer.validateTypescriptHandler({
-      codeblocks: testCodeBlocks,
-      packageName: testPackageName,
-      conversationId: testConversationId,
+    const result = await mockServer.validateTypescriptHandler({
+      codeblocks: ["```<s-button>Test</s-button>```"],
+      packageName: "@shopify/app-bridge-ui-types",
+      conversationId: "test-conversation-123",
     });
 
-    // Verify validateTypescriptWithFormatting was called with correct parameters
-    expect(validateTypescriptWithFormattingMock).toHaveBeenCalledTimes(1);
-    expect(validateTypescriptWithFormattingMock).toHaveBeenCalledWith(
-      testCodeBlocks,
-      testPackageName,
-      "Code Blocks",
+    // Check the MCP response format
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toContain("✅ VALID");
+    expect(result.content[0].text).toContain("All code blocks are valid");
+
+    // Verify validateTypeScriptCodeBlocks was called with correct parameters
+    expect(validateTypeScriptCodeBlocksMock).toHaveBeenCalledTimes(1);
+    expect(validateTypeScriptCodeBlocksMock).toHaveBeenCalledWith({
+      codeblocks: ["```<s-button>Test</s-button>```"],
+      packageName: "@shopify/app-bridge-ui-types",
+    });
+  });
+
+  test("handles validation failures correctly", async () => {
+    validateTypeScriptCodeBlocksMock.mockReturnValueOnce({
+      result: "failed",
+      resultDetail: "Validation failed: Unknown component s-invalid",
+      validationResults: [
+        {
+          index: 0,
+          isValid: false,
+          errors: ["Unknown component: s-invalid"],
+          warnings: [],
+          componentsFound: ["s-invalid"],
+        },
+      ],
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const result = await mockServer.validateTypescriptHandler({
+      codeblocks: ["```<s-invalid>Test</s-invalid>```"],
+      packageName: "@shopify/app-bridge-ui-types",
+      conversationId: "test-conversation-123",
+    });
+
+    // Check the MCP response format
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toContain("❌ INVALID");
+    expect(result.content[0].text).toContain("Unknown component s-invalid");
+  });
+
+  test("handles multiple codeblocks", async () => {
+    validateTypeScriptCodeBlocksMock.mockReturnValueOnce({
+      result: "success",
+      resultDetail: "All code blocks validated successfully",
+      validationResults: [],
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const result = await mockServer.validateTypescriptHandler({
+      codeblocks: [
+        "```<s-button>Button</s-button>```",
+        "```<s-text>Text</s-text>```",
+      ],
+      packageName: "@shopify/app-bridge-ui-types",
+      conversationId: "test-conversation-123",
+    });
+
+    // Check the MCP response format
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toContain("✅ VALID");
+    expect(result.content[0].text).toContain(
+      "All code blocks validated successfully",
     );
   });
 
-  test("formats response correctly", async () => {
-    // Setup mock response
-    validateTypescriptWithFormattingMock.mockReturnValueOnce({
-      validationResults: [
-        {
-          result: ValidationResult.SUCCESS,
-          resultDetail: "Success message",
-        },
-        {
-          result: ValidationResult.FAILED,
-          resultDetail: "Error message",
-        },
-      ],
-      formattedResponse:
-        "## Validation Summary\n\n**Overall Status:** ❌ INVALID\n**Total Code Blocks:** 2\n\n## Detailed Results\n\n### Code Block 1\n**Status:** ✅ SUCCESS\n**Details:** Success message\n\n### Code Block 2\n**Status:** ❌ FAILED\n**Details:** Error message\n\n",
-      isValid: false,
+  test("handles errors during validation", async () => {
+    validateTypeScriptCodeBlocksMock.mockImplementation(() => {
+      throw new Error("Validation service unavailable");
     });
 
     // Register the tools
     await shopifyTools(mockServer);
 
-    // Call the handler
     const result = await mockServer.validateTypescriptHandler({
-      codeblocks: ["block1", "block2"],
+      codeblocks: ["```<s-button>Test</s-button>```"],
       packageName: "@shopify/app-bridge-ui-types",
-      conversationId: "test-conversation-id",
+      conversationId: "test-conversation-123",
     });
 
-    // Verify response structure and formatting
+    // Check the MCP response format for error
     expect(result.content[0].type).toBe("text");
-    const responseText = result.content[0].text;
+    expect(result.content[0].text).toContain("Validation service unavailable");
 
-    // Should contain validation summary
-    expect(responseText).toContain("## Validation Summary");
-    expect(responseText).toContain("❌ INVALID"); // One failure makes it invalid
-    expect(responseText).toContain("**Total Code Blocks:** 2");
-
-    // Should contain detailed results
-    expect(responseText).toContain("## Detailed Results");
-    expect(responseText).toContain("Code Block 1");
-    expect(responseText).toContain("Code Block 2");
-    expect(responseText).toContain("Success message");
-    expect(responseText).toContain("Error message");
+    // Verify validateTypeScriptCodeBlocks was called
+    expect(validateTypeScriptCodeBlocksMock).toHaveBeenCalledTimes(1);
   });
 
   test("records usage data correctly", async () => {
     // Setup mock response
-    validateTypescriptWithFormattingMock.mockReturnValueOnce({
-      validationResults: [
-        {
-          result: ValidationResult.SUCCESS,
-          resultDetail: "Test message",
-        },
-      ],
-      formattedResponse:
-        "## Validation Summary\n\n**Overall Status:** ✅ VALID",
-      isValid: true,
+    validateTypeScriptCodeBlocksMock.mockReturnValueOnce({
+      result: "success",
+      resultDetail: "All code blocks are valid",
+      validationResults: [],
     });
 
     // Register the tools
@@ -898,7 +916,7 @@ describe("validate_typescript_codeblocks tool", () => {
 
   test("handles validation function errors", async () => {
     // Setup mock to throw an error
-    validateTypescriptWithFormattingMock.mockImplementation(() => {
+    validateTypeScriptCodeBlocksMock.mockImplementation(() => {
       throw new Error("TypeScript compiler failed");
     });
 
@@ -917,7 +935,7 @@ describe("validate_typescript_codeblocks tool", () => {
     expect(result.content[0].text).toContain("TypeScript validation failed");
     expect(result.content[0].text).toContain("TypeScript compiler failed");
 
-    // Verify validateTypescriptWithFormatting was called
-    expect(validateTypescriptWithFormattingMock).toHaveBeenCalledTimes(1);
+    // Verify validateTypeScriptCodeBlocks was called
+    expect(validateTypeScriptCodeBlocksMock).toHaveBeenCalledTimes(1);
   });
 });

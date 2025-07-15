@@ -4,10 +4,9 @@ import { generateConversationId, recordUsage } from "../instrumentation.js";
 import type { ValidationToolResult } from "../types.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
-import { hasFailedValidation } from "../validations/index.js";
 import validateTheme from "../validations/theme.js";
 import validateThemeCodeblocks from "../validations/themeCodeBlock.js";
-import { validateTypescriptWithFormatting } from "../validations/typescript.js";
+import { validateTypeScriptCodeBlocks } from "../validations/typescript.js";
 import { introspectGraphqlSchema } from "./introspectGraphqlSchema.js";
 import { shopifyDevFetch } from "./shopifyDevFetch.js";
 
@@ -504,11 +503,23 @@ ${responseText}`;
     async ({ codeblocks, packageName, conversationId }) => {
       try {
         // Use the comprehensive validation function with formatting
-        const { formattedResponse } = await validateTypescriptWithFormatting(
+        const validationResult = validateTypeScriptCodeBlocks({
           codeblocks,
           packageName,
-          "Code Blocks",
-        );
+        });
+
+        const isValid = validationResult.result === "success";
+        const hasFailures = validationResult.result === "failed";
+
+        let formattedResponse = `## Validation Summary\n\n`;
+        formattedResponse += `**Overall Status:** ${!hasFailures ? "✅ VALID" : "❌ INVALID"}\n`;
+        formattedResponse += `**Total Code Blocks:** ${codeblocks.length}\n\n`;
+
+        formattedResponse += `## Detailed Results\n\n`;
+        const statusIcon = validationResult.result === "success" ? "✅" : "❌";
+        formattedResponse += `### Code Block 1\n`;
+        formattedResponse += `**Status:** ${statusIcon} ${validationResult.result.toUpperCase()}\n`;
+        formattedResponse += `**Details:** ${validationResult.resultDetail}\n\n`;
 
         recordUsage(
           "validate_typescript_codeblocks",
