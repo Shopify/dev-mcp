@@ -1,8 +1,9 @@
+import { buildClientSchema, parse, validate } from "graphql";
 import { fileURLToPath } from "node:url";
-import { parse, validate, buildClientSchema } from "graphql";
 import { loadSchemaContent } from "../tools/shopifyAdminSchema.js";
-import { ValidationResult } from "../types.js";
 import type { ValidationResponse } from "../types.js";
+import { ValidationResult } from "../types.js";
+import { extractCodeWithStrategy } from "./codeblockExtraction.js";
 
 // ============================================================================
 // Schema Configuration
@@ -38,8 +39,9 @@ export default async function validateGraphQLOperation(
     const schemaValidation = validateSchemaIsSupported(schemaName);
     if (schemaValidation) return schemaValidation;
 
-    const trimmedCode = graphqlCode.trim();
-    if (!trimmedCode) {
+    // Use shared cleaning utility - just trims for GraphQL
+    const cleanedCode = extractCodeWithStrategy(graphqlCode, "graphql");
+    if (!cleanedCode) {
       return validationResult(
         ValidationResult.FAILED,
         "No GraphQL operation found in the provided code.",
@@ -47,7 +49,7 @@ export default async function validateGraphQLOperation(
     }
 
     return await performGraphQLValidation(
-      graphqlCode,
+      cleanedCode,
       schemaName as SupportedSchemaName,
     );
   } catch (error) {
@@ -133,10 +135,9 @@ async function performGraphQLValidation(
   graphqlCode: string,
   schemaName: SupportedSchemaName,
 ): Promise<ValidationResponse> {
-  const operation = graphqlCode.trim();
   const schema = await loadAndBuildGraphQLSchema(schemaName);
 
-  const parseResult = parseGraphQLDocument(operation);
+  const parseResult = parseGraphQLDocument(graphqlCode);
   if (parseResult.success === false) {
     return validationResult(
       ValidationResult.FAILED,

@@ -3,6 +3,52 @@ import { z } from "zod";
 // Generated schemas for component types
 // This file is auto-generated - do not edit manually
 
+// Tag name to TypeScript type mapping
+/* eslint-disable @typescript-eslint/naming-convention */
+export const TAG_TO_TYPE_MAPPING = {
+  "s-badge": "Badge",
+  "s-banner": "Banner",
+  "s-box": "Box",
+  "s-button": "Button",
+  "s-checkbox": "Checkbox",
+  "s-choice": "ChoiceList",
+  "s-choice-list": "ChoiceList",
+  "s-clickable": "Clickable",
+  "s-date-picker": "DatePicker",
+  "s-divider": "Divider",
+  "s-email-field": "EmailField",
+  "s-grid": "Grid",
+  "s-grid-item": "Grid",
+  "s-heading": "Heading",
+  "s-icon": "Icon",
+  "s-image": "Image",
+  "s-link": "Link",
+  "s-money-field": "MoneyField",
+  "s-number-field": "NumberField",
+  "s-option": "Select",
+  "s-page": "Page",
+  "s-paragraph": "Paragraph",
+  "s-password-field": "PasswordField",
+  "s-query-container": "QueryContainer",
+  "s-search-field": "SearchField",
+  "s-section": "Page",
+  "s-select": "Select",
+  "s-spinner": "Spinner",
+  "s-stack": "Stack",
+  "s-switch": "Switch",
+  "s-table": "Table",
+  "s-table-body": "Table",
+  "s-table-cell": "Table",
+  "s-table-header": "Table",
+  "s-table-header-row": "Table",
+  "s-table-row": "Table",
+  "s-text": "Page",
+  "s-text-area": "TextArea",
+  "s-text-field": "TextField",
+  "s-url-field": "URLField",
+} as const;
+/* eslint-enable @typescript-eslint/naming-convention */
+
 export const _UIModalAttributesSchema = z.object({
   children: z.string().optional(),
   id: z.string().optional(),
@@ -112,7 +158,7 @@ export const BannerEventsSchema = z.object({
 });
 
 export const BannerSlotsSchema = z.object({
-  secondary_actions: z.string().optional(),
+  secondaryActions: z.string().optional(),
 });
 
 export const BoxSchema = z.object({
