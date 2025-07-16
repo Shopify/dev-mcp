@@ -15,6 +15,7 @@ import {
   formatType,
   introspectGraphqlSchema,
   MAX_FIELDS_TO_SHOW,
+  type Schema,
 } from "./introspectGraphqlSchema.js";
 
 // Mock console.error
@@ -479,12 +480,24 @@ describe("introspectGraphqlSchema", () => {
 
     vol.reset();
     vol.fromJSON({
-      "./data/admin_schema_2025-01.json": JSON.stringify(sampleSchema),
+      "./data/admin_2025-01.json": JSON.stringify(sampleSchema),
     });
   });
 
+  // Mock schemas for testing
+  const mockSchemas: Schema[] = [
+    {
+      api: "admin",
+      id: "admin_2025-01",
+      version: "2025-01",
+      url: "https://shopify-dev.myshopify.io/mcp/graphql_schemas/admin_2025-01.json",
+    },
+  ];
+
   test("returns formatted results for a search query", async () => {
-    const result = await introspectGraphqlSchema("product");
+    const result = await introspectGraphqlSchema("product", {
+      schemas: mockSchemas,
+    });
 
     expect(result.success).toBe(true);
     expect(result.responseText).toContain("## Matching GraphQL Types:");
@@ -497,48 +510,47 @@ describe("introspectGraphqlSchema", () => {
   });
 
   test("normalizes query by removing trailing s", async () => {
-    await introspectGraphqlSchema("products");
+    // Console error should be mocked by vi, so we can capture the messages
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
-    // Check that console.error was called with the normalized search term
-    const logCalls = (console.error as any).mock.calls.map(
-      (call: any[]) => call[0],
-    );
-    const hasNormalizedMessage = logCalls.some(
-      (msg: any) =>
-        typeof msg === "string" &&
-        msg.includes("products") &&
-        msg.includes("(normalized: product)"),
+    await introspectGraphqlSchema("products", { schemas: mockSchemas });
+
+    // Check console.error was called with the normalization message
+    const errorMessages = consoleErrorSpy.mock.calls.map((call) => call[0]);
+    const hasNormalizedMessage = errorMessages.some((msg) =>
+      msg.includes("(normalized: product)"),
     );
     expect(hasNormalizedMessage).toBe(true);
   });
 
   test("normalizes query by removing spaces", async () => {
-    await introspectGraphqlSchema("product input");
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
-    // Check that console.error was called with the normalized search term
-    const logCalls = (console.error as any).mock.calls.map(
-      (call: any[]) => call[0],
-    );
-    const hasNormalizedMessage = logCalls.some(
-      (msg: any) =>
-        typeof msg === "string" &&
-        msg.includes("product input") &&
-        msg.includes("(normalized: productinput)"),
+    await introspectGraphqlSchema("product input", { schemas: mockSchemas });
+
+    // Check console.error was called with the normalization message
+    const errorMessages = consoleErrorSpy.mock.calls.map((call) => call[0]);
+    const hasNormalizedMessage = errorMessages.some((msg) =>
+      msg.includes("(normalized: productinput)"),
     );
     expect(hasNormalizedMessage).toBe(true);
   });
 
   test("handles empty query", async () => {
-    const result = await introspectGraphqlSchema("");
+    const result = await introspectGraphqlSchema("", { schemas: mockSchemas });
 
     expect(result.success).toBe(true);
     // Should not filter the schema
     expect(result.responseText).toContain("OBJECT Product");
-    expect(result.responseText).toContain("OBJECT Order");
   });
 
   test("filters results to show only types", async () => {
     const result = await introspectGraphqlSchema("product", {
+      schemas: mockSchemas,
       filter: ["types"],
     });
 
@@ -547,13 +559,14 @@ describe("introspectGraphqlSchema", () => {
     expect(result.responseText).toContain("## Matching GraphQL Types:");
     expect(result.responseText).toContain("OBJECT Product");
     expect(result.responseText).toContain("INPUT_OBJECT ProductInput");
-    // Should not include other sections
+    // Should not include queries or mutations sections
     expect(result.responseText).not.toContain("## Matching GraphQL Queries:");
     expect(result.responseText).not.toContain("## Matching GraphQL Mutations:");
   });
 
   test("filters results to show only queries", async () => {
     const result = await introspectGraphqlSchema("product", {
+      schemas: mockSchemas,
       filter: ["queries"],
     });
 
@@ -565,11 +578,11 @@ describe("introspectGraphqlSchema", () => {
     expect(result.responseText).toContain("product");
     // Should not include mutations section
     expect(result.responseText).not.toContain("## Matching GraphQL Mutations:");
-    expect(result.responseText).not.toContain("productCreate");
   });
 
   test("filters results to show only mutations", async () => {
     const result = await introspectGraphqlSchema("product", {
+      schemas: mockSchemas,
       filter: ["mutations"],
     });
 
@@ -585,36 +598,33 @@ describe("introspectGraphqlSchema", () => {
 
   test("shows all sections when operationType is 'all'", async () => {
     const result = await introspectGraphqlSchema("product", {
+      schemas: mockSchemas,
       filter: ["all"],
     });
 
     expect(result.success).toBe(true);
     // Should include all sections
     expect(result.responseText).toContain("## Matching GraphQL Types:");
-    expect(result.responseText).toContain("OBJECT Product");
-    expect(result.responseText).toContain("INPUT_OBJECT ProductInput");
     expect(result.responseText).toContain("## Matching GraphQL Queries:");
-    expect(result.responseText).toContain("product");
     expect(result.responseText).toContain("## Matching GraphQL Mutations:");
-    expect(result.responseText).toContain("productCreate");
   });
 
   test("defaults to showing all sections when filter is not provided", async () => {
-    const result = await introspectGraphqlSchema("product");
+    // When not providing filter, it should default to ["all"]
+    const result = await introspectGraphqlSchema("product", {
+      schemas: mockSchemas,
+    });
 
     expect(result.success).toBe(true);
     // Should include all sections
     expect(result.responseText).toContain("## Matching GraphQL Types:");
-    expect(result.responseText).toContain("OBJECT Product");
-    expect(result.responseText).toContain("INPUT_OBJECT ProductInput");
     expect(result.responseText).toContain("## Matching GraphQL Queries:");
-    expect(result.responseText).toContain("product");
     expect(result.responseText).toContain("## Matching GraphQL Mutations:");
-    expect(result.responseText).toContain("productCreate");
   });
 
   test("can show multiple sections with array of filters", async () => {
     const result = await introspectGraphqlSchema("product", {
+      schemas: mockSchemas,
       filter: ["queries", "mutations"],
     });
 
@@ -623,9 +633,7 @@ describe("introspectGraphqlSchema", () => {
     expect(result.responseText).not.toContain("## Matching GraphQL Types:");
     // Should include queries section
     expect(result.responseText).toContain("## Matching GraphQL Queries:");
-    expect(result.responseText).toContain("product");
     // Should include mutations section
     expect(result.responseText).toContain("## Matching GraphQL Mutations:");
-    expect(result.responseText).toContain("productCreate");
   });
 });

@@ -1,37 +1,90 @@
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
-import zlib from "node:zlib";
 
-// Path to the schema file in the data folder
-export const SCHEMA_FILE_PATH = fileURLToPath(
-  new URL("../../data/admin_schema_2025-01.json", import.meta.url),
+export type Schema = {
+  api: string;
+  id: string;
+  version: string;
+  url: string;
+};
+
+// Path to the schemas cache directory
+export const SCHEMAS_CACHE_DIR = fileURLToPath(
+  new URL("../../data", import.meta.url),
 );
 
-// Function to load schema content, handling decompression if needed
-export async function loadSchemaContent(schemaPath: string): Promise<string> {
-  const gzippedSchemaPath = `${schemaPath}.gz`;
+// Function to get the schema ID for a specific API
+export async function getSchema(
+  api: string,
+  version: string,
+  schemas: Schema[] = [],
+): Promise<Schema> {
+  const matchingSchema = schemas.find(
+    (schema) => schema.api === api && (!version || schema.version === version),
+  );
 
-  // If uncompressed file doesn't exist but gzipped does, decompress it
-  if (!existsSync(schemaPath) && existsSync(gzippedSchemaPath)) {
-    console.error(
-      `[graphql-schema-tool] Decompressing GraphQL schema from ${gzippedSchemaPath}`,
-    );
-    const compressedData = await fs.readFile(gzippedSchemaPath);
-    const schemaContent = zlib.gunzipSync(compressedData).toString("utf-8");
+  if (!matchingSchema) {
+    const supportedSchemas = schemas
+      .map((schema) => `${schema.api} (${schema.version})`)
+      .join(", ");
 
-    // Save the uncompressed content to disk
-    await fs.writeFile(schemaPath, schemaContent, "utf-8");
-    console.error(
-      `[graphql-schema-tool] Saved uncompressed schema to ${schemaPath}`,
+    throw new Error(
+      `Schema configuration for API "${api}"${
+        version ? ` version "${version}"` : ""
+      } not found in provided schemas. Currently supported schemas: ${supportedSchemas}`,
     );
-    return schemaContent;
   }
 
-  console.error(
-    `[graphql-schema-tool] Reading GraphQL schema from ${schemaPath}`,
-  );
-  return fs.readFile(schemaPath, "utf8");
+  return matchingSchema;
+}
+
+// Function to load schema content from the API or cache
+export async function loadSchemaContent(schema: Schema): Promise<string> {
+  // Ensure cache directory exists
+  await fs.mkdir(SCHEMAS_CACHE_DIR, { recursive: true });
+
+  const cacheFilePath = path.join(SCHEMAS_CACHE_DIR, `${schema.id}.json`);
+
+  try {
+    // Check if we have a cached version
+    if (existsSync(cacheFilePath)) {
+      console.error(
+        `[shopify-admin-schema-tool] Reading cached schema from ${cacheFilePath}`,
+      );
+      return fs.readFile(cacheFilePath, "utf-8");
+    }
+
+    console.error(
+      `[shopify-admin-schema-tool] Fetching schema from API for ${schema.id}`,
+    );
+
+    const response = await fetch(schema.url, {
+      headers: {
+        "Accept-Encoding": "gzip",
+        "X-Shopify-Surface": "mcp",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch schema: ${response.statusText}`);
+    }
+
+    // Get the response content - fetch will handle decompression automatically
+    const schemaContent = await response.text();
+
+    // Cache the schema content
+    await fs.writeFile(cacheFilePath, schemaContent, "utf-8");
+    console.error(
+      `[shopify-admin-schema-tool] Cached schema to ${cacheFilePath}`,
+    );
+
+    return schemaContent;
+  } catch (error) {
+    console.error(`[shopify-admin-schema-tool] Error loading schema: ${error}`);
+    throw error;
+  }
 }
 
 // Maximum number of fields to extract from an object
@@ -191,11 +244,23 @@ export const formatGraphqlOperation = (query: any): string => {
 export async function introspectGraphqlSchema(
   query: string,
   {
+    schemas = [],
+    api = "admin",
+    version = "2025-01",
     filter = ["all"],
-  }: { filter?: Array<"all" | "types" | "queries" | "mutations"> } = {},
+  }: {
+    schemas?: Schema[];
+    api?: string;
+    version?: string;
+    filter?: Array<"all" | "types" | "queries" | "mutations">;
+  } = {},
 ) {
   try {
-    const schemaContent = await loadSchemaContent(SCHEMA_FILE_PATH);
+    // Get the schema ID based on the API and version from provided schemas
+    const schema = await getSchema(api, version, schemas);
+
+    // Load the schema content from the API or the cache
+    const schemaContent = await loadSchemaContent(schema);
 
     // Parse the schema content
     const schemaJson = JSON.parse(schemaContent);

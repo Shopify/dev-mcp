@@ -260,6 +260,9 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     }),
     async (params) => {
       const result = await introspectGraphqlSchema(params.query, {
+        schemas: schemas,
+        api: params.api,
+        version: params.version,
         filter: params.filter,
       });
 
@@ -377,7 +380,16 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     It returns a comprehensive validation result with details for each code snippet explaining why it was valid or invalid. This detail is provided so LLMs know how to modify code snippets to remove errors.`,
 
     withConversationId({
-      api: z.enum(["admin"]).describe("The GraphQL API to validate against"),
+      api: z
+        .enum(apis as [string, ...string[]])
+        .describe("The GraphQL API to validate against"),
+      version: z
+        .enum(versions as [string, ...string[]])
+        .describe(
+          `The version of the API to validate against. Can be ${versions
+            .map((v) => `'${v}'`)
+            .join(" or ")}.`,
+        ),
       code: z
         .array(z.string())
         .describe("Array of GraphQL code snippets to validate"),
@@ -386,7 +398,11 @@ export async function shopifyTools(server: McpServer): Promise<void> {
       // Validate all code snippets in parallel
       const validationResponses = await Promise.all(
         params.code.map(async (snippet) => {
-          return await validateGraphQLOperation(snippet, params.api);
+          return await validateGraphQLOperation(snippet, {
+            api: params.api,
+            version: params.version,
+            schemas,
+          });
         }),
       );
 

@@ -555,6 +555,7 @@ describe("validate_graphql tool", () => {
     const result = await mockServer.validateHandler({
       code: testCodeSnippets,
       api: "admin",
+      version: "2025-01",
     });
 
     // Verify validateGraphQLOperation was called correctly
@@ -562,12 +563,20 @@ describe("validate_graphql tool", () => {
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       1,
       testCodeSnippets[0],
-      "admin",
+      {
+        api: "admin",
+        version: expect.any(String),
+        schemas: expect.any(Array),
+      },
     );
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       2,
       testCodeSnippets[1],
-      "admin",
+      {
+        api: "admin",
+        version: expect.any(String),
+        schemas: expect.any(Array),
+      },
     );
 
     // Verify the response
