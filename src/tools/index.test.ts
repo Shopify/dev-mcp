@@ -1,4 +1,13 @@
-import { afterAll, beforeEach, describe, expect, it, test, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  test,
+  vi,
+} from "vitest";
 
 global.fetch = vi.fn();
 
@@ -91,6 +100,9 @@ vi.mock("../../package.json", () => ({
 // Mock fetch globally
 const fetchMock = vi.fn();
 global.fetch = fetchMock;
+
+// Mock the environment variable
+const originalEnv = process.env;
 
 // Mock console.error and console.warn
 const consoleError = console.error;
@@ -262,6 +274,17 @@ describe("fetchGettingStartedApis", () => {
     });
   });
 
+  beforeEach(() => {
+    vi.resetModules();
+    // Reset environment to clean state
+    process.env = { ...originalEnv };
+    delete process.env.LIQUID_MCP;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
   test("fetches and validates API information successfully", async () => {
     // Since this function is not directly exposed, we need to test it indirectly
     // We'll check that fetch was called with the right URL when shopifyTools is executed
@@ -281,6 +304,38 @@ describe("fetchGettingStartedApis", () => {
 
     // Verify fetch was called to get the APIs
     expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/mcp/getting_started_apis"),
+      expect.any(Object),
+    );
+  });
+
+  test("adds liquid_mcp query parameter when environment variable is set", async () => {
+    process.env.LIQUID_MCP = "true";
+
+    const { shopifyTools } = await import("./index.js");
+
+    const fetchSpy = vi.spyOn(global, "fetch");
+    const mockServer = { tool: vi.fn() };
+
+    await shopifyTools(mockServer as any);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/mcp/getting_started_apis?liquid_mcp=true"),
+      expect.any(Object),
+    );
+  });
+
+  test("does not add liquid_mcp query parameter when environment variable is false", async () => {
+    process.env.LIQUID_MCP = "false";
+
+    const { shopifyTools } = await import("./index.js");
+
+    const fetchSpy = vi.spyOn(global, "fetch");
+    const mockServer = { tool: vi.fn() };
+
+    await shopifyTools(mockServer as any);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/mcp/getting_started_apis"),
       expect.any(Object),
     );

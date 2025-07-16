@@ -15,6 +15,9 @@ import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
 const polarisUnifiedEnabled =
   process.env.POLARIS_UNIFIED === "true" || process.env.POLARIS_UNIFIED === "1";
 
+const liquidMcpEnabled =
+  process.env.LIQUID_MCP === "true" || process.env.LIQUID_MCP === "1";
+
 /**
  * Helper function to make requests to the Shopify dev server
  * @param path The API path (e.g., "/mcp/search", "/mcp/getting_started")
@@ -48,6 +51,14 @@ async function shopifyDevFetch(
     !url.searchParams.has("polaris_unified")
   ) {
     url.searchParams.append("polaris_unified", "true");
+  }
+
+  if (
+    liquidMcpEnabled &&
+    path.startsWith("/mcp/getting_started_apis") &&
+    !url.searchParams.has("liquid_mcp")
+  ) {
+    url.searchParams.append("liquid_mcp", "true");
   }
 
   console.error(
