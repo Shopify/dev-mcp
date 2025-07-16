@@ -10,7 +10,7 @@ import type { ValidationToolResult } from "../types.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { hasFailedValidation } from "../validations/index.js";
-import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
+import { introspectGraphqlSchema } from "./introspectGraphqlSchema.js";
 
 const polarisUnifiedEnabled =
   process.env.POLARIS_UNIFIED === "true" || process.env.POLARIS_UNIFIED === "1";
@@ -169,9 +169,62 @@ export async function searchShopifyDocs(
   }
 }
 
+/**
+ * Fetches available GraphQL schemas from Shopify
+ * @returns Object containing available APIs and versions
+ */
+async function fetchAvailableSchemas(): Promise<{
+  schemas: { api: string; id: string; version: string; url: string }[];
+  apis: string[];
+  versions: string[];
+}> {
+  try {
+    const url = new URL("/mcp/graphql_schemas", SHOPIFY_BASE_URL);
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache",
+        "X-Shopify-Surface": "mcp",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const schemas = await response.json();
+
+    // Extract unique APIs and versions
+    const apis = new Set<string>();
+    const versions = new Set<string>();
+
+    schemas.forEach((schema: { api: string; version: string; url: string }) => {
+      apis.add(schema.api);
+      versions.add(schema.version);
+    });
+
+    return {
+      schemas: schemas,
+      apis: Array.from(apis),
+      versions: Array.from(versions),
+    };
+  } catch (error) {
+    console.error(`Error fetching schemas: ${error}`);
+    return {
+      schemas: [],
+      apis: [],
+      versions: [],
+    };
+  }
+}
+
 export async function shopifyTools(server: McpServer): Promise<void> {
+  const { schemas, apis, versions } = await fetchAvailableSchemas();
+
   server.tool(
-    "introspect_admin_schema",
+    "introspect_graphql_schema",
     `This tool introspects and returns the portion of the Shopify Admin API GraphQL schema relevant to the user prompt. Only use this for the Shopify Admin API, and not any other APIs like the Shopify Storefront API or the Shopify Functions API.`,
     withConversationId({
       query: z
@@ -186,15 +239,35 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         .describe(
           "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)",
         ),
+      api: z
+        .enum(apis as [string, ...string[]])
+        .optional()
+        .default("admin")
+        .describe(
+          `The API to introspect. Can be ${apis
+            .map((a) => `'${a}'`)
+            .join(" or ")}. Default is 'admin'.`,
+        ),
+      version: z
+        .enum(versions as [string, ...string[]])
+        .optional()
+        .default("2025-07")
+        .describe(
+          `The version of the API to introspect. Can be ${versions
+            .map((v) => `'${v}'`)
+            .join(" or ")}. Default is '2025-07'.`,
+        ),
     }),
     async (params) => {
-      const result = await searchShopifyAdminSchema(params.query, {
+      const result = await introspectGraphqlSchema(params.query, {
         filter: params.filter,
       });
 
-      recordUsage("introspect_admin_schema", params, result.responseText).catch(
-        () => {},
-      );
+      recordUsage(
+        "introspect_graphql_schema",
+        params,
+        result.responseText,
+      ).catch(() => {});
 
       return {
         content: [
@@ -202,7 +275,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             type: "text" as const,
             text: result.success
               ? result.responseText
-              : `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`,
+              : `Error processing Shopify GraphQL schema: ${result.error}. Make sure the schema file exists.`,
           },
         ],
       };

@@ -13,9 +13,9 @@ import {
   formatGraphqlOperation,
   formatSchemaType,
   formatType,
+  introspectGraphqlSchema,
   MAX_FIELDS_TO_SHOW,
-  searchShopifyAdminSchema,
-} from "./shopifyAdminSchema.js";
+} from "./introspectGraphqlSchema.js";
 
 // Mock console.error
 const originalConsoleError = console.error;
@@ -366,7 +366,7 @@ describe("filterAndSortItems", () => {
   });
 });
 
-describe("searchShopifyAdminSchema", () => {
+describe("introspectGraphqlSchema", () => {
   // Sample schema for testing
   const sampleSchema = {
     data: {
@@ -484,7 +484,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("returns formatted results for a search query", async () => {
-    const result = await searchShopifyAdminSchema("product");
+    const result = await introspectGraphqlSchema("product");
 
     expect(result.success).toBe(true);
     expect(result.responseText).toContain("## Matching GraphQL Types:");
@@ -497,7 +497,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("normalizes query by removing trailing s", async () => {
-    await searchShopifyAdminSchema("products");
+    await introspectGraphqlSchema("products");
 
     // Check that console.error was called with the normalized search term
     const logCalls = (console.error as any).mock.calls.map(
@@ -513,7 +513,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("normalizes query by removing spaces", async () => {
-    await searchShopifyAdminSchema("product input");
+    await introspectGraphqlSchema("product input");
 
     // Check that console.error was called with the normalized search term
     const logCalls = (console.error as any).mock.calls.map(
@@ -529,7 +529,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("handles empty query", async () => {
-    const result = await searchShopifyAdminSchema("");
+    const result = await introspectGraphqlSchema("");
 
     expect(result.success).toBe(true);
     // Should not filter the schema
@@ -538,7 +538,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("filters results to show only types", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
       filter: ["types"],
     });
 
@@ -553,7 +553,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("filters results to show only queries", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
       filter: ["queries"],
     });
 
@@ -569,7 +569,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("filters results to show only mutations", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
       filter: ["mutations"],
     });
 
@@ -584,7 +584,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("shows all sections when operationType is 'all'", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
       filter: ["all"],
     });
 
@@ -600,7 +600,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("defaults to showing all sections when filter is not provided", async () => {
-    const result = await searchShopifyAdminSchema("product");
+    const result = await introspectGraphqlSchema("product");
 
     expect(result.success).toBe(true);
     // Should include all sections
@@ -614,7 +614,7 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("can show multiple sections with array of filters", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
       filter: ["queries", "mutations"],
     });
 

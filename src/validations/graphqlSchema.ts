@@ -1,8 +1,7 @@
+import { buildClientSchema, parse, validate } from "graphql";
 import { fileURLToPath } from "node:url";
-import { parse, validate, buildClientSchema } from "graphql";
-import { loadSchemaContent } from "../tools/shopifyAdminSchema.js";
-import { ValidationResult } from "../types.js";
-import type { ValidationResponse } from "../types.js";
+import { loadSchemaContent } from "../tools/introspectGraphqlSchema.js";
+import { ValidationResponse, ValidationResult } from "../types.js";
 
 // ============================================================================
 // Schema Configuration

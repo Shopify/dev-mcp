@@ -83,9 +83,9 @@ vi.mock("../instrumentation.js", () => ({
   recordUsage: vi.fn(() => Promise.resolve()),
 }));
 
-// Mock searchShopifyAdminSchema
-vi.mock("./shopifyAdminSchema.js", () => ({
-  searchShopifyAdminSchema: vi.fn(),
+// Mock introspectGraphqlSchema
+vi.mock("./introspectGraphqlSchema.js", () => ({
+  introspectGraphqlSchema: vi.fn(),
 }));
 
 // Mock validateGraphQLOperation
