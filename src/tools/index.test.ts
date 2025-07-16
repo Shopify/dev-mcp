@@ -156,6 +156,7 @@ describe("searchShopifyDocs", () => {
           callback("text/plain", "content-type");
         },
       },
+      text: async () => "Internal Server Error",
     });
 
     // Call the function directly
@@ -193,9 +194,6 @@ describe("searchShopifyDocs", () => {
       text: async () => "This is not valid JSON",
     });
 
-    // Clear the mocks before the test
-    vi.mocked(console.warn).mockClear();
-
     // Call the function directly
     const result = await searchShopifyDocs("product");
 
@@ -204,9 +202,8 @@ describe("searchShopifyDocs", () => {
     expect(result.formattedText).toBe("This is not valid JSON");
 
     // Verify that console.warn was called with the JSON parsing error
-    expect(console.warn).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(console.warn).mock.calls[0][0]).toContain(
-      "Error parsing JSON response",
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("[shopify-docs] Error parsing JSON response:"),
     );
   });
 
@@ -388,6 +385,7 @@ describe("learn_shopify_api tool behavior", () => {
           headers: {
             forEach: () => {},
           },
+          text: async () => "Internal Server Error",
         });
       }
       return Promise.reject(new Error("Unexpected URL"));

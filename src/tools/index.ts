@@ -19,7 +19,8 @@ const polarisUnifiedEnabled =
  * Helper function to make requests to the Shopify dev server
  * @param path The API path (e.g., "/mcp/search", "/mcp/getting_started")
  * @param options Request options including parameters and headers
- * @returns The fetch response
+ * @returns The response text
+ * @throws Error if the response is not ok
  */
 async function shopifyDevFetch(
   path: string,
@@ -28,7 +29,7 @@ async function shopifyDevFetch(
     headers?: Record<string, string>;
     method?: string;
   },
-): Promise<Response> {
+): Promise<string> {
   const url = new URL(path, SHOPIFY_BASE_URL);
   const instrumentation = instrumentationData();
 
@@ -69,7 +70,11 @@ async function shopifyDevFetch(
     `[shopify-dev] Response status: ${response.status} ${response.statusText}`,
   );
 
-  return response;
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return await response.text();
 }
 
 const GettingStartedAPISchema = z.object({
@@ -102,7 +107,7 @@ const withConversationId = <T extends z.ZodRawShape>(schema: T) => ({
  */
 export async function searchShopifyDocs(
   prompt: string,
-  options?: { max_num_results?: number },
+  max_num_results?: number,
 ) {
   try {
     // Prepare parameters
@@ -110,24 +115,14 @@ export async function searchShopifyDocs(
       query: prompt,
     };
 
-    if (options?.max_num_results !== undefined) {
-      parameters.max_num_results = String(options.max_num_results);
+    if (max_num_results !== undefined) {
+      parameters.max_num_results = String(max_num_results);
     }
 
-    const response = await shopifyDevFetch("/mcp/search", {
+    const responseText = await shopifyDevFetch("/mcp/search", {
       parameters,
     });
 
-    if (!response.ok) {
-      console.error(`[shopify-docs] HTTP error status: ${response.status}`);
-      return {
-        success: false,
-        formattedText: `HTTP error! status: ${response.status}`,
-      };
-    }
-
-    // Read and process the response
-    const responseText = await response.text();
     console.error(
       `[shopify-docs] Response text (truncated): ${
         responseText.substring(0, 200) +
@@ -135,17 +130,16 @@ export async function searchShopifyDocs(
       }`,
     );
 
-    // Parse and format the JSON for human readability
+    // Try to parse and format as JSON, otherwise return raw text
     try {
       const jsonData = JSON.parse(responseText);
       const formattedJson = JSON.stringify(jsonData, null, 2);
-
       return {
         success: true,
         formattedText: formattedJson,
       };
     } catch (e) {
-      // If JSON parsing fails, get the raw text
+      // If JSON parsing fails, return the raw text
       console.warn(`[shopify-docs] Error parsing JSON response: ${e}`);
       return {
         success: true,
@@ -217,9 +211,10 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         ),
     }),
     async (params) => {
-      const result = await searchShopifyDocs(params.prompt, {
-        max_num_results: params.max_num_results,
-      });
+      const result = await searchShopifyDocs(
+        params.prompt,
+        params.max_num_results,
+      );
 
       recordUsage("search_docs_chunks", params, result.formattedText).catch(
         () => {},
@@ -256,14 +251,12 @@ export async function shopifyTools(server: McpServer): Promise<void> {
       async function fetchDocText(path: string): Promise<DocResult> {
         try {
           const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
-          const response = await shopifyDevFetch(appendedPath);
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const text = await response.text();
-          return { text: `## ${path}\n\n${text}\n\n`, path, success: true };
+          const responseText = await shopifyDevFetch(appendedPath);
+          return {
+            text: `## ${path}\n\n${responseText}\n\n`,
+            path,
+            success: true,
+          };
         } catch (error) {
           console.error(`Error fetching document at ${path}: ${error}`);
           return {
@@ -385,15 +378,9 @@ export async function shopifyTools(server: McpServer): Promise<void> {
       }
 
       try {
-        const response = await shopifyDevFetch("/mcp/getting_started", {
+        const responseText = await shopifyDevFetch("/mcp/getting_started", {
           parameters: { api: params.api },
         });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const responseText = await response.text();
 
         recordUsage("learn_shopify_api", params, responseText).catch(() => {});
 
@@ -430,15 +417,8 @@ ${responseText}`;
  */
 async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
   try {
-    const response = await shopifyDevFetch("/mcp/getting_started_apis");
+    const responseText = await shopifyDevFetch("/mcp/getting_started_apis");
 
-    if (!response.ok) {
-      console.error(`[api-information] HTTP error status: ${response.status}`);
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    // Read and process the response
-    const responseText = await response.text();
     console.error(
       `[api-information] Response text (truncated): ${
         responseText.substring(0, 200) +
