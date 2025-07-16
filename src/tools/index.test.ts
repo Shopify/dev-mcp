@@ -678,3 +678,383 @@ describe("validate_graphql tool", () => {
     );
   });
 });
+
+// Mock execa and fs/promises at module level for validate_function tests
+vi.mock("execa", () => ({
+  execa: vi.fn(),
+}));
+
+vi.mock("fs/promises", async () => {
+  const actual =
+    await vi.importActual<typeof import("fs/promises")>("fs/promises");
+  return {
+    ...actual,
+    access: vi.fn(),
+  };
+});
+
+describe("validate_function tool", () => {
+  let mockServer: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Mock fetch for getting started APIs
+    const fetchMock = global.fetch as any;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(sampleGettingStartedApisResponse),
+    });
+
+    // Create a mock server that captures the registered tools
+    mockServer = {
+      tool: vi.fn((name, description, schema, handler) => {
+        if (name === "validate_function") {
+          mockServer.validateFunctionHandler = handler;
+        }
+      }),
+      validateFunctionHandler: null,
+    };
+  });
+
+  test("validates function successfully when both build and run succeed", async () => {
+    const { execa } = await import("execa");
+    const execaMock = vi.mocked(execa);
+    const fs = await import("fs/promises");
+    const fsAccessMock = vi.mocked(fs.access);
+
+    // Mock successful execa responses
+    execaMock
+      .mockResolvedValueOnce({
+        // shopify version
+        stdout: "3.80.0",
+        stderr: "",
+        exitCode: 0,
+      } as any)
+      .mockResolvedValueOnce({
+        // shopify app function build
+        stdout: "Build successful",
+        stderr: "",
+        exitCode: 0,
+      } as any)
+      .mockResolvedValueOnce({
+        // shopify app function run
+        stdout: '{"result": "success"}',
+        stderr: "",
+        exitCode: 0,
+      } as any);
+
+    // Mock fs.access to find shopify.app.toml
+    fsAccessMock.mockResolvedValue(undefined);
+
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Ensure the handler was registered
+    expect(mockServer.validateFunctionHandler).not.toBeNull();
+
+    // Call the handler
+    const result = await mockServer.validateFunctionHandler({
+      extensionPath: "./extensions/my-function",
+      inputFile: "src/run.input.json",
+      exportName: "run",
+    });
+
+    // Verify execa was called correctly
+    expect(execaMock).toHaveBeenCalledTimes(3);
+    expect(execaMock).toHaveBeenNthCalledWith(
+      1,
+      "shopify",
+      ["version"],
+      expect.any(Object),
+    );
+    expect(execaMock).toHaveBeenNthCalledWith(
+      2,
+      "shopify",
+      ["app", "function", "build"],
+      expect.any(Object),
+    );
+    expect(execaMock).toHaveBeenNthCalledWith(
+      3,
+      "shopify",
+      ["app", "function", "run", "--export=run", "--input=src/run.input.json"],
+      expect.any(Object),
+    );
+
+    // Verify the response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ Shopify CLI is installed");
+    expect(responseText).toContain("✅ Found Shopify app at:");
+    expect(responseText).toContain("✅ Build completed successfully");
+    expect(responseText).toContain("✅ Function ran successfully");
+    expect(responseText).toContain("✅ **Function validated successfully!**");
+  });
+
+  test("handles missing Shopify CLI", async () => {
+    const { execa } = await import("execa");
+    const execaMock = vi.mocked(execa);
+
+    // Mock failed execa responses
+    execaMock
+      .mockResolvedValueOnce({
+        // shopify version
+        stdout: "",
+        stderr: "Command not found",
+        exitCode: 1,
+      } as any)
+      .mockResolvedValueOnce({
+        // command -v shopify
+        stdout: "",
+        stderr: "",
+        exitCode: 1,
+      } as any)
+      .mockResolvedValueOnce({
+        // /opt/homebrew/bin/shopify
+        stdout: "",
+        stderr: "",
+        exitCode: 1,
+      } as any);
+
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Call the handler
+    const result = await mockServer.validateFunctionHandler({
+      extensionPath: ".",
+    });
+
+    // Verify the response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain(
+      "❌ Shopify CLI is not installed or not in PATH",
+    );
+    expect(responseText).toContain("Please install the Shopify CLI");
+    expect(execaMock).toHaveBeenCalledTimes(3); // Now expects 3 calls
+  });
+
+  test("handles missing shopify.app.toml", async () => {
+    const { execa } = await import("execa");
+    const execaMock = vi.mocked(execa);
+    const fs = await import("fs/promises");
+    const fsAccessMock = vi.mocked(fs.access);
+
+    // Mock successful shopify version check
+    execaMock.mockResolvedValueOnce({
+      stdout: "3.80.0",
+      stderr: "",
+      exitCode: 0,
+    } as any);
+
+    // Mock fs.access to not find shopify.app.toml
+    fsAccessMock.mockRejectedValue(new Error("File not found"));
+
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Call the handler
+    const result = await mockServer.validateFunctionHandler({
+      extensionPath: "./some/nested/path",
+    });
+
+    // Verify the response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("❌ Not inside a Shopify app directory");
+    expect(responseText).toContain("directory containing shopify.app.toml");
+  });
+
+  test("handles build failure", async () => {
+    const { execa } = await import("execa");
+    const execaMock = vi.mocked(execa);
+    const fs = await import("fs/promises");
+    const fsAccessMock = vi.mocked(fs.access);
+
+    // Mock successful version check, then failed build
+    execaMock
+      .mockResolvedValueOnce({
+        stdout: "3.80.0",
+        stderr: "",
+        exitCode: 0,
+      } as any)
+      .mockResolvedValueOnce({
+        stdout: "",
+        stderr: "Error: TypeScript compilation failed",
+        exitCode: 1,
+      } as any);
+
+    // Mock fs.access to find shopify.app.toml
+    fsAccessMock.mockResolvedValue(undefined);
+
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Call the handler
+    const result = await mockServer.validateFunctionHandler({
+      extensionPath: ".",
+    });
+
+    // Verify the response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("❌ Build failed with exit code 1");
+    expect(responseText).toContain("Error: TypeScript compilation failed");
+  });
+
+  test("handles run failure", async () => {
+    const { execa } = await import("execa");
+    const execaMock = vi.mocked(execa);
+    const fs = await import("fs/promises");
+    const fsAccessMock = vi.mocked(fs.access);
+
+    // Mock successful version check, successful build, then failed run
+    execaMock
+      .mockResolvedValueOnce({
+        stdout: "3.80.0",
+        stderr: "",
+        exitCode: 0,
+      } as any)
+      .mockResolvedValueOnce({
+        stdout: "Build successful",
+        stderr: "",
+        exitCode: 0,
+      } as any)
+      .mockResolvedValueOnce({
+        stdout: "",
+        stderr: "Error: Invalid input JSON",
+        exitCode: 1,
+      } as any);
+
+    // Mock fs.access to find shopify.app.toml
+    fsAccessMock.mockResolvedValue(undefined);
+
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Call the handler
+    const result = await mockServer.validateFunctionHandler({
+      extensionPath: ".",
+      inputFile: "bad-input.json",
+    });
+
+    // Verify the response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("❌ Run failed with exit code 1");
+    expect(responseText).toContain("Error: Invalid input JSON");
+  });
+
+  test("handles optional input file", async () => {
+    const { execa } = await import("execa");
+    const execaMock = vi.mocked(execa);
+    const fs = await import("fs/promises");
+    const fsAccessMock = vi.mocked(fs.access);
+
+    // Mock successful commands
+    execaMock.mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+    } as any);
+    fsAccessMock.mockResolvedValue(undefined);
+
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Call the handler without inputFile
+    const result = await mockServer.validateFunctionHandler({
+      extensionPath: ".",
+      exportName: "customExport",
+    });
+
+    // Verify the run command didn't include --input flag
+    expect(execaMock).toHaveBeenCalledWith(
+      "shopify",
+      ["app", "function", "run", "--export=customExport"],
+      expect.any(Object),
+    );
+
+    // Verify the response mentions standard input
+    const responseText = result.content[0].text;
+    expect(responseText).toContain(
+      "Using standard input (no input file specified)",
+    );
+  });
+
+  test("records usage data correctly", async () => {
+    const { execa } = await import("execa");
+    const execaMock = vi.mocked(execa);
+    const fs = await import("fs/promises");
+    const fsAccessMock = vi.mocked(fs.access);
+
+    // Mock successful execution
+    execaMock.mockResolvedValue({
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+    } as any);
+    fsAccessMock.mockResolvedValue(undefined);
+
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    const testParams = {
+      extensionPath: "./test",
+      inputFile: "input.json",
+      exportName: "run",
+    };
+
+    // Call the handler
+    await mockServer.validateFunctionHandler(testParams);
+
+    // Verify recordUsage was called with correct parameters
+    const { recordUsage } = await import("../instrumentation.js");
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "validate_function",
+      testParams,
+      expect.stringContaining("Shopify Function Validation"),
+    );
+  });
+
+  test("handles timeout correctly", async () => {
+    const { execa } = await import("execa");
+    const execaMock = vi.mocked(execa);
+    const fs = await import("fs/promises");
+    const fsAccessMock = vi.mocked(fs.access);
+
+    // Mock version check succeeds, then build times out
+    execaMock
+      .mockResolvedValueOnce({
+        // version check succeeds
+        stdout: "3.80.0",
+        stderr: "",
+        exitCode: 0,
+      } as any)
+      .mockRejectedValueOnce({
+        // build times out
+        timedOut: true,
+        stdout: "",
+        stderr: "",
+        message: "Command timed out",
+      } as any);
+
+    fsAccessMock.mockResolvedValue(undefined);
+
+    // Register the tools
+    const { shopifyTools } = await import("./index.js");
+    await shopifyTools(mockServer);
+
+    // Call the handler
+    const result = await mockServer.validateFunctionHandler({
+      extensionPath: ".",
+    });
+
+    // The response should contain the timeout error
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("Command timed out after 120 seconds");
+  });
+});

@@ -1,4 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { execa } from "execa";
+import * as fs from "fs/promises";
+import * as path from "path";
 import { z } from "zod";
 import { SHOPIFY_BASE_URL } from "../constants.js";
 import {
@@ -114,6 +117,315 @@ export async function searchShopifyDocs(prompt: string) {
       formattedText: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+/**
+ * Executes a command and returns the output
+ */
+async function runCommand(
+  command: string,
+  args: string[],
+  cwd?: string,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  console.error(
+    `[validate-function] Running command: ${command} ${args.join(" ")}`,
+  );
+  console.error(`[validate-function] Command CWD: ${cwd || "inherit"}`);
+
+  try {
+    // Use execa with better defaults and error handling
+    const result = await execa(command, args, {
+      cwd,
+      shell: true,
+      timeout: 120000, // 2 minute timeout
+      reject: false, // Don't throw on non-zero exit code
+      all: true, // Combine stdout and stderr
+      env: process.env,
+    });
+
+    console.error(
+      `[validate-function] Command '${command}' exited with code: ${result.exitCode}`,
+    );
+
+    if (result.exitCode !== 0 && result.stderr) {
+      console.error(`[validate-function] stderr output: ${result.stderr}`);
+    }
+
+    return {
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
+      exitCode: result.exitCode || 0,
+    };
+  } catch (error: any) {
+    console.error(
+      `[validate-function] Command error for '${command}': ${error.message}`,
+    );
+
+    // Handle timeout errors specifically
+    if (error.timedOut) {
+      return {
+        stdout: error.stdout || "",
+        stderr: `Command timed out after 120 seconds\n${error.stderr || ""}`,
+        exitCode: 1,
+      };
+    }
+
+    // Handle command not found
+    if (error.code === "ENOENT") {
+      return {
+        stdout: "",
+        stderr: `Command '${command}' not found in PATH\nError details: ${error.message}`,
+        exitCode: 1,
+      };
+    }
+
+    // Handle other errors
+    return {
+      stdout: error.stdout || "",
+      stderr: error.stderr || `Command error: ${error.message}`,
+      exitCode: error.exitCode || 1,
+    };
+  }
+}
+
+/**
+ * Checks if Shopify CLI is installed
+ */
+async function checkShopifyCLI(): Promise<{
+  found: boolean;
+  details: string[];
+}> {
+  const details: string[] = [];
+
+  try {
+    // Debug: Log the PATH environment variable
+    console.error(`[validate-function] Current PATH: ${process.env.PATH}`);
+    console.error(
+      `[validate-function] Current working directory: ${process.cwd()}`,
+    );
+
+    details.push(`Checking for Shopify CLI...`);
+
+    // First try running shopify version directly
+    const { exitCode, stdout, stderr } = await runCommand("shopify", [
+      "version",
+    ]);
+
+    if (exitCode === 0) {
+      console.error(
+        `[validate-function] Shopify CLI found, version: ${stdout.trim()}`,
+      );
+      details.push(`✓ Found via 'shopify' command, version: ${stdout.trim()}`);
+      return { found: true, details };
+    }
+
+    details.push(`✗ 'shopify version' failed with exit code ${exitCode}`);
+    if (stderr) details.push(`  Error: ${stderr.trim()}`);
+
+    // If that fails, try using 'command -v' to find it
+    const {
+      exitCode: commandExitCode,
+      stdout: commandPath,
+      stderr: commandStderr,
+    } = await runCommand("command", ["-v", "shopify"]);
+
+    if (commandExitCode === 0 && commandPath.trim()) {
+      console.error(
+        `[validate-function] Shopify CLI found at: ${commandPath.trim()}`,
+      );
+      details.push(`✓ Found at: ${commandPath.trim()}`);
+
+      // Try running version with the full path
+      const { exitCode: versionExitCode } = await runCommand(
+        commandPath.trim(),
+        ["version"],
+      );
+      return { found: versionExitCode === 0, details };
+    }
+
+    details.push(`✗ 'command -v shopify' failed`);
+    if (commandStderr) details.push(`  Error: ${commandStderr.trim()}`);
+
+    // Also try the known homebrew path directly
+    const homebrewPath = "/opt/homebrew/bin/shopify";
+    console.error(`[validate-function] Trying homebrew path: ${homebrewPath}`);
+    details.push(`Trying direct path: ${homebrewPath}`);
+
+    const { exitCode: homebrewExitCode, stderr: homebrewStderr } =
+      await runCommand(homebrewPath, ["version"]);
+
+    if (homebrewExitCode === 0) {
+      console.error(`[validate-function] Shopify CLI found at homebrew path`);
+      details.push(`✓ Found at homebrew path`);
+      return { found: true, details };
+    }
+
+    details.push(`✗ Direct path failed with exit code ${homebrewExitCode}`);
+    if (homebrewStderr) details.push(`  Error: ${homebrewStderr.trim()}`);
+
+    console.error(
+      `[validate-function] Shopify CLI not found. Exit code: ${exitCode}, stderr: ${stderr}`,
+    );
+    return { found: false, details };
+  } catch (error) {
+    console.error(`[validate-function] Error checking Shopify CLI: ${error}`);
+    details.push(
+      `Exception occurred: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return { found: false, details };
+  }
+}
+
+/**
+ * Finds the Shopify app root by looking for shopify.app.toml
+ */
+async function findShopifyAppRoot(startPath: string): Promise<string | null> {
+  let currentPath = path.resolve(startPath);
+
+  while (currentPath !== path.dirname(currentPath)) {
+    try {
+      const appTomlPath = path.join(currentPath, "shopify.app.toml");
+      await fs.access(appTomlPath);
+      console.error(
+        `[validate-function] Found shopify.app.toml at: ${currentPath}`,
+      );
+      return currentPath;
+    } catch {
+      // File doesn't exist, continue searching
+    }
+    currentPath = path.dirname(currentPath);
+  }
+
+  return null;
+}
+
+/**
+ * Validates a Shopify Function by building and running it
+ */
+async function validateShopifyFunction(
+  extensionPath: string,
+  inputFile?: string,
+  exportName: string = "run",
+): Promise<{ logs: string; formattedOutput: string }> {
+  const logs: string[] = [];
+
+  logs.push("## Shopify Function Validation\n");
+
+  // Step 1: Check if Shopify CLI is installed
+  logs.push("### Environment Check\n");
+
+  // Add debug information to the output
+  logs.push("**Debug Information:**");
+  logs.push(`- PATH: ${process.env.PATH || "(not set)"}`);
+  logs.push(`- Current directory: ${process.cwd()}`);
+  logs.push(`- Node version: ${process.version}`);
+  logs.push(`- Platform: ${process.platform}`);
+  logs.push(`- Architecture: ${process.arch}\n`);
+
+  const cliCheck = await checkShopifyCLI();
+
+  if (!cliCheck.found) {
+    const errorMsg =
+      "❌ Shopify CLI is not installed or not in PATH.\n\nPlease install the Shopify CLI: https://shopify.dev/docs/apps/tools/cli";
+    logs.push(errorMsg);
+    logs.push("\n**Troubleshooting Details:**");
+    cliCheck.details.forEach((detail) => logs.push(`- ${detail}`));
+    logs.push("\n**Additional Help:**");
+    logs.push("- The Shopify CLI could not be found in the PATH");
+    logs.push(
+      "- Tried paths: 'shopify' command, 'command -v shopify', and '/opt/homebrew/bin/shopify'",
+    );
+    logs.push(
+      "- Make sure the Shopify CLI is installed and accessible from the environment where the MCP server runs",
+    );
+    return {
+      logs: logs.join("\n"),
+      formattedOutput: logs.join("\n"),
+    };
+  }
+
+  logs.push("✅ Shopify CLI is installed\n");
+
+  // Step 2: Check if we're in a Shopify app
+  const absoluteExtensionPath = path.resolve(extensionPath);
+  const appRoot = await findShopifyAppRoot(absoluteExtensionPath);
+
+  if (!appRoot) {
+    const errorMsg =
+      "❌ Not inside a Shopify app directory.\n\nThis tool must be run from within a Shopify app (directory containing shopify.app.toml).";
+    logs.push(errorMsg);
+    return {
+      logs: logs.join("\n"),
+      formattedOutput: logs.join("\n"),
+    };
+  }
+
+  logs.push(`✅ Found Shopify app at: ${appRoot}\n`);
+
+  // Step 3: Build the function
+  logs.push("### Building Function\n");
+  logs.push(`Working directory: ${absoluteExtensionPath}\n`);
+
+  const buildResult = await runCommand(
+    "shopify",
+    ["app", "function", "build"],
+    absoluteExtensionPath,
+  );
+
+  logs.push("**Build Output:**");
+  logs.push("```");
+  if (buildResult.stdout) logs.push(buildResult.stdout);
+  if (buildResult.stderr) logs.push(buildResult.stderr);
+  logs.push("```\n");
+
+  if (buildResult.exitCode !== 0) {
+    logs.push(`❌ Build failed with exit code ${buildResult.exitCode}`);
+    return {
+      logs: logs.join("\n"),
+      formattedOutput: logs.join("\n"),
+    };
+  }
+
+  logs.push("✅ Build completed successfully\n");
+
+  // Step 4: Run the function
+  logs.push("### Running Function\n");
+
+  const runArgs = ["app", "function", "run", `--export=${exportName}`];
+
+  if (inputFile) {
+    runArgs.push(`--input=${inputFile}`);
+    logs.push(`Using input file: ${inputFile}\n`);
+  } else {
+    logs.push("Using standard input (no input file specified)\n");
+  }
+
+  const runResult = await runCommand("shopify", runArgs, absoluteExtensionPath);
+
+  logs.push("**Run Output:**");
+  logs.push("```");
+  if (runResult.stdout) logs.push(runResult.stdout);
+  if (runResult.stderr) logs.push(runResult.stderr);
+  logs.push("```\n");
+
+  if (runResult.exitCode !== 0) {
+    logs.push(`❌ Run failed with exit code ${runResult.exitCode}`);
+    return {
+      logs: logs.join("\n"),
+      formattedOutput: logs.join("\n"),
+    };
+  }
+
+  logs.push("✅ Function ran successfully\n");
+  logs.push("### Summary\n");
+  logs.push(
+    "✅ **Function validated successfully!** The function builds and runs without errors.",
+  );
+
+  return {
+    logs: logs.join("\n"),
+    formattedOutput: logs.join("\n"),
+  };
 }
 
 export async function shopifyTools(server: McpServer): Promise<void> {
@@ -361,6 +673,66 @@ ${responseText}`;
             {
               type: "text" as const,
               text: `Error fetching getting started information for ${params.api}: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
+    },
+  );
+
+  server.tool(
+    "validate_function",
+    `Validates that a Shopify Function builds and runs successfully using the Shopify CLI.
+    Prefer to use this tool over calling CLI commands directly to validate functions.
+
+IMPORTANT: This tool requires the Shopify CLI to be installed and should only be called in environments where CLI commands can be executed. Do not call this tool in browser-based environments or where shell access is not available.`,
+    withConversationId({
+      extensionPath: z
+        .string()
+        .optional()
+        .default(".")
+        .describe(
+          "Path to the function extension directory (where shopify.extension.toml is located)",
+        ),
+      inputFile: z
+        .string()
+        .optional()
+        .describe(
+          "Path to the input JSON file relative to extensionPath. If omitted, standard input is used.",
+        ),
+      exportName: z
+        .string()
+        .optional()
+        .default("run")
+        .describe("Name of the WebAssembly export to invoke"),
+    }),
+    async (params) => {
+      try {
+        const result = await validateShopifyFunction(
+          params.extensionPath,
+          params.inputFile,
+          params.exportName,
+        );
+
+        recordUsage("validate_function", params, result.logs).catch(() => {});
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: result.formattedOutput,
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage = `Error validating function: ${error instanceof Error ? error.message : String(error)}`;
+        recordUsage("validate_function", params, errorMessage).catch(() => {});
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: errorMessage,
             },
           ],
         };
