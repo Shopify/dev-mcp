@@ -84,18 +84,38 @@ If you want Cursor or Claude Desktop to surface Polaris Web Components documenta
 }
 ```
 
+<!--
+### Opt-in Liquid support (experimental)
+
+If you want Cursor or Claude Desktop to surface Liquid documentation, include an `env` block with the `LIQUID_MCP` flag in your MCP server configuration:
+
+```json
+{
+  "mcpServers": {
+    "shopify-dev-mcp": {
+      "command": "npx",
+      "args": ["-y", "@shopify/dev-mcp@latest"],
+      "env": {
+        "LIQUID_MCP": "true"
+      }
+    }
+  }
+}
+```
+-->
+
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0IiwiZW52Ijp7IlBPTEFSSVNfVU5JRklFRCI6InRydWUifX0%3D)
 
 ## Available tools
 
 This MCP server provides the following tools:
 
-| Tool Name               | Description                                                                                                                                                                                                                                                                                                           |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| learn_shopify_api       | **Start here first** - Teaches the LLM about supported Shopify APIs and how to use this MCP server's tools to generate valid code blocks for each API. This tool makes a request to shopify.dev to get the most up-to-date instruction for how to best work with the API the user would need to use for their prompt. |
-| search_docs_chunks      | Search across all shopify.dev documentation to find relevant chunks matching your query. Useful for getting content from many different documentation categories, but may have incomplete context due to chunking                                                                                                     |
-| fetch_full_docs         | Retrieve complete documentation for specific paths from shopify.dev. Provides full context without chunking loss, but requires knowing the exact path. Paths are provided via `learn_shopify_api`                                                                                                                     |
-| introspect_admin_schema | Access and search the Shopify Admin API GraphQL schema                                                                                                                                                                                                                                                                |
+| Tool Name                 | Description                                                                                                                                                                                                                                                                                                           |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| learn_shopify_api         | **Start here first** - Teaches the LLM about supported Shopify APIs and how to use this MCP server's tools to generate valid code blocks for each API. This tool makes a request to shopify.dev to get the most up-to-date instruction for how to best work with the API the user would need to use for their prompt. |
+| search_docs_chunks        | Search across all shopify.dev documentation to find relevant chunks matching your query. Useful for getting content from many different documentation categories, but may have incomplete context due to chunking                                                                                                     |
+| fetch_full_docs           | Retrieve complete documentation for specific paths from shopify.dev. Provides full context without chunking loss, but requires knowing the exact path. Paths are provided via `learn_shopify_api`                                                                                                                     |
+| introspect_graphql_schema | Access and search various Shopify GraphQL schemas                                                                                                                                                                                                                                                                     |
 
 ## Tool Usage Guidelines
 

@@ -1,24 +1,26 @@
-import { buildClientSchema, parse, validate } from "graphql";
-import { fileURLToPath } from "node:url";
-import { loadSchemaContent } from "../tools/shopifyAdminSchema.js";
-import type { ValidationResponse } from "../types.js";
-import { ValidationResult } from "../types.js";
-import { extractCodeWithStrategy } from "./codeblockExtraction.js";
+import { buildClientSchema, GraphQLSchema, parse, validate } from "graphql";
+import {
+  getSchema,
+  loadSchemaContent,
+  type Schema,
+} from "../tools/introspectGraphqlSchema.js";
+import { ValidationResponse, ValidationResult } from "../types.js";
 
 // ============================================================================
-// Schema Configuration
+// Types
 // ============================================================================
 
 /**
- * Mapping of schema names to their file paths
+ * Options for GraphQL validation
  */
-const SCHEMA_MAPPINGS = {
-  admin: fileURLToPath(
-    new URL("../../data/admin_schema_2025-01.json", import.meta.url),
-  ),
-} as const;
-
-type SupportedSchemaName = keyof typeof SCHEMA_MAPPINGS;
+export interface GraphQLValidationOptions {
+  /** The name of the API (e.g. 'admin' for Shopify Admin API) */
+  api: string;
+  /** The version of the schema to validate against */
+  version: string;
+  /** Array of available schemas */
+  schemas?: Schema[];
+}
 
 // ============================================================================
 // Public API
@@ -28,30 +30,29 @@ type SupportedSchemaName = keyof typeof SCHEMA_MAPPINGS;
  * Validates a GraphQL operation against the specified schema
  *
  * @param graphqlCode - The raw GraphQL operation code
- * @param schemaName - The name of the schema (currently supports 'admin' for Shopify Admin API)
+ * @param options - Validation options containing api, version, and schemas
  * @returns ValidationResponse indicating the status of the validation
  */
 export default async function validateGraphQLOperation(
   graphqlCode: string,
-  schemaName: string,
+  options: GraphQLValidationOptions,
 ): Promise<ValidationResponse> {
-  try {
-    const schemaValidation = validateSchemaIsSupported(schemaName);
-    if (schemaValidation) return schemaValidation;
+  const { api, version, schemas = [] } = options;
 
-    // Use shared cleaning utility - just trims for GraphQL
-    const cleanedCode = extractCodeWithStrategy(graphqlCode, "graphql");
-    if (!cleanedCode) {
+  try {
+    const trimmedCode = graphqlCode.trim();
+    if (!trimmedCode) {
       return validationResult(
         ValidationResult.FAILED,
         "No GraphQL operation found in the provided code.",
       );
     }
 
-    return await performGraphQLValidation(
-      cleanedCode,
-      schemaName as SupportedSchemaName,
-    );
+    // Get the schema directly, which will throw if not found
+    const schemaObj = await getSchema(api, version, schemas);
+    const schema = await loadAndBuildGraphQLSchema(schemaObj);
+
+    return await performGraphQLValidation(trimmedCode, schema);
   } catch (error) {
     return validationResult(
       ValidationResult.FAILED,
@@ -71,19 +72,10 @@ function validationResult(
   return { result, resultDetail };
 }
 
-function validateSchemaName(
-  schemaName: string,
-): schemaName is SupportedSchemaName {
-  return schemaName in SCHEMA_MAPPINGS;
-}
-
-function getSchemaPath(schemaName: SupportedSchemaName): string {
-  return SCHEMA_MAPPINGS[schemaName];
-}
-
-async function loadAndBuildGraphQLSchema(schemaName: SupportedSchemaName) {
-  const schemaPath = getSchemaPath(schemaName);
-  const schemaContent = await loadSchemaContent(schemaPath);
+async function loadAndBuildGraphQLSchema(
+  schema: Schema,
+): Promise<GraphQLSchema> {
+  const schemaContent = await loadSchemaContent(schema);
   const schemaJson = JSON.parse(schemaContent);
   return buildClientSchema(schemaJson.data);
 }
@@ -118,24 +110,11 @@ function getOperationType(document: any): string {
   return "operation";
 }
 
-function validateSchemaIsSupported(
-  schemaName: string,
-): ValidationResponse | null {
-  if (!validateSchemaName(schemaName)) {
-    const supportedSchemas = Object.keys(SCHEMA_MAPPINGS).join(", ");
-    return validationResult(
-      ValidationResult.FAILED,
-      `Unsupported schema name: ${schemaName}. Currently supported schemas: ${supportedSchemas}`,
-    );
-  }
-  return null;
-}
-
 async function performGraphQLValidation(
   graphqlCode: string,
-  schemaName: SupportedSchemaName,
+  schema: GraphQLSchema,
 ): Promise<ValidationResponse> {
-  const schema = await loadAndBuildGraphQLSchema(schemaName);
+  const operation = graphqlCode.trim();
 
   const parseResult = parseGraphQLDocument(graphqlCode);
   if (parseResult.success === false) {
@@ -159,6 +138,6 @@ async function performGraphQLValidation(
   const operationType = getOperationType(parseResult.document);
   return validationResult(
     ValidationResult.SUCCESS,
-    `Successfully validated GraphQL ${operationType} against ${schemaName} schema.`,
+    `Successfully validated GraphQL ${operationType} against schema.`,
   );
 }

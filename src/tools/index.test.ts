@@ -1,4 +1,13 @@
-import { afterAll, beforeEach, describe, expect, it, test, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  test,
+  vi,
+} from "vitest";
 
 global.fetch = vi.fn();
 
@@ -74,9 +83,9 @@ vi.mock("../instrumentation.js", () => ({
   recordUsage: vi.fn(() => Promise.resolve()),
 }));
 
-// Mock searchShopifyAdminSchema
-vi.mock("./shopifyAdminSchema.js", () => ({
-  searchShopifyAdminSchema: vi.fn(),
+// Mock introspectGraphqlSchema
+vi.mock("./introspectGraphqlSchema.js", () => ({
+  introspectGraphqlSchema: vi.fn(),
 }));
 
 // Mock validateGraphQLOperation
@@ -96,6 +105,9 @@ vi.mock("../../package.json", () => ({
 // Mock fetch globally
 const fetchMock = vi.fn();
 global.fetch = fetchMock;
+
+// Mock the environment variable
+const originalEnv = process.env;
 
 // Mock console.error and console.warn
 const consoleError = console.error;
@@ -161,6 +173,7 @@ describe("searchShopifyDocs", () => {
           callback("text/plain", "content-type");
         },
       },
+      text: async () => "Internal Server Error",
     });
 
     // Call the function directly
@@ -198,9 +211,6 @@ describe("searchShopifyDocs", () => {
       text: async () => "This is not valid JSON",
     });
 
-    // Clear the mocks before the test
-    vi.mocked(console.warn).mockClear();
-
     // Call the function directly
     const result = await searchShopifyDocs("product");
 
@@ -209,9 +219,10 @@ describe("searchShopifyDocs", () => {
     expect(result.formattedText).toBe("This is not valid JSON");
 
     // Verify that console.warn was called with the JSON parsing error
-    expect(console.warn).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(console.warn).mock.calls[0][0]).toContain(
-      "Error parsing JSON response",
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "[search-shopify-docs] Error parsing JSON response:",
+      ),
     );
   });
 
@@ -239,6 +250,7 @@ describe("searchShopifyDocs", () => {
     expect(fetchOptions.headers).toEqual({
       Accept: "application/json",
       "Cache-Control": "no-cache",
+      "X-Shopify-Surface": "mcp",
       "X-Shopify-MCP-Version": "",
       "X-Shopify-Timestamp": "",
     });
@@ -269,6 +281,17 @@ describe("fetchGettingStartedApis", () => {
     });
   });
 
+  beforeEach(() => {
+    vi.resetModules();
+    // Reset environment to clean state
+    process.env = { ...originalEnv };
+    delete process.env.LIQUID_MCP;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
   test("fetches and validates API information successfully", async () => {
     // Since this function is not directly exposed, we need to test it indirectly
     // We'll check that fetch was called with the right URL when shopifyTools is executed
@@ -288,6 +311,38 @@ describe("fetchGettingStartedApis", () => {
 
     // Verify fetch was called to get the APIs
     expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/mcp/getting_started_apis"),
+      expect.any(Object),
+    );
+  });
+
+  test("adds liquid_mcp query parameter when environment variable is set", async () => {
+    process.env.LIQUID_MCP = "true";
+
+    const { shopifyTools } = await import("./index.js");
+
+    const fetchSpy = vi.spyOn(global, "fetch");
+    const mockServer = { tool: vi.fn() };
+
+    await shopifyTools(mockServer as any);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/mcp/getting_started_apis?liquid_mcp=true"),
+      expect.any(Object),
+    );
+  });
+
+  test("does not add liquid_mcp query parameter when environment variable is false", async () => {
+    process.env.LIQUID_MCP = "false";
+
+    const { shopifyTools } = await import("./index.js");
+
+    const fetchSpy = vi.spyOn(global, "fetch");
+    const mockServer = { tool: vi.fn() };
+
+    await shopifyTools(mockServer as any);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/mcp/getting_started_apis"),
       expect.any(Object),
     );
@@ -392,6 +447,7 @@ describe("learn_shopify_api tool behavior", () => {
           headers: {
             forEach: () => {},
           },
+          text: async () => "Internal Server Error",
         });
       }
       return Promise.reject(new Error("Unexpected URL"));
@@ -506,6 +562,7 @@ describe("validate_graphql tool", () => {
     const result = await mockServer.validateHandler({
       code: testCodeSnippets,
       api: "admin",
+      version: "2025-01",
     });
 
     // Verify validateGraphQLOperation was called correctly
@@ -513,12 +570,20 @@ describe("validate_graphql tool", () => {
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       1,
       testCodeSnippets[0],
-      "admin",
+      {
+        api: "admin",
+        version: expect.any(String),
+        schemas: expect.any(Array),
+      },
     );
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       2,
       testCodeSnippets[1],
-      "admin",
+      {
+        api: "admin",
+        version: expect.any(String),
+        schemas: expect.any(Array),
+      },
     );
 
     // Verify the response
