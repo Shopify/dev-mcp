@@ -1,16 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { SHOPIFY_BASE_URL } from "../constants.js";
-import {
-  generateConversationId,
-  instrumentationData,
-  recordUsage,
-} from "../instrumentation.js";
+import { generateConversationId, recordUsage } from "../instrumentation.js";
 import type { ValidationToolResult } from "../types.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { hasFailedValidation } from "../validations/index.js";
-import { searchShopifyAdminSchema } from "./shopifyAdminSchema.js";
+import { introspectGraphqlSchema } from "./introspectGraphqlSchema.js";
+import { shopifyDevFetch } from "./shopifyDevFetch.js";
 
 const polarisUnifiedEnabled =
   process.env.POLARIS_UNIFIED === "true" || process.env.POLARIS_UNIFIED === "1";
@@ -18,82 +14,34 @@ const polarisUnifiedEnabled =
 const liquidMcpEnabled =
   process.env.LIQUID_MCP === "true" || process.env.LIQUID_MCP === "1";
 
-/**
- * Helper function to make requests to the Shopify dev server
- * @param path The API path (e.g., "/mcp/search", "/mcp/getting_started")
- * @param options Request options including parameters and headers
- * @returns The response text
- * @throws Error if the response is not ok
- */
-async function shopifyDevFetch(
-  path: string,
-  options?: {
-    parameters?: Record<string, string>;
-    headers?: Record<string, string>;
-    method?: string;
-  },
-): Promise<string> {
-  const url = new URL(path, SHOPIFY_BASE_URL);
-  const instrumentation = instrumentationData();
-
-  // Add query parameters
-  if (options?.parameters) {
-    Object.entries(options.parameters).forEach(([key, value]) => {
-      url.searchParams.append(key, value);
-    });
-  }
-
-  // Add polaris_unified only for specific endpoints that support it
-  const polarisEndpoints = ["/mcp/search", "/mcp/getting_started_apis"];
-  if (
-    polarisUnifiedEnabled &&
-    polarisEndpoints.some((endpoint) => path.startsWith(endpoint)) &&
-    !url.searchParams.has("polaris_unified")
-  ) {
-    url.searchParams.append("polaris_unified", "true");
-  }
-
-  if (
-    liquidMcpEnabled &&
-    path.startsWith("/mcp/getting_started_apis") &&
-    !url.searchParams.has("liquid_mcp")
-  ) {
-    url.searchParams.append("liquid_mcp", "true");
-  }
-
-  console.error(
-    `[shopify-dev] Making ${options?.method || "GET"} request to: ${url.toString()}`,
-  );
-
-  const response = await fetch(url.toString(), {
-    method: options?.method || "GET",
-    headers: {
-      Accept: "application/json",
-      "Cache-Control": "no-cache",
-      "X-Shopify-Surface": "mcp",
-      "X-Shopify-MCP-Version": instrumentation.packageVersion || "",
-      "X-Shopify-Timestamp": instrumentation.timestamp || "",
-      ...options?.headers,
-    },
-  });
-
-  console.error(
-    `[shopify-dev] Response status: ${response.status} ${response.statusText}`,
-  );
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-
-  return await response.text();
-}
-
 const GettingStartedAPISchema = z.object({
   name: z.string(),
   description: z.string(),
 });
 
 type GettingStartedAPI = z.infer<typeof GettingStartedAPISchema>;
+
+// Schema for individual GraphQL schema objects
+const GraphQLSchemaSchema = z.object({
+  id: z.string(),
+  version: z.string(),
+  url: z.string(),
+});
+
+// Schema for API objects
+const APISchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  schemas: z.array(GraphQLSchemaSchema),
+});
+
+// Schema for the complete GraphQL schemas response
+const GraphQLSchemasResponseSchema = z.object({
+  latest_version: z.string(),
+  apis: z.array(APISchema),
+});
+
+type GraphQLSchemasResponse = z.infer<typeof GraphQLSchemasResponseSchema>;
 
 // Common conversationId parameter schema
 const ConversationIdSchema = z.object({
@@ -118,24 +66,18 @@ const withConversationId = <T extends z.ZodRawShape>(schema: T) => ({
  */
 export async function searchShopifyDocs(
   prompt: string,
-  max_num_results?: number,
+  parameters: Record<string, string> = {},
 ) {
   try {
-    // Prepare parameters
-    const parameters: Record<string, string> = {
-      query: prompt,
-    };
-
-    if (max_num_results !== undefined) {
-      parameters.max_num_results = String(max_num_results);
-    }
-
     const responseText = await shopifyDevFetch("/mcp/search", {
-      parameters,
+      parameters: {
+        query: prompt,
+        ...parameters,
+      },
     });
 
     console.error(
-      `[shopify-docs] Response text (truncated): ${
+      `[search-shopify-docs] Response text (truncated): ${
         responseText.substring(0, 200) +
         (responseText.length > 200 ? "..." : "")
       }`,
@@ -151,7 +93,7 @@ export async function searchShopifyDocs(
       };
     } catch (e) {
       // If JSON parsing fails, return the raw text
-      console.warn(`[shopify-docs] Error parsing JSON response: ${e}`);
+      console.warn(`[search-shopify-docs] Error parsing JSON response: ${e}`);
       return {
         success: true,
         formattedText: responseText,
@@ -159,7 +101,7 @@ export async function searchShopifyDocs(
     }
   } catch (error) {
     console.error(
-      `[shopify-docs] Error searching Shopify documentation: ${error}`,
+      `[search-shopify-docs] Error searching Shopify documentation: ${error}`,
     );
 
     return {
@@ -169,9 +111,78 @@ export async function searchShopifyDocs(
   }
 }
 
+/**
+ * Fetches available GraphQL schemas from Shopify
+ * @returns Object containing available APIs and versions
+ */
+async function fetchGraphQLSchemas(): Promise<{
+  schemas: { api: string; id: string; version: string; url: string }[];
+  apis: { name: string; description: string }[];
+  versions: string[];
+  latestVersion?: string;
+}> {
+  try {
+    const responseText = await shopifyDevFetch("/mcp/graphql_schemas");
+
+    let parsedResponse: GraphQLSchemasResponse;
+    try {
+      const jsonData = JSON.parse(responseText);
+      parsedResponse = GraphQLSchemasResponseSchema.parse(jsonData);
+    } catch (parseError) {
+      console.error(`Error parsing schemas JSON: ${parseError}`);
+      console.error(`Response text: ${responseText.substring(0, 500)}...`);
+      return {
+        schemas: [],
+        apis: [],
+        versions: [],
+      };
+    }
+
+    // Extract unique APIs and versions
+    const apisMap = new Map<string, { name: string; description: string }>();
+    const versions = new Set<string>();
+    const schemas: { api: string; id: string; version: string; url: string }[] =
+      [];
+
+    parsedResponse.apis.forEach((api) => {
+      apisMap.set(api.name, { name: api.name, description: api.description });
+
+      api.schemas.forEach((schema) => {
+        versions.add(schema.version);
+        schemas.push({
+          api: api.name,
+          id: schema.id,
+          version: schema.version,
+          url: schema.url,
+        });
+      });
+    });
+
+    return {
+      schemas,
+      apis: Array.from(apisMap.values()),
+      versions: Array.from(versions),
+      latestVersion: parsedResponse.latest_version,
+    };
+  } catch (error) {
+    console.error(`Error fetching schemas: ${error}`);
+    return {
+      schemas: [],
+      apis: [],
+      versions: [],
+    };
+  }
+}
+
 export async function shopifyTools(server: McpServer): Promise<void> {
+  const { schemas, apis, versions, latestVersion } =
+    await fetchGraphQLSchemas();
+
+  // Extract just the API names for enum definitions
+  const apiNames = apis.map((api) => api.name);
+
   server.tool(
-    "introspect_admin_schema",
+    "introspect_graphql_schema",
     `This tool introspects and returns the portion of the Shopify Admin API GraphQL schema relevant to the user prompt. Only use this for the Shopify Admin API, and not any other APIs like the Shopify Storefront API or the Shopify Functions API.`,
     withConversationId({
       query: z
@@ -184,17 +195,40 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         .optional()
         .default(["all"])
         .describe(
-          "Filter results to show specific sections. Can include 'types', 'queries', 'mutations', or 'all' (default)",
+          "Filter results to show specific sections. Valid values are 'types', 'queries', 'mutations', or 'all' (default)",
+        ),
+      api: z
+        .enum(apiNames as [string, ...string[]])
+        .optional()
+        .default("admin")
+        .describe(
+          `The API to introspect. Valid options are:\n${apis
+            .map((api) => `- '${api.name}': ${api.description}`)
+            .join("\n")}\nDefault is 'admin'.`,
+        ),
+      version: z
+        .enum(versions as [string, ...string[]])
+        .optional()
+        .default(latestVersion!)
+        .describe(
+          `The version of the API to introspect. MUST be one of ${versions
+            .map((v) => `'${v}'`)
+            .join(" or ")}. Default is '${latestVersion}'.`,
         ),
     }),
     async (params) => {
-      const result = await searchShopifyAdminSchema(params.query, {
+      const result = await introspectGraphqlSchema(params.query, {
+        schemas: schemas,
+        api: params.api,
+        version: params.version,
         filter: params.filter,
       });
 
-      recordUsage("introspect_admin_schema", params, result.responseText).catch(
-        () => {},
-      );
+      recordUsage(
+        "introspect_graphql_schema",
+        params,
+        result.responseText,
+      ).catch(() => {});
 
       return {
         content: [
@@ -202,9 +236,10 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             type: "text" as const,
             text: result.success
               ? result.responseText
-              : `Error processing Shopify Admin GraphQL schema: ${result.error}. Make sure the schema file exists.`,
+              : `Error processing Shopify GraphQL schema: ${result.error}. Make sure the schema file exists.`,
           },
         ],
+        isError: !result.success,
       };
     },
   );
@@ -222,10 +257,14 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         ),
     }),
     async (params) => {
-      const result = await searchShopifyDocs(
-        params.prompt,
-        params.max_num_results,
-      );
+      const parameters: Record<string, string> = {
+        ...(params.max_num_results && {
+          max_num_results: params.max_num_results.toString(),
+        }),
+        ...(polarisUnifiedEnabled && { polaris_unified: "true" }),
+      };
+
+      const result = await searchShopifyDocs(params.prompt, parameters);
 
       recordUsage("search_docs_chunks", params, result.formattedText).catch(
         () => {},
@@ -238,6 +277,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             text: result.formattedText,
           },
         ],
+        isError: !result.success,
       };
     },
   );
@@ -293,6 +333,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             text: results.map(({ text }) => text).join("---\n\n"),
           },
         ],
+        isError: results.some(({ success }) => !success),
       };
     },
   );
@@ -304,7 +345,22 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     It returns a comprehensive validation result with details for each code snippet explaining why it was valid or invalid. This detail is provided so LLMs know how to modify code snippets to remove errors.`,
 
     withConversationId({
-      api: z.enum(["admin"]).describe("The GraphQL API to validate against"),
+      api: z
+        .enum(apiNames as [string, ...string[]])
+        .default("admin")
+        .describe(
+          `The GraphQL API to validate against. Valid options are:\n${apis
+            .map((api) => `- '${api.name}': ${api.description}`)
+            .join("\n")}\nDefault is 'admin'.`,
+        ),
+      version: z
+        .enum(versions as [string, ...string[]])
+        .default(latestVersion!)
+        .describe(
+          `The version of the API to validate against. MUST be one of ${versions
+            .map((v) => `'${v}'`)
+            .join(" or ")}\nDefault is '${latestVersion}'.`,
+        ),
       code: z
         .array(z.string())
         .describe("Array of GraphQL code snippets to validate"),
@@ -313,7 +369,11 @@ export async function shopifyTools(server: McpServer): Promise<void> {
       // Validate all code snippets in parallel
       const validationResponses = await Promise.all(
         params.code.map(async (snippet) => {
-          return await validateGraphQLOperation(snippet, params.api);
+          return await validateGraphQLOperation(snippet, {
+            api: params.api,
+            version: params.version,
+            schemas,
+          });
         }),
       );
 
@@ -334,6 +394,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             text: responseText,
           },
         ],
+        isError: hasFailedValidation(validationResponses),
       };
     },
   );
@@ -379,14 +440,6 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     async (params) => {
       const currentConversationId =
         params.conversationId || generateConversationId();
-      if (!gettingStartedApiNames.includes(params.api)) {
-        const options = gettingStartedApiNames.map((s) => `- ${s}`).join("\n");
-        const text = `Please specify which Shopify API you are building for. Valid options are: ${options}.`;
-
-        return {
-          content: [{ type: "text", text }],
-        };
-      }
 
       try {
         const responseText = await shopifyDevFetch("/mcp/getting_started", {
@@ -416,6 +469,7 @@ ${responseText}`;
               text: `Error fetching getting started information for ${params.api}: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
+          isError: true,
         };
       }
     },
@@ -428,10 +482,17 @@ ${responseText}`;
  */
 async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
   try {
-    const responseText = await shopifyDevFetch("/mcp/getting_started_apis");
+    const parameters: Record<string, string> = {
+      ...(polarisUnifiedEnabled && { polaris_unified: "true" }),
+      ...(liquidMcpEnabled && { liquid_mcp: "true" }),
+    };
+
+    const responseText = await shopifyDevFetch("/mcp/getting_started_apis", {
+      parameters,
+    });
 
     console.error(
-      `[api-information] Response text (truncated): ${
+      `[fetch-getting-started-apis] Response text (truncated): ${
         responseText.substring(0, 200) +
         (responseText.length > 200 ? "..." : "")
       }`,
@@ -443,11 +504,15 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
       const validatedData = z.array(GettingStartedAPISchema).parse(jsonData);
       return validatedData;
     } catch (e) {
-      console.warn(`[api-information] Error parsing JSON response: ${e}`);
+      console.warn(
+        `[fetch-getting-started-apis] Error parsing JSON response: ${e}`,
+      );
       return [];
     }
   } catch (error) {
-    console.error(`[api-information] Error fetching API information: ${error}`);
+    console.error(
+      `[fetch-getting-started-apis] Error fetching API information: ${error}`,
+    );
     return [];
   }
 }

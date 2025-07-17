@@ -83,9 +83,9 @@ vi.mock("../instrumentation.js", () => ({
   recordUsage: vi.fn(() => Promise.resolve()),
 }));
 
-// Mock searchShopifyAdminSchema
-vi.mock("./shopifyAdminSchema.js", () => ({
-  searchShopifyAdminSchema: vi.fn(),
+// Mock introspectGraphqlSchema
+vi.mock("./introspectGraphqlSchema.js", () => ({
+  introspectGraphqlSchema: vi.fn(),
 }));
 
 // Mock validateGraphQLOperation
@@ -215,7 +215,9 @@ describe("searchShopifyDocs", () => {
 
     // Verify that console.warn was called with the JSON parsing error
     expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining("[shopify-docs] Error parsing JSON response:"),
+      expect.stringContaining(
+        "[search-shopify-docs] Error parsing JSON response:",
+      ),
     );
   });
 
@@ -555,6 +557,7 @@ describe("validate_graphql tool", () => {
     const result = await mockServer.validateHandler({
       code: testCodeSnippets,
       api: "admin",
+      version: "2025-01",
     });
 
     // Verify validateGraphQLOperation was called correctly
@@ -562,12 +565,20 @@ describe("validate_graphql tool", () => {
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       1,
       testCodeSnippets[0],
-      "admin",
+      {
+        api: "admin",
+        version: expect.any(String),
+        schemas: expect.any(Array),
+      },
     );
     expect(validateGraphQLOperationMock).toHaveBeenNthCalledWith(
       2,
       testCodeSnippets[1],
-      "admin",
+      {
+        api: "admin",
+        version: expect.any(String),
+        schemas: expect.any(Array),
+      },
     );
 
     // Verify the response
