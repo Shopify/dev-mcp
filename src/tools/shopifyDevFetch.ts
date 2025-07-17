@@ -34,7 +34,7 @@ export async function shopifyDevFetch(
   }
 
   console.error(
-    `[shopify-dev] Making ${options?.method || "GET"} request to: ${url.toString()}`,
+    `[shopify-dev-fetch] Making ${options?.method || "GET"} request to: ${url.toString()}`,
   );
 
   const response = await fetch(url.toString(), {
@@ -51,7 +51,7 @@ export async function shopifyDevFetch(
   });
 
   console.error(
-    `[shopify-dev] Response status: ${response.status} ${response.statusText}`,
+    `[shopify-dev-fetch] Response status: ${response.status} ${response.statusText}`,
   );
 
   if (!response.ok) {

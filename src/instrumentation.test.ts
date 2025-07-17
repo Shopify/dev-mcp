@@ -186,7 +186,7 @@ describe("instrumentation", () => {
 
       // Verify error was logged
       expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("[mcp-usage] Error sending usage data:"),
+        expect.stringContaining("[record-mcp-usage] Error sending usage data:"),
       );
     });
 

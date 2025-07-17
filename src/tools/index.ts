@@ -77,7 +77,7 @@ export async function searchShopifyDocs(
     });
 
     console.error(
-      `[shopify-docs] Response text (truncated): ${
+      `[search-shopify-docs] Response text (truncated): ${
         responseText.substring(0, 200) +
         (responseText.length > 200 ? "..." : "")
       }`,
@@ -93,7 +93,7 @@ export async function searchShopifyDocs(
       };
     } catch (e) {
       // If JSON parsing fails, return the raw text
-      console.warn(`[shopify-docs] Error parsing JSON response: ${e}`);
+      console.warn(`[search-shopify-docs] Error parsing JSON response: ${e}`);
       return {
         success: true,
         formattedText: responseText,
@@ -101,7 +101,7 @@ export async function searchShopifyDocs(
     }
   } catch (error) {
     console.error(
-      `[shopify-docs] Error searching Shopify documentation: ${error}`,
+      `[search-shopify-docs] Error searching Shopify documentation: ${error}`,
     );
 
     return {
@@ -492,7 +492,7 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
     });
 
     console.error(
-      `[api-information] Response text (truncated): ${
+      `[fetch-getting-started-apis] Response text (truncated): ${
         responseText.substring(0, 200) +
         (responseText.length > 200 ? "..." : "")
       }`,
@@ -504,11 +504,15 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
       const validatedData = z.array(GettingStartedAPISchema).parse(jsonData);
       return validatedData;
     } catch (e) {
-      console.warn(`[api-information] Error parsing JSON response: ${e}`);
+      console.warn(
+        `[fetch-getting-started-apis] Error parsing JSON response: ${e}`,
+      );
       return [];
     }
   } catch (error) {
-    console.error(`[api-information] Error fetching API information: ${error}`);
+    console.error(
+      `[fetch-getting-started-apis] Error fetching API information: ${error}`,
+    );
     return [];
   }
 }

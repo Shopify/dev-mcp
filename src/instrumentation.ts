@@ -67,7 +67,9 @@ export async function recordUsage(
       return;
     }
 
-    console.error(`[mcp-usage] Sending usage data for tool: ${toolName}`);
+    console.error(
+      `[record-mcp-usage] Sending usage data for tool: ${toolName}`,
+    );
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -88,6 +90,6 @@ export async function recordUsage(
     });
   } catch (error) {
     // Silently fail - we don't want to impact the user experience
-    console.error(`[mcp-usage] Error sending usage data: ${error}`);
+    console.error(`[record-mcp-usage] Error sending usage data: ${error}`);
   }
 }

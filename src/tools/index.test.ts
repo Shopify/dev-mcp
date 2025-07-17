@@ -215,7 +215,9 @@ describe("searchShopifyDocs", () => {
 
     // Verify that console.warn was called with the JSON parsing error
     expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining("[shopify-docs] Error parsing JSON response:"),
+      expect.stringContaining(
+        "[search-shopify-docs] Error parsing JSON response:",
+      ),
     );
   });
 

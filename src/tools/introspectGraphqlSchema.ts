@@ -52,13 +52,13 @@ export async function loadSchemaContent(schema: Schema): Promise<string> {
     // Check if we have a cached version
     if (existsSync(cacheFilePath)) {
       console.error(
-        `[shopify-admin-schema-tool] Reading cached schema from ${cacheFilePath}`,
+        `[introspect-graphql-schema] Reading cached schema from ${cacheFilePath}`,
       );
       return fs.readFile(cacheFilePath, "utf-8");
     }
 
     console.error(
-      `[shopify-admin-schema-tool] Fetching schema from API for ${schema.id}`,
+      `[introspect-graphql-schema] Fetching schema from API for ${schema.id}`,
     );
 
     const schemaContent = await shopifyDevFetch(schema.url, {
@@ -70,12 +70,12 @@ export async function loadSchemaContent(schema: Schema): Promise<string> {
     // Cache the schema content
     await fs.writeFile(cacheFilePath, schemaContent, "utf-8");
     console.error(
-      `[shopify-admin-schema-tool] Cached schema to ${cacheFilePath}`,
+      `[introspect-graphql-schema] Cached schema to ${cacheFilePath}`,
     );
 
     return schemaContent;
   } catch (error) {
-    console.error(`[shopify-admin-schema-tool] Error loading schema: ${error}`);
+    console.error(`[introspect-graphql-schema] Error loading schema: ${error}`);
     throw error;
   }
 }
@@ -273,7 +273,7 @@ export async function introspectGraphqlSchema(
       normalizedQuery = normalizedQuery.replace(/\s+/g, "");
 
       console.error(
-        `[graphql-schema-tool] Filtering schema with query: ${query} (normalized: ${normalizedQuery})`,
+        `[introspect-graphql-schema] Filtering schema with query: ${query} (normalized: ${normalizedQuery})`,
       );
 
       const searchTerm = normalizedQuery.toLowerCase();
@@ -399,7 +399,7 @@ export async function introspectGraphqlSchema(
     return { success: true as const, responseText };
   } catch (error) {
     console.error(
-      `[graphql-schema-tool] Error processing GraphQL schema: ${error}`,
+      `[introspect-graphql-schema] Error processing GraphQL schema: ${error}`,
     );
     return {
       success: false as const,
