@@ -18,6 +18,8 @@
   "description": "A command line tool for setting up Shopify Dev MCP server",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.15.1",
+    "@shopify/theme-check-common": "^3.19.0",
+    "@shopify/theme-check-docs-updater": "^3.19.0",
     "graphql": "^16.11.0",
     "zod": "^3.24.2"
   },
