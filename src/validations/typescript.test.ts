@@ -243,6 +243,64 @@ describe("validateTypescript", () => {
         );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
+
+      it("s-number-field with numeric placeholder should pass", async () => {
+        const validationResults = await validateTypescript(
+          [
+            "```<s-number-field label='Quantity' placeholder='0'></s-number-field>```",
+          ],
+          "@shopify/app-bridge-ui-types",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      });
+
+      it("s-number-field with numeric placeholder (different value) should pass", async () => {
+        const validationResults = await validateTypescript(
+          [
+            "```<s-number-field label='Quantity' placeholder='10'></s-number-field>```",
+          ],
+          "@shopify/app-bridge-ui-types",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      });
+
+      it("s-number-field with text placeholder should pass", async () => {
+        const validationResults = await validateTypescript(
+          [
+            "```<s-number-field label='Quantity' placeholder='Enter a quantity'></s-number-field>```",
+          ],
+          "@shopify/app-bridge-ui-types",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      });
+
+      it("s-number-field with mixed placeholder should pass", async () => {
+        const validationResults = await validateTypescript(
+          [
+            "```<s-number-field label='Quantity' placeholder='0 items'></s-number-field>```",
+          ],
+          "@shopify/app-bridge-ui-types",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      });
+
+      it("s-number-field with no placeholder should pass", async () => {
+        const validationResults = await validateTypescript(
+          ["```<s-number-field label='Quantity'></s-number-field>```"],
+          "@shopify/app-bridge-ui-types",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      });
+
+      it("s-number-field with numeric attributes should convert correctly", async () => {
+        const validationResults = await validateTypescript(
+          [
+            "```<s-number-field label='Quantity' min='0' max='100' step='1' placeholder='Enter quantity'></s-number-field>```",
+          ],
+          "@shopify/app-bridge-ui-types",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      });
     });
 
     describe("components with different prefixes", () => {
