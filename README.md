@@ -84,6 +84,26 @@ If you want Cursor or Claude Desktop to surface Polaris Web Components documenta
 }
 ```
 
+<!--
+### Opt-in Liquid support (experimental)
+
+If you want Cursor or Claude Desktop to surface Liquid documentation, include an `env` block with the `LIQUID_MCP` flag in your MCP server configuration:
+
+```json
+{
+  "mcpServers": {
+    "shopify-dev-mcp": {
+      "command": "npx",
+      "args": ["-y", "@shopify/dev-mcp@latest"],
+      "env": {
+        "LIQUID_MCP": "true"
+      }
+    }
+  }
+}
+```
+-->
+
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0IiwiZW52Ijp7IlBPTEFSSVNfVU5JRklFRCI6InRydWUifX0%3D)
 
 ## Available tools
