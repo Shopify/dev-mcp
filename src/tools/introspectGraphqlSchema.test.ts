@@ -490,7 +490,7 @@ describe("introspectGraphqlSchema", () => {
       api: "admin",
       id: "admin_2025-01",
       version: "2025-01",
-      url: "https://shopify-dev.myshopify.io/mcp/graphql_schemas/admin_2025-01.json",
+      url: "https://example.com/admin_2025-01.json",
     },
   ];
 
