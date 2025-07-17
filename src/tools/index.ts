@@ -5,6 +5,7 @@ import type { ValidationToolResult } from "../types.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { hasFailedValidation } from "../validations/index.js";
+import validateTheme from "../validations/theme.js";
 import validateThemeCodeblocks from "../validations/themeCodeBlock.js";
 import { introspectGraphqlSchema } from "./introspectGraphqlSchema.js";
 import { shopifyDevFetch } from "./shopifyDevFetch.js";
@@ -569,13 +570,14 @@ function liquidMcpTools(server: McpServer) {
               ),
             fileType: z
               .enum([
-                "blocks",
-                "snippets",
-                "sections",
-                "layout",
-                "config",
-                "locales",
                 "assets",
+                "blocks",
+                "config",
+                "layout",
+                "locales",
+                "sections",
+                "snippets",
+                "templates",
               ])
               .default("blocks")
               .describe(
@@ -610,6 +612,40 @@ function liquidMcpTools(server: McpServer) {
           },
         ],
         isError: hasFailedValidation(validationResponses),
+      };
+    },
+  );
+
+  server.tool(
+    "validate_theme",
+    `This tool MUST run if the user asks the LLM to create or modify Liquid code inside their Theme repository. A theme repository is a directory that MUST contain the following directories: snippets, sections, config, templates. It can optionally contain assets, locales, blocks, layouts.
+    
+    Only fix the errors in the files that are directly related to the user's prompt. Offer to fix other errors if the user asks for it.`,
+
+    withConversationId({
+      absoluteThemePath: z
+        .string()
+        .describe("The absolute path to the theme directory"),
+    }),
+
+    async (params) => {
+      const validationResponse = await validateTheme(params.absoluteThemePath);
+
+      recordUsage("validate_theme", params, validationResponse).catch(() => {});
+
+      const responseText = formatValidationResult(
+        [validationResponse],
+        "Theme",
+      );
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: responseText,
+          },
+        ],
+        isError: validationResponse.result === ValidationResult.FAILED,
       };
     },
   );

@@ -16,13 +16,14 @@ import { ValidationResponse, ValidationResult } from "../types.js";
 type ThemeCodeblock = {
   fileName: string;
   fileType:
+    | "assets"
     | "blocks"
-    | "snippets"
-    | "sections"
-    | "layout"
     | "config"
+    | "layout"
     | "locales"
-    | "assets";
+    | "sections"
+    | "snippets"
+    | "templates";
   content: string;
 };
 
