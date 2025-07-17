@@ -21,6 +21,28 @@ const GettingStartedAPISchema = z.object({
 
 type GettingStartedAPI = z.infer<typeof GettingStartedAPISchema>;
 
+// Schema for individual GraphQL schema objects
+const GraphQLSchemaSchema = z.object({
+  id: z.string(),
+  version: z.string(),
+  url: z.string(),
+});
+
+// Schema for API objects
+const APISchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  schemas: z.array(GraphQLSchemaSchema),
+});
+
+// Schema for the complete GraphQL schemas response
+const GraphQLSchemasResponseSchema = z.object({
+  latest_version: z.string(),
+  apis: z.array(APISchema),
+});
+
+type GraphQLSchemasResponse = z.infer<typeof GraphQLSchemasResponseSchema>;
+
 // Common conversationId parameter schema
 const ConversationIdSchema = z.object({
   conversationId: z
@@ -93,17 +115,19 @@ export async function searchShopifyDocs(
  * Fetches available GraphQL schemas from Shopify
  * @returns Object containing available APIs and versions
  */
-async function fetchAvailableSchemas(): Promise<{
+async function fetchGraphQLSchemas(): Promise<{
   schemas: { api: string; id: string; version: string; url: string }[];
-  apis: string[];
+  apis: { name: string; description: string }[];
   versions: string[];
+  latestVersion?: string;
 }> {
   try {
     const responseText = await shopifyDevFetch("/mcp/graphql_schemas");
 
-    let schemas;
+    let parsedResponse: GraphQLSchemasResponse;
     try {
-      schemas = JSON.parse(responseText);
+      const jsonData = JSON.parse(responseText);
+      parsedResponse = GraphQLSchemasResponseSchema.parse(jsonData);
     } catch (parseError) {
       console.error(`Error parsing schemas JSON: ${parseError}`);
       console.error(`Response text: ${responseText.substring(0, 500)}...`);
@@ -115,18 +139,30 @@ async function fetchAvailableSchemas(): Promise<{
     }
 
     // Extract unique APIs and versions
-    const apis = new Set<string>();
+    const apisMap = new Map<string, { name: string; description: string }>();
     const versions = new Set<string>();
+    const schemas: { api: string; id: string; version: string; url: string }[] =
+      [];
 
-    schemas.forEach((schema: { api: string; version: string; url: string }) => {
-      apis.add(schema.api);
-      versions.add(schema.version);
+    parsedResponse.apis.forEach((api) => {
+      apisMap.set(api.name, { name: api.name, description: api.description });
+
+      api.schemas.forEach((schema) => {
+        versions.add(schema.version);
+        schemas.push({
+          api: api.name,
+          id: schema.id,
+          version: schema.version,
+          url: schema.url,
+        });
+      });
     });
 
     return {
-      schemas: schemas,
-      apis: Array.from(apis),
+      schemas,
+      apis: Array.from(apisMap.values()),
       versions: Array.from(versions),
+      latestVersion: parsedResponse.latest_version,
     };
   } catch (error) {
     console.error(`Error fetching schemas: ${error}`);
@@ -139,7 +175,11 @@ async function fetchAvailableSchemas(): Promise<{
 }
 
 export async function shopifyTools(server: McpServer): Promise<void> {
-  const { schemas, apis, versions } = await fetchAvailableSchemas();
+  const { schemas, apis, versions, latestVersion } =
+    await fetchGraphQLSchemas();
+
+  // Extract just the API names for enum definitions
+  const apiNames = apis.map((api) => api.name);
 
   server.tool(
     "introspect_graphql_schema",
@@ -158,22 +198,22 @@ export async function shopifyTools(server: McpServer): Promise<void> {
           "Filter results to show specific sections. Valid values are 'types', 'queries', 'mutations', or 'all' (default)",
         ),
       api: z
-        .enum(apis as [string, ...string[]])
+        .enum(apiNames as [string, ...string[]])
         .optional()
         .default("admin")
         .describe(
-          `The API to introspect. MUST be one of ${apis
-            .map((a) => `'${a}'`)
-            .join(" or ")}. Default is 'admin'.`,
+          `The API to introspect. Valid options are:\n${apis
+            .map((api) => `- '${api.name}': ${api.description}`)
+            .join("\n")}\nDefault is 'admin'.`,
         ),
       version: z
         .enum(versions as [string, ...string[]])
         .optional()
-        .default("2025-07")
+        .default(latestVersion!)
         .describe(
           `The version of the API to introspect. MUST be one of ${versions
             .map((v) => `'${v}'`)
-            .join(" or ")}. Default is '2025-07'.`,
+            .join(" or ")}. Default is '${latestVersion}'.`,
         ),
     }),
     async (params) => {
@@ -199,6 +239,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
               : `Error processing Shopify GraphQL schema: ${result.error}. Make sure the schema file exists.`,
           },
         ],
+        isError: !result.success,
       };
     },
   );
@@ -236,6 +277,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             text: result.formattedText,
           },
         ],
+        isError: !result.success,
       };
     },
   );
@@ -291,6 +333,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             text: results.map(({ text }) => text).join("---\n\n"),
           },
         ],
+        isError: results.some(({ success }) => !success),
       };
     },
   );
@@ -303,14 +346,20 @@ export async function shopifyTools(server: McpServer): Promise<void> {
 
     withConversationId({
       api: z
-        .enum(apis as [string, ...string[]])
-        .describe("The GraphQL API to validate against"),
+        .enum(apiNames as [string, ...string[]])
+        .default("admin")
+        .describe(
+          `The GraphQL API to validate against. Valid options are:\n${apis
+            .map((api) => `- '${api.name}': ${api.description}`)
+            .join("\n")}\nDefault is 'admin'.`,
+        ),
       version: z
         .enum(versions as [string, ...string[]])
+        .default(latestVersion!)
         .describe(
           `The version of the API to validate against. MUST be one of ${versions
             .map((v) => `'${v}'`)
-            .join(" or ")}.`,
+            .join(" or ")}\nDefault is '${latestVersion}'.`,
         ),
       code: z
         .array(z.string())
@@ -345,6 +394,7 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             text: responseText,
           },
         ],
+        isError: hasFailedValidation(validationResponses),
       };
     },
   );
@@ -390,14 +440,6 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     async (params) => {
       const currentConversationId =
         params.conversationId || generateConversationId();
-      if (!gettingStartedApiNames.includes(params.api)) {
-        const options = gettingStartedApiNames.map((s) => `- ${s}`).join("\n");
-        const text = `Please specify which Shopify API you are building for. Valid options are: ${options}.`;
-
-        return {
-          content: [{ type: "text", text }],
-        };
-      }
 
       try {
         const responseText = await shopifyDevFetch("/mcp/getting_started", {
@@ -427,6 +469,7 @@ ${responseText}`;
               text: `Error fetching getting started information for ${params.api}: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
+          isError: true,
         };
       }
     },
