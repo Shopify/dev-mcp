@@ -1,4 +1,4 @@
-import { buildClientSchema, parse, validate } from "graphql";
+import { buildClientSchema, GraphQLSchema, parse, validate } from "graphql";
 import {
   getSchema,
   loadSchemaContent,
@@ -72,7 +72,9 @@ function validationResult(
   return { result, resultDetail };
 }
 
-async function loadAndBuildGraphQLSchema(schema: Schema) {
+async function loadAndBuildGraphQLSchema(
+  schema: Schema,
+): Promise<GraphQLSchema> {
   const schemaContent = await loadSchemaContent(schema);
   const schemaJson = JSON.parse(schemaContent);
   return buildClientSchema(schemaJson.data);
@@ -110,7 +112,7 @@ function getOperationType(document: any): string {
 
 async function performGraphQLValidation(
   graphqlCode: string,
-  schema: any,
+  schema: GraphQLSchema,
 ): Promise<ValidationResponse> {
   const operation = graphqlCode.trim();
 
