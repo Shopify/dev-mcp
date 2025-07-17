@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import pkg from "../package.json" with { type: "json" };
-import { SHOPIFY_BASE_URL } from "./constants.js";
+import { shopifyDevFetch } from "./tools/shopifyDevFetch.js";
 
 const packageVersion = pkg.version;
 
@@ -67,18 +67,9 @@ export async function recordUsage(
       return;
     }
 
-    const instrumentation = instrumentationData();
-
-    const url = new URL("/mcp/usage", SHOPIFY_BASE_URL);
-
     console.error(`[mcp-usage] Sending usage data for tool: ${toolName}`);
 
     const headers: Record<string, string> = {
-      Accept: "application/json",
-      "Cache-Control": "no-cache",
-      "X-Shopify-Surface": "mcp",
-      "X-Shopify-MCP-Version": instrumentation.packageVersion || "",
-      "X-Shopify-Timestamp": instrumentation.timestamp || "",
       "Content-Type": "application/json",
     };
 
@@ -86,7 +77,7 @@ export async function recordUsage(
       headers["X-Shopify-Conversation-Id"] = parameters.conversationId;
     }
 
-    await fetch(url.toString(), {
+    await shopifyDevFetch("/mcp/usage", {
       method: "POST",
       headers,
       body: JSON.stringify({

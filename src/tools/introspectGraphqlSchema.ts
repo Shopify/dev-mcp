@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { shopifyDevFetch } from "./shopifyDevFetch.js";
 
 export type Schema = {
   api: string;
@@ -60,19 +61,11 @@ export async function loadSchemaContent(schema: Schema): Promise<string> {
       `[shopify-admin-schema-tool] Fetching schema from API for ${schema.id}`,
     );
 
-    const response = await fetch(schema.url, {
+    const schemaContent = await shopifyDevFetch(schema.url, {
       headers: {
         "Accept-Encoding": "gzip",
-        "X-Shopify-Surface": "mcp",
       },
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch schema: ${response.statusText}`);
-    }
-
-    // Get the response content - fetch will handle decompression automatically
-    const schemaContent = await response.text();
 
     // Cache the schema content
     await fs.writeFile(cacheFilePath, schemaContent, "utf-8");
