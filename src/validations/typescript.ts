@@ -340,6 +340,29 @@ function parseCodeBlock(codeblock: string): ComponentInfo[] {
 }
 
 /**
+ * Determines if an attribute should be converted to a number based on common HTML/component patterns
+ */
+function isNumericAttribute(attributeName: string): boolean {
+  // Attributes that are typically numeric in component schemas
+  const numericAttributes = new Set([
+    "max",
+    "min",
+    "step",
+    "tabindex",
+    "size",
+    "rows",
+    "cols",
+    "span",
+    "colspan",
+    "rowspan",
+    "width",
+    "height",
+  ]);
+
+  return numericAttributes.has(attributeName.toLowerCase());
+}
+
+/**
  * Parses HTML attributes from a string
  * Optimized for LLM-generated component attributes
  */
@@ -363,8 +386,12 @@ function parseAttributes(attributeString: string): Record<string, any> {
     if (typeof value === "string") {
       if (value === "true") parsedValue = true;
       else if (value === "false") parsedValue = false;
-      else if (/^\d+$/.test(value)) parsedValue = parseInt(value, 10);
-      else if (/^\d*\.\d+$/.test(value)) parsedValue = parseFloat(value);
+      // Only convert to numbers for specific numeric attributes
+      // Most HTML attributes should remain as strings (e.g., placeholder, label, etc.)
+      else if (isNumericAttribute(name) && /^\d+$/.test(value))
+        parsedValue = parseInt(value, 10);
+      else if (isNumericAttribute(name) && /^\d*\.\d+$/.test(value))
+        parsedValue = parseFloat(value);
       // Keep as string otherwise
       else parsedValue = value;
     }
