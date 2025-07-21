@@ -16,9 +16,10 @@ describe("validateTheme", () => {
     snippetsDirectory = join(tempThemeDirectory, "snippets");
     localesDirectory = join(tempThemeDirectory, "locales");
 
-    [snippetsDirectory, localesDirectory].forEach(async (directory) => {
-      await mkdir(directory, { recursive: true });
-    });
+    await Promise.all([
+      mkdir(snippetsDirectory, { recursive: true }),
+      mkdir(localesDirectory, { recursive: true }),
+    ]);
   });
 
   afterEach(async () => {
