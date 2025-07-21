@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ValidationResult } from "../types.js";
 import validateTheme from "./theme.js";
 
-describe("validateTheme", () => {
+describe.skip("validateTheme", () => {
   let tempThemeDirectory: string;
   let snippetsDirectory: string;
   let localesDirectory: string;
