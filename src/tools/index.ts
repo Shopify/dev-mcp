@@ -341,10 +341,10 @@ export async function shopifyTools(server: McpServer): Promise<void> {
   );
 
   server.tool(
-    "validate_graphql",
-    `This tool validates GraphQL code snippets against the Shopify GraphQL schema to ensure they don't contain hallucinated fields or operations. If a user asks for an LLM to generate a GraphQL operation, this tool should always be used to ensure valid code was generated.
+    "validate_graphql_codeblocks",
+    `This tool validates GraphQL code blocks against the Shopify GraphQL schema to ensure they don't contain hallucinated fields or operations. If a user asks for an LLM to generate a GraphQL operation, this tool should always be used to ensure valid code was generated.
 
-    It returns a comprehensive validation result with details for each code snippet explaining why it was valid or invalid. This detail is provided so LLMs know how to modify code snippets to remove errors.`,
+    It returns a comprehensive validation result with details for each code block explaining why it was valid or invalid. This detail is provided so LLMs know how to modify code snippets to remove errors.`,
 
     withConversationId({
       api: z
@@ -363,15 +363,15 @@ export async function shopifyTools(server: McpServer): Promise<void> {
             .map((v) => `'${v}'`)
             .join(" or ")}\nDefault is '${latestVersion}'.`,
         ),
-      code: z
+      codeblocks: z
         .array(z.string())
-        .describe("Array of GraphQL code snippets to validate"),
+        .describe("Array of GraphQL code blocks to validate"),
     }),
     async (params) => {
-      // Validate all code snippets in parallel
+      // Validate all code blocks in parallel
       const validationResponses = await Promise.all(
-        params.code.map(async (snippet) => {
-          return await validateGraphQLOperation(snippet, {
+        params.codeblocks.map(async (codeblock) => {
+          return await validateGraphQLOperation(codeblock, {
             api: params.api,
             version: params.version,
             schemas,
@@ -379,14 +379,16 @@ export async function shopifyTools(server: McpServer): Promise<void> {
         }),
       );
 
-      recordUsage("validate_graphql", params, validationResponses).catch(
-        () => {},
-      );
+      recordUsage(
+        "validate_graphql_codeblocks",
+        params,
+        validationResponses,
+      ).catch(() => {});
 
       // Format the response using the shared formatting function
       const responseText = formatValidationResult(
         validationResponses,
-        "Code Snippets",
+        "Code Blocks",
       );
 
       return {
@@ -619,7 +621,7 @@ function liquidMcpTools(server: McpServer) {
   server.tool(
     "validate_theme",
     `This tool MUST run if the user asks the LLM to create or modify Liquid code inside their Theme repository. A theme repository is a directory that MUST contain the following directories: snippets, sections, config, templates. It can optionally contain assets, locales, blocks, layouts.
-    
+
     Only fix the errors in the files that are directly related to the user's prompt. Offer to fix other errors if the user asks for it.`,
 
     withConversationId({
