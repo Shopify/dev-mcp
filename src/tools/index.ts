@@ -5,8 +5,6 @@ import type { ValidationToolResult } from "../types.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { hasFailedValidation } from "../validations/index.js";
-import validateTheme from "../validations/theme.js";
-import validateThemeCodeblocks from "../validations/themeCodeBlock.js";
 import { introspectGraphqlSchema } from "./introspectGraphqlSchema.js";
 import { shopifyDevFetch } from "./shopifyDevFetch.js";
 
@@ -557,98 +555,98 @@ function liquidMcpTools(server: McpServer) {
     return;
   }
 
-  server.tool(
-    "validate_theme_codeblocks",
-    `This tool validates Liquid codeblocks, Liquid files, and supporting Theme files (e.g. JSON translation files, JSON config files, JSON template files, JavaScript files, CSS files, and SVG files) generated or updated by LLMs to ensure they don't have hallucinated Liquid filters, or incorrect references. If the user asks for an LLM to generate or update Liquid code, this tool should always be used to ensure valid code and supporting files were generated. If the codeblocks reference other files, those files must also be validated by this tool.`,
+  // server.tool(
+  //   "validate_theme_codeblocks",
+  //   `This tool validates Liquid codeblocks, Liquid files, and supporting Theme files (e.g. JSON translation files, JSON config files, JSON template files, JavaScript files, CSS files, and SVG files) generated or updated by LLMs to ensure they don't have hallucinated Liquid filters, or incorrect references. If the user asks for an LLM to generate or update Liquid code, this tool should always be used to ensure valid code and supporting files were generated. If the codeblocks reference other files, those files must also be validated by this tool.`,
 
-    withConversationId({
-      codeblocks: z
-        .array(
-          z.object({
-            fileName: z
-              .string()
-              .describe(
-                "The filename of the codeblock. If the filename is not provided, the filename should be descriptive of the codeblock's purpose, and should be in dashcase. Include file extension in the filename.",
-              ),
-            fileType: z
-              .enum([
-                "assets",
-                "blocks",
-                "config",
-                "layout",
-                "locales",
-                "sections",
-                "snippets",
-                "templates",
-              ])
-              .default("blocks")
-              .describe(
-                "The type of codeblock generated. All JavaScript, CSS, and SVG files are in assets folder. Locale files are JSON files located in the locale folder. If the translation is only used in schemas, it should be in `locales/en(.default).schema.json`; if the translation is used anywhere in the liquid code, it should be in `en(.default).json`. The brackets show an optional default locale. The locale code should be the two-letter code for the locale.",
-              ),
-            content: z.string().describe("The content of the file."),
-          }),
-        )
-        .describe("An array of codeblocks to validate."),
-    }),
-    async (params) => {
-      const validationResponses = await validateThemeCodeblocks(
-        params.codeblocks,
-      );
+  //   withConversationId({
+  //     codeblocks: z
+  //       .array(
+  //         z.object({
+  //           fileName: z
+  //             .string()
+  //             .describe(
+  //               "The filename of the codeblock. If the filename is not provided, the filename should be descriptive of the codeblock's purpose, and should be in dashcase. Include file extension in the filename.",
+  //             ),
+  //           fileType: z
+  //             .enum([
+  //               "assets",
+  //               "blocks",
+  //               "config",
+  //               "layout",
+  //               "locales",
+  //               "sections",
+  //               "snippets",
+  //               "templates",
+  //             ])
+  //             .default("blocks")
+  //             .describe(
+  //               "The type of codeblock generated. All JavaScript, CSS, and SVG files are in assets folder. Locale files are JSON files located in the locale folder. If the translation is only used in schemas, it should be in `locales/en(.default).schema.json`; if the translation is used anywhere in the liquid code, it should be in `en(.default).json`. The brackets show an optional default locale. The locale code should be the two-letter code for the locale.",
+  //             ),
+  //           content: z.string().describe("The content of the file."),
+  //         }),
+  //       )
+  //       .describe("An array of codeblocks to validate."),
+  //   }),
+  //   async (params) => {
+  //     const validationResponses = await validateThemeCodeblocks(
+  //       params.codeblocks,
+  //     );
 
-      recordUsage(
-        "validate_theme_codeblocks",
-        params,
-        validationResponses,
-      ).catch(() => {});
+  //     recordUsage(
+  //       "validate_theme_codeblocks",
+  //       params,
+  //       validationResponses,
+  //     ).catch(() => {});
 
-      const responseText = formatValidationResult(
-        validationResponses,
-        "Theme Codeblocks",
-      );
+  //     const responseText = formatValidationResult(
+  //       validationResponses,
+  //       "Theme Codeblocks",
+  //     );
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: responseText,
-          },
-        ],
-        isError: hasFailedValidation(validationResponses),
-      };
-    },
-  );
+  //     return {
+  //       content: [
+  //         {
+  //           type: "text" as const,
+  //           text: responseText,
+  //         },
+  //       ],
+  //       isError: hasFailedValidation(validationResponses),
+  //     };
+  //   },
+  // );
 
-  server.tool(
-    "validate_theme",
-    `This tool MUST run if the user asks the LLM to create or modify Liquid code inside their Theme repository. A theme repository is a directory that MUST contain the following directories: snippets, sections, config, templates. It can optionally contain assets, locales, blocks, layouts.
+  // server.tool(
+  //   "validate_theme",
+  //   `This tool MUST run if the user asks the LLM to create or modify Liquid code inside their Theme repository. A theme repository is a directory that MUST contain the following directories: snippets, sections, config, templates. It can optionally contain assets, locales, blocks, layouts.
 
-    Only fix the errors in the files that are directly related to the user's prompt. Offer to fix other errors if the user asks for it.`,
+  //   Only fix the errors in the files that are directly related to the user's prompt. Offer to fix other errors if the user asks for it.`,
 
-    withConversationId({
-      absoluteThemePath: z
-        .string()
-        .describe("The absolute path to the theme directory"),
-    }),
+  //   withConversationId({
+  //     absoluteThemePath: z
+  //       .string()
+  //       .describe("The absolute path to the theme directory"),
+  //   }),
 
-    async (params) => {
-      const validationResponse = await validateTheme(params.absoluteThemePath);
+  //   async (params) => {
+  //     const validationResponse = await validateTheme(params.absoluteThemePath);
 
-      recordUsage("validate_theme", params, validationResponse).catch(() => {});
+  //     recordUsage("validate_theme", params, validationResponse).catch(() => {});
 
-      const responseText = formatValidationResult(
-        [validationResponse],
-        "Theme",
-      );
+  //     const responseText = formatValidationResult(
+  //       [validationResponse],
+  //       "Theme",
+  //     );
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: responseText,
-          },
-        ],
-        isError: validationResponse.result === ValidationResult.FAILED,
-      };
-    },
-  );
+  //     return {
+  //       content: [
+  //         {
+  //           type: "text" as const,
+  //           text: responseText,
+  //         },
+  //       ],
+  //       isError: validationResponse.result === ValidationResult.FAILED,
+  //     };
+  //   },
+  // );
 }
