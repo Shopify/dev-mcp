@@ -6,6 +6,7 @@ import { z } from "zod";
 // Tag name to TypeScript type mapping
 /* eslint-disable @typescript-eslint/naming-convention */
 export const TAG_TO_TYPE_MAPPING = {
+  "s-avatar": "Avatar",
   "s-badge": "Badge",
   "s-banner": "Banner",
   "s-box": "Box",
@@ -45,6 +46,7 @@ export const TAG_TO_TYPE_MAPPING = {
   "s-text": "Page",
   "s-text-area": "TextArea",
   "s-text-field": "TextField",
+  "s-thumbnail": "Thumbnail",
   "s-url-field": "URLField",
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */
@@ -53,7 +55,7 @@ export const _UIModalAttributesSchema = z.object({
   children: z.string().optional(),
   id: z.string().optional(),
   src: z.string().optional(),
-  variant: z.string().optional(),
+  variant: z.enum(["small", "base", "large", "max"]).optional(),
 });
 
 export const UITitleBarAttributesSchema = z.object({
@@ -111,8 +113,8 @@ export const _UITitleBarAttributesSchema = z.object({
 });
 
 export const UITitleBarChildrenSchema = z.object({
-  a: z.string().optional(),
-  button: z.string().optional(),
+  a: z.enum(["breadcrumb", "primary"]).optional(),
+  button: z.enum(["breadcrumb", "primary", "critical", "default"]).optional(),
   section: z.string().optional(),
 });
 
@@ -127,11 +129,11 @@ export const BaseElementAttributesSchema = z.object({
   target: z.string().optional(),
 });
 
-export const BadgeSchema = z.object({
-  color: z.string().optional(),
-  icon: z.string().optional(),
-  size: z.string().optional(),
-  tone: z.string().optional(),
+export const AvatarSchema = z.object({
+  alt: z.string().optional(),
+  initials: z.string().optional(),
+  size: z.enum(["small", "small-200", "base", "large", "large-200"]).optional(),
+  src: z.string().optional(),
 });
 
 export const ClickOptionsSchema = z.object({
@@ -145,11 +147,33 @@ export const ActivationEventEsqueSchema = z.object({
   shiftKey: z.boolean().optional(),
 });
 
+export const AvatarEventsSchema = z.object({
+  error: z.string().optional(),
+  load: z.string().optional(),
+});
+
+export const BadgeSchema = z.object({
+  color: z.enum(["base", "strong"]).optional(),
+  icon: z.string().optional(),
+  size: z.enum(["base", "large", "large-100"]).optional(),
+  tone: z
+    .enum([
+      "info",
+      "success",
+      "warning",
+      "critical",
+      "auto",
+      "neutral",
+      "caution",
+    ])
+    .optional(),
+});
+
 export const BannerSchema = z.object({
   dismissible: z.boolean().optional(),
   heading: z.string().optional(),
   hidden: z.boolean().optional(),
-  tone: z.string().optional(),
+  tone: z.enum(["info", "success", "warning", "critical", "auto"]).optional(),
 });
 
 export const BannerEventsSchema = z.object({
@@ -164,21 +188,32 @@ export const BannerSlotsSchema = z.object({
 export const BoxSchema = z.object({
   accessibilityLabel: z.string().optional(),
   accessibilityRole: z.string().optional(),
-  accessibilityVisibility: z.string().optional(),
+  accessibilityVisibility: z
+    .enum(["visible", "hidden", "exclusive"])
+    .optional(),
   background: z.string().optional(),
   blockSize: z.string().optional(),
   border: z.string().optional(),
   borderColor: z.string().optional(),
   borderRadius: z.string().optional(),
   borderStyle: z.string().optional(),
-  borderWidth: z.string().optional(),
-  display: z.string().optional(),
+  borderWidth: z
+    .enum([
+      " | MaybeAllValuesShorthandProperty<",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+    ])
+    .optional(),
+  display: z.enum(["auto", "none"]).optional(),
   inlineSize: z.string().optional(),
   maxBlockSize: z.string().optional(),
   maxInlineSize: z.string().optional(),
   minBlockSize: z.string().optional(),
   minInlineSize: z.string().optional(),
-  overflow: z.string().optional(),
+  overflow: z.enum(["visible", "hidden"]).optional(),
   padding: z.string().optional(),
   paddingBlock: z.string().optional(),
   paddingBlockEnd: z.string().optional(),
@@ -190,17 +225,17 @@ export const BoxSchema = z.object({
 
 export const ButtonSchema = z.object({
   accessibilityLabel: z.string().optional(),
-  command: z.string().optional(),
+  command: z.enum(["--auto", "--show", "--hide", "--toggle"]).optional(),
   commandFor: z.string().optional(),
   disabled: z.boolean().optional(),
   download: z.string().optional(),
   href: z.string().optional(),
   icon: z.string().optional(),
   loading: z.boolean().optional(),
-  target: z.string().optional(),
-  tone: z.string().optional(),
-  type: z.string().optional(),
-  variant: z.string().optional(),
+  target: z.enum(["auto", "_blank", "_self", "_parent", "_top"]).optional(),
+  tone: z.enum(["critical", "auto", "neutral"]).optional(),
+  type: z.enum(["button", "reset", "submit"]).optional(),
+  variant: z.enum(["auto", "primary", "secondary", "tertiary"]).optional(),
 });
 
 export const ButtonEventsSchema = z.object({
@@ -235,7 +270,7 @@ export const ChoiceListSchema = z.object({
   disabled: z.boolean().optional(),
   error: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   multiple: z.boolean().optional(),
   name: z.string().optional(),
   values: z.string().optional(),
@@ -259,18 +294,29 @@ export const ChoiceListEventsSchema = z.object({
 export const ClickableSchema = z.object({
   accessibilityLabel: z.string().optional(),
   accessibilityRole: z.string().optional(),
-  accessibilityVisibility: z.string().optional(),
+  accessibilityVisibility: z
+    .enum(["visible", "hidden", "exclusive"])
+    .optional(),
   background: z.string().optional(),
   blockSize: z.string().optional(),
   border: z.string().optional(),
   borderColor: z.string().optional(),
   borderRadius: z.string().optional(),
   borderStyle: z.string().optional(),
-  borderWidth: z.string().optional(),
-  command: z.string().optional(),
+  borderWidth: z
+    .enum([
+      " | MaybeAllValuesShorthandProperty<",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+    ])
+    .optional(),
+  command: z.enum(["--auto", "--show", "--hide", "--toggle"]).optional(),
   commandFor: z.string().optional(),
   disabled: z.boolean().optional(),
-  display: z.string().optional(),
+  display: z.enum(["auto", "none"]).optional(),
   download: z.string().optional(),
   href: z.string().optional(),
   inlineSize: z.string().optional(),
@@ -279,7 +325,7 @@ export const ClickableSchema = z.object({
   maxInlineSize: z.string().optional(),
   minBlockSize: z.string().optional(),
   minInlineSize: z.string().optional(),
-  overflow: z.string().optional(),
+  overflow: z.enum(["visible", "hidden"]).optional(),
   padding: z.string().optional(),
   paddingBlock: z.string().optional(),
   paddingBlockEnd: z.string().optional(),
@@ -287,8 +333,8 @@ export const ClickableSchema = z.object({
   paddingInline: z.string().optional(),
   paddingInlineEnd: z.string().optional(),
   paddingInlineStart: z.string().optional(),
-  target: z.string().optional(),
-  type: z.string().optional(),
+  target: z.enum(["auto", "_blank", "_self", "_parent", "_top"]).optional(),
+  type: z.enum(["button", "reset", "submit"]).optional(),
 });
 
 export const ClickableEventsSchema = z.object({
@@ -305,7 +351,7 @@ export const DatePickerSchema = z.object({
   disallow: z.string().optional(),
   disallowDays: z.string().optional(),
   name: z.string().optional(),
-  type: z.string().optional(),
+  type: z.enum(["single", "multiple", "range"]).optional(),
   value: z.string().optional(),
   view: z.string().optional(),
 });
@@ -315,23 +361,38 @@ export const DatePickerEventsSchema = z.object({
   change: z.string().optional(),
   focus: z.string().optional(),
   input: z.string().optional(),
-  viewchange: z.string().optional(),
+  viewchange: z.enum(["viewchange"]).optional(),
 });
 
 export const DividerSchema = z.object({
-  color: z.string().optional(),
-  direction: z.string().optional(),
+  color: z.enum(["base", "strong"]).optional(),
+  direction: z.enum(["inline", "block"]).optional(),
 });
 
 export const EmailFieldSchema = z.object({
-  autocomplete: z.string().optional(),
+  autocomplete: z
+    .enum([
+      "on",
+      "off",
+      "shipping email",
+      "shipping home email",
+      "shipping mobile email",
+      "shipping fax email",
+      "shipping pager email",
+      "billing email",
+      "billing home email",
+      "billing mobile email",
+      "billing fax email",
+      "billing pager email",
+    ])
+    .optional(),
   defaultValue: z.string().optional(),
   details: z.string().optional(),
   disabled: z.boolean().optional(),
   error: z.string().optional(),
   id: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   maxLength: z.number().optional(),
   minLength: z.number().optional(),
   name: z.string().optional(),
@@ -351,7 +412,9 @@ export const EmailFieldEventsSchema = z.object({
 export const GridSchema = z.object({
   accessibilityLabel: z.string().optional(),
   accessibilityRole: z.string().optional(),
-  accessibilityVisibility: z.string().optional(),
+  accessibilityVisibility: z
+    .enum(["visible", "hidden", "exclusive"])
+    .optional(),
   alignContent: z.string().optional(),
   alignItems: z.string().optional(),
   background: z.string().optional(),
@@ -360,9 +423,18 @@ export const GridSchema = z.object({
   borderColor: z.string().optional(),
   borderRadius: z.string().optional(),
   borderStyle: z.string().optional(),
-  borderWidth: z.string().optional(),
+  borderWidth: z
+    .enum([
+      " | MaybeAllValuesShorthandProperty<",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+    ])
+    .optional(),
   columnGap: z.string().optional(),
-  display: z.string().optional(),
+  display: z.enum(["auto", "none"]).optional(),
   gap: z.string().optional(),
   gridTemplateColumns: z.string().optional(),
   gridTemplateRows: z.string().optional(),
@@ -373,7 +445,7 @@ export const GridSchema = z.object({
   maxInlineSize: z.string().optional(),
   minBlockSize: z.string().optional(),
   minInlineSize: z.string().optional(),
-  overflow: z.string().optional(),
+  overflow: z.enum(["visible", "hidden"]).optional(),
   padding: z.string().optional(),
   paddingBlock: z.string().optional(),
   paddingBlockEnd: z.string().optional(),
@@ -389,23 +461,34 @@ export const GridSchema = z.object({
 export const GridItemSchema = z.object({
   accessibilityLabel: z.string().optional(),
   accessibilityRole: z.string().optional(),
-  accessibilityVisibility: z.string().optional(),
+  accessibilityVisibility: z
+    .enum(["visible", "hidden", "exclusive"])
+    .optional(),
   background: z.string().optional(),
   blockSize: z.string().optional(),
   border: z.string().optional(),
   borderColor: z.string().optional(),
   borderRadius: z.string().optional(),
   borderStyle: z.string().optional(),
-  borderWidth: z.string().optional(),
-  display: z.string().optional(),
-  gridColumn: z.string().optional(),
-  gridRow: z.string().optional(),
+  borderWidth: z
+    .enum([
+      " | MaybeAllValuesShorthandProperty<",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+    ])
+    .optional(),
+  display: z.enum(["auto", "none"]).optional(),
+  gridColumn: z.enum(["auto"]).optional(),
+  gridRow: z.enum(["auto"]).optional(),
   inlineSize: z.string().optional(),
   maxBlockSize: z.string().optional(),
   maxInlineSize: z.string().optional(),
   minBlockSize: z.string().optional(),
   minInlineSize: z.string().optional(),
-  overflow: z.string().optional(),
+  overflow: z.enum(["visible", "hidden"]).optional(),
   padding: z.string().optional(),
   paddingBlock: z.string().optional(),
   paddingBlockEnd: z.string().optional(),
@@ -416,30 +499,51 @@ export const GridItemSchema = z.object({
 });
 
 export const HeadingSchema = z.object({
-  accessibilityRole: z.string().optional(),
-  accessibilityVisibility: z.string().optional(),
+  accessibilityRole: z.enum(["none", "presentation", "heading"]).optional(),
+  accessibilityVisibility: z
+    .enum(["visible", "hidden", "exclusive"])
+    .optional(),
   lineClamp: z.number().optional(),
 });
 
 export const IconSchema = z.object({
-  color: z.string().optional(),
-  size: z.string().optional(),
-  tone: z.string().optional(),
+  color: z.enum(["base", "subdued"]).optional(),
+  size: z.enum(["small", "base"]).optional(),
+  tone: z
+    .enum([
+      "info",
+      "success",
+      "warning",
+      "critical",
+      "auto",
+      "neutral",
+      "caution",
+    ])
+    .optional(),
   type: z.string().optional(),
 });
 
 export const ImageSchema = z.object({
-  accessibilityRole: z.string().optional(),
+  accessibilityRole: z.enum(["none", "presentation", "img"]).optional(),
   alt: z.string().optional(),
   aspectRatio: z.string().optional(),
   border: z.string().optional(),
   borderColor: z.string().optional(),
   borderRadius: z.string().optional(),
   borderStyle: z.string().optional(),
-  borderWidth: z.string().optional(),
-  inlineSize: z.string().optional(),
-  loading: z.string().optional(),
-  objectFit: z.string().optional(),
+  borderWidth: z
+    .enum([
+      " | MaybeAllValuesShorthandProperty<",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+    ])
+    .optional(),
+  inlineSize: z.enum(["auto", "fill"]).optional(),
+  loading: z.enum(["eager", "lazy"]).optional(),
+  objectFit: z.enum(["contain", "cover"]).optional(),
   sizes: z.string().optional(),
   src: z.string().optional(),
   srcSet: z.string().optional(),
@@ -452,13 +556,13 @@ export const ImageEventsSchema = z.object({
 
 export const LinkSchema = z.object({
   accessibilityLabel: z.string().optional(),
-  command: z.string().optional(),
+  command: z.enum(["--auto", "--show", "--hide", "--toggle"]).optional(),
   commandFor: z.string().optional(),
   download: z.string().optional(),
   href: z.string().optional(),
   lang: z.string().optional(),
-  target: z.string().optional(),
-  tone: z.string().optional(),
+  target: z.enum(["auto", "_blank", "_self", "_parent", "_top"]).optional(),
+  tone: z.enum(["critical", "auto", "neutral"]).optional(),
 });
 
 export const LinkEventsSchema = z.object({
@@ -474,7 +578,7 @@ export const MoneyFieldSchema = z.object({
   error: z.string().optional(),
   id: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   max: z.number().optional(),
   min: z.number().optional(),
   name: z.string().optional(),
@@ -493,15 +597,26 @@ export const MoneyFieldEventsSchema = z.object({
 });
 
 export const NumberFieldSchema = z.object({
-  autocomplete: z.string().optional(),
+  autocomplete: z
+    .enum([
+      "on",
+      "off",
+      "shipping one-time-code",
+      "shipping cc-number",
+      "shipping cc-csc",
+      "billing one-time-code",
+      "billing cc-number",
+      "billing cc-csc",
+    ])
+    .optional(),
   defaultValue: z.string().optional(),
   details: z.string().optional(),
   disabled: z.boolean().optional(),
   error: z.string().optional(),
   id: z.string().optional(),
-  inputMode: z.string().optional(),
+  inputMode: z.enum(["decimal", "numeric"]).optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   max: z.number().optional(),
   min: z.number().optional(),
   name: z.string().optional(),
@@ -524,7 +639,7 @@ export const NumberFieldEventsSchema = z.object({
 export const PageSchema = z.object({
   connectedCallback: z.function().optional(),
   disconnectedCallback: z.function().optional(),
-  inlineSize: z.string().optional(),
+  inlineSize: z.enum(["small", "base", "large"]).optional(),
 });
 
 export const PageSlotsSchema = z.object({
@@ -532,23 +647,44 @@ export const PageSlotsSchema = z.object({
 });
 
 export const ParagraphSchema = z.object({
-  accessibilityVisibility: z.string().optional(),
-  color: z.string().optional(),
-  dir: z.string().optional(),
-  fontVariantNumeric: z.string().optional(),
+  accessibilityVisibility: z
+    .enum(["visible", "hidden", "exclusive"])
+    .optional(),
+  color: z.enum(["base", "subdued"]).optional(),
+  dir: z.enum([" | ", " | ", " | "]).optional(),
+  fontVariantNumeric: z.enum(["auto", "normal", "tabular-nums"]).optional(),
   lineClamp: z.number().optional(),
-  tone: z.string().optional(),
+  tone: z
+    .enum([
+      "info",
+      "success",
+      "warning",
+      "critical",
+      "auto",
+      "neutral",
+      "caution",
+    ])
+    .optional(),
 });
 
 export const PasswordFieldSchema = z.object({
-  autocomplete: z.string().optional(),
+  autocomplete: z
+    .enum([
+      "on",
+      "off",
+      "shipping current-password",
+      "shipping new-password",
+      "billing current-password",
+      "billing new-password",
+    ])
+    .optional(),
   defaultValue: z.string().optional(),
   details: z.string().optional(),
   disabled: z.boolean().optional(),
   error: z.string().optional(),
   id: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   maxLength: z.number().optional(),
   minLength: z.number().optional(),
   name: z.string().optional(),
@@ -577,7 +713,7 @@ export const SearchFieldSchema = z.object({
   error: z.string().optional(),
   id: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   maxLength: z.number().optional(),
   minLength: z.number().optional(),
   name: z.string().optional(),
@@ -597,7 +733,7 @@ export const SearchFieldEventsSchema = z.object({
 export const SectionSchema = z.object({
   accessibilityLabel: z.string().optional(),
   heading: z.string().optional(),
-  padding: z.string().optional(),
+  padding: z.enum(["base", "none"]).optional(),
 });
 
 export const SelectSchema = z.object({
@@ -608,7 +744,7 @@ export const SelectSchema = z.object({
   icon: z.string().optional(),
   id: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   name: z.string().optional(),
   placeholder: z.string().optional(),
   required: z.boolean().optional(),
@@ -622,13 +758,15 @@ export const SelectEventsSchema = z.object({
 
 export const SpinnerSchema = z.object({
   accessibilityLabel: z.string().optional(),
-  size: z.string().optional(),
+  size: z.enum(["base", "large", "large-100"]).optional(),
 });
 
 export const StackSchema = z.object({
   accessibilityLabel: z.string().optional(),
   accessibilityRole: z.string().optional(),
-  accessibilityVisibility: z.string().optional(),
+  accessibilityVisibility: z
+    .enum(["visible", "hidden", "exclusive"])
+    .optional(),
   alignContent: z.string().optional(),
   alignItems: z.string().optional(),
   background: z.string().optional(),
@@ -637,10 +775,19 @@ export const StackSchema = z.object({
   borderColor: z.string().optional(),
   borderRadius: z.string().optional(),
   borderStyle: z.string().optional(),
-  borderWidth: z.string().optional(),
+  borderWidth: z
+    .enum([
+      " | MaybeAllValuesShorthandProperty<",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+      " | ",
+    ])
+    .optional(),
   columnGap: z.string().optional(),
-  direction: z.string().optional(),
-  display: z.string().optional(),
+  direction: z.enum(["inline", "block"]).optional(),
+  display: z.enum(["auto", "none"]).optional(),
   gap: z.string().optional(),
   inlineSize: z.string().optional(),
   justifyContent: z.string().optional(),
@@ -648,7 +795,7 @@ export const StackSchema = z.object({
   maxInlineSize: z.string().optional(),
   minBlockSize: z.string().optional(),
   minInlineSize: z.string().optional(),
-  overflow: z.string().optional(),
+  overflow: z.enum(["visible", "hidden"]).optional(),
   padding: z.string().optional(),
   paddingBlock: z.string().optional(),
   paddingBlockEnd: z.string().optional(),
@@ -668,7 +815,7 @@ export const SwitchSchema = z.object({
   error: z.string().optional(),
   id: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   name: z.string().optional(),
   required: z.boolean().optional(),
   value: z.string().optional(),
@@ -684,7 +831,7 @@ export const TableSchema = z.object({
   hasPreviousPage: z.boolean().optional(),
   loading: z.boolean().optional(),
   paginate: z.boolean().optional(),
-  variant: z.string().optional(),
+  variant: z.enum(["auto", "list"]).optional(),
 });
 
 export const AddedContextSchema = z.object({
@@ -712,12 +859,24 @@ export const TableHeaderRowSchema = z.object({
 });
 
 export const TextSchema = z.object({
-  accessibilityVisibility: z.string().optional(),
-  color: z.string().optional(),
-  dir: z.string().optional(),
-  fontVariantNumeric: z.string().optional(),
-  tone: z.string().optional(),
-  type: z.string().optional(),
+  accessibilityVisibility: z
+    .enum(["visible", "hidden", "exclusive"])
+    .optional(),
+  color: z.enum(["base", "subdued"]).optional(),
+  dir: z.enum([" | ", " | ", " | "]).optional(),
+  fontVariantNumeric: z.enum(["auto", "normal", "tabular-nums"]).optional(),
+  tone: z
+    .enum([
+      "info",
+      "success",
+      "warning",
+      "critical",
+      "auto",
+      "neutral",
+      "caution",
+    ])
+    .optional(),
+  type: z.enum(["strong", "generic", "address", "redundant"]).optional(),
 });
 
 export const TextAreaSchema = z.object({
@@ -728,7 +887,7 @@ export const TextAreaSchema = z.object({
   error: z.string().optional(),
   id: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   maxLength: z.number().optional(),
   minLength: z.number().optional(),
   name: z.string().optional(),
@@ -755,7 +914,7 @@ export const TextFieldSchema = z.object({
   icon: z.string().optional(),
   id: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   maxLength: z.number().optional(),
   minLength: z.number().optional(),
   name: z.string().optional(),
@@ -778,15 +937,47 @@ export const TextFieldEventsSchema = z.object({
   input: z.string().optional(),
 });
 
+export const ThumbnailSchema = z.object({
+  alt: z.string().optional(),
+  size: z
+    .enum(["small", "small-200", "small-100", "base", "large", "large-100"])
+    .optional(),
+  src: z.string().optional(),
+});
+
+export const ThumbnailEventsSchema = z.object({
+  error: z.string().optional(),
+  load: z.string().optional(),
+});
+
 export const URLFieldSchema = z.object({
-  autocomplete: z.string().optional(),
+  autocomplete: z
+    .enum([
+      "on",
+      "off",
+      "shipping url",
+      "shipping photo",
+      "shipping impp",
+      "shipping home impp",
+      "shipping mobile impp",
+      "shipping fax impp",
+      "shipping pager impp",
+      "billing url",
+      "billing photo",
+      "billing impp",
+      "billing home impp",
+      "billing mobile impp",
+      "billing fax impp",
+      "billing pager impp",
+    ])
+    .optional(),
   defaultValue: z.string().optional(),
   details: z.string().optional(),
   disabled: z.boolean().optional(),
   error: z.string().optional(),
   id: z.string().optional(),
   label: z.string().optional(),
-  labelAccessibilityVisibility: z.string().optional(),
+  labelAccessibilityVisibility: z.enum(["visible", "exclusive"]).optional(),
   maxLength: z.number().optional(),
   minLength: z.number().optional(),
   name: z.string().optional(),
