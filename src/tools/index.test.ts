@@ -751,7 +751,7 @@ describe("validate_graphql_codeblocks tool", () => {
   });
 });
 
-describe("validate_functions_codeblocks tool", () => {
+describe("validate_functions tool", () => {
   let mockServer: any;
   let validateJavaScriptCodeBlockMock: any;
   let validateRustCodeBlockMock: any;
@@ -776,7 +776,7 @@ describe("validate_functions_codeblocks tool", () => {
     // Create a mock server that captures the registered tools
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
-        if (name === "validate_functions_codeblocks") {
+        if (name === "validate_functions") {
           mockServer.validateFunctionsHandler = handler;
         }
       }),
@@ -1046,7 +1046,7 @@ describe("validate_functions_codeblocks tool", () => {
     // Verify recordUsage was called with correct parameters
     const { recordUsage } = await import("../instrumentation.js");
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
-      "validate_functions_codeblocks",
+      "validate_functions",
       {
         codeblocks: testCodeblocks,
         conversationId: "test-id",
@@ -1124,5 +1124,94 @@ describe("validate_functions_codeblocks tool", () => {
     const responseText = result.content[0].text;
     expect(responseText).toContain("✅ VALID");
     expect(responseText).toContain("**Total Functions Code Blocks:** 3");
+  });
+
+  test("uses non-CLI validation by default", async () => {
+    // Ensure no CLI environment variable is set
+    delete process.env.FUNCTIONS_CLI_VALIDATION;
+
+    // Setup mock responses
+    validateJavaScriptCodeBlockMock.mockResolvedValueOnce({
+      result: ValidationResult.SUCCESS,
+      resultDetail: "JavaScript code has valid syntax",
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeblocks = [
+      {
+        code: 'function test() { return "hello"; }',
+        language: "javascript",
+      },
+    ];
+
+    // Call the handler with codeblocks (non-CLI mode)
+    const result = await mockServer.validateFunctionsHandler({
+      codeblocks: testCodeblocks,
+      conversationId: "test-id",
+    });
+
+    // Verify validateJavaScriptCodeBlock was called (non-CLI implementation)
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledTimes(1);
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledWith({
+      code: 'function test() { return "hello"; }',
+    });
+
+    // Verify successful response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+  });
+
+  test("uses CLI validation when environment variable is set", async () => {
+    // Set environment variable to enable CLI validation
+    process.env.FUNCTIONS_CLI_VALIDATION = "true";
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Call the handler with only conversationId (CLI mode)
+    const result = await mockServer.validateFunctionsHandler({
+      conversationId: "test-id",
+    });
+
+    // In CLI mode, validateWithCLI is called with an empty array
+    // So no individual language validation functions should be called
+    expect(validateJavaScriptCodeBlockMock).not.toHaveBeenCalled();
+    expect(validateRustCodeBlockMock).not.toHaveBeenCalled();
+
+    // Verify successful response (empty validation should be valid)
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+    expect(responseText).toContain("**Total Functions Code Blocks:** 0");
+
+    // Clean up environment variable
+    delete process.env.FUNCTIONS_CLI_VALIDATION;
+  });
+
+  test("records usage correctly for CLI mode", async () => {
+    // Set environment variable to enable CLI validation
+    process.env.FUNCTIONS_CLI_VALIDATION = "true";
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Call the handler with only conversationId (CLI mode)
+    await mockServer.validateFunctionsHandler({
+      conversationId: "test-id",
+    });
+
+    // Verify recordUsage was called with correct parameters for CLI mode
+    const { recordUsage } = await import("../instrumentation.js");
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "validate_functions",
+      {
+        conversationId: "test-id",
+      },
+      expect.any(Array), // The validation responses array
+    );
+
+    // Clean up environment variable
+    delete process.env.FUNCTIONS_CLI_VALIDATION;
   });
 });
