@@ -31,40 +31,47 @@ describe("validateTheme", () => {
 
   it("should successfully validate a theme", async () => {
     // Create the test.liquid file with the specified content
-    const liquidFile = join(snippetsDirectory, "test.liquid");
-    await writeFile(liquidFile, "{{ 'hello' }}");
+    const relativeFilePath = join("snippets", "test.liquid");
+    const filePath = join(snippetsDirectory, "test.liquid");
+    await writeFile(filePath, "{{ 'hello' }}");
 
     // Run validateTheme on the temporary directory
-    const result = await validateTheme(tempThemeDirectory);
+    const responses = await validateTheme(tempThemeDirectory, [
+      relativeFilePath,
+    ]);
 
-    // Assert the response was a success
-    expect(result.result).toBe(ValidationResult.SUCCESS);
-    expect(result.resultDetail).toBe(
-      `Theme at ${tempThemeDirectory} passed all checks from Shopify's Theme Check.`,
-    );
+    expect(responses).toContainEqual({
+      result: ValidationResult.SUCCESS,
+      resultDetail: `Theme file ${relativeFilePath} passed all checks from Shopify's Theme Check.`,
+    });
   });
 
   it("should fail to validate a theme with an unknown filter", async () => {
     // Create the test.liquid file with the specified content
-    const liquidFile = join(snippetsDirectory, "test.liquid");
-    await writeFile(liquidFile, "{{ 'hello' | non-existent-filter }}");
+    const relativeFilePath = join("snippets", "test.liquid");
+    const filePath = join(snippetsDirectory, "test.liquid");
+    await writeFile(filePath, "{{ 'hello' | non-existent-filter }}");
 
     // Run validateTheme on the temporary directory
-    const result = await validateTheme(tempThemeDirectory);
+    const responses = await validateTheme(tempThemeDirectory, [
+      relativeFilePath,
+    ]);
 
-    // Assert the response was a success
-    expect(result.result).toBe(ValidationResult.FAILED);
-    expect(result.resultDetail).toContain(
-      "Unknown filter 'non-existent-filter' used.",
-    );
+    expect(responses).toContainEqual({
+      result: ValidationResult.FAILED,
+      resultDetail: `Theme file ${relativeFilePath} failed to validate:
+
+ERROR: Unknown filter 'non-existent-filter' used.`,
+    });
   });
 
   it("should fail to validate a theme with an invalid schema", async () => {
     // Create the test.liquid file with the specified content
-    const liquidFile = join(blocksDirectory, "test.liquid");
+    const relativeFilePath = join("blocks", "test.liquid");
+    const filePath = join(blocksDirectory, "test.liquid");
     const schemaName = "Long long long long long long name";
     await writeFile(
-      liquidFile,
+      filePath,
       `
 {% schema %}
   {
@@ -74,30 +81,57 @@ describe("validateTheme", () => {
     );
 
     // Run validateTheme on the temporary directory
-    const result = await validateTheme(tempThemeDirectory);
+    const responses = await validateTheme(tempThemeDirectory, [
+      relativeFilePath,
+    ]);
 
-    // Assert the response was a success
-    expect(result.result).toBe(ValidationResult.FAILED);
-    expect(result.resultDetail).toContain(
-      `Schema name '${schemaName}' is too long (max 25 characters)`,
-    );
+    expect(responses).toContainEqual({
+      result: ValidationResult.FAILED,
+      resultDetail: `Theme file ${relativeFilePath} failed to validate:
+
+ERROR: Schema name '${schemaName}' is too long (max 25 characters)`,
+    });
   });
 
   it("should successfully validate a theme with an unknown filter if its check is exempted", async () => {
     // Create the test.liquid file with the specified content
-    const liquidFile = join(snippetsDirectory, "test.liquid");
-    await writeFile(liquidFile, "{{ 'hello' | non-existent-filter }}");
+    const relativeSnippetFilePath = join("snippets", "test.liquid");
+    const snippetFilePath = join(snippetsDirectory, "test.liquid");
+    await writeFile(snippetFilePath, "{{ 'hello' | non-existent-filter }}");
 
     const themeCheckYml = join(tempThemeDirectory, ".theme-check.yml");
     await writeFile(themeCheckYml, "ignore:\n- snippets/test.liquid");
 
     // Run validateTheme on the temporary directory
-    const result = await validateTheme(tempThemeDirectory);
+    const responses = await validateTheme(tempThemeDirectory, [
+      relativeSnippetFilePath,
+    ]);
 
-    // Assert the response was a success
-    expect(result.result).toBe(ValidationResult.SUCCESS);
-    expect(result.resultDetail).toBe(
-      `Theme at ${tempThemeDirectory} passed all checks from Shopify's Theme Check.`,
-    );
+    expect(responses).toContainEqual({
+      result: ValidationResult.SUCCESS,
+      resultDetail: `Theme file ${relativeSnippetFilePath} passed all checks from Shopify's Theme Check.`,
+    });
+  });
+
+  it("should fail to validate only files that were touched by the LLM", async () => {
+    for (let i = 0; i < 5; i++) {
+      const snippetFilePath = join(snippetsDirectory, `test-${i}.liquid`);
+      await writeFile(snippetFilePath, "{{ 'hello' | non-existent-filter }}");
+    }
+
+    const relativeSnippetFilePath = join("snippets", "test-0.liquid");
+
+    // Run validateTheme on the temporary directory
+    const responses = await validateTheme(tempThemeDirectory, [
+      relativeSnippetFilePath,
+    ]);
+
+    expect(responses).toHaveLength(1);
+    expect(responses).toContainEqual({
+      result: ValidationResult.FAILED,
+      resultDetail: `Theme file ${relativeSnippetFilePath} failed to validate:
+
+ERROR: Unknown filter 'non-existent-filter' used.`,
+    });
   });
 });

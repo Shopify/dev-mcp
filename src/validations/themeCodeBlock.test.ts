@@ -147,7 +147,7 @@ describe("validateThemeCodeblocks", () => {
     expect(result).toContainEqual({
       result: ValidationResult.FAILED,
       resultDetail:
-        "Theme codeblock test.liquid has the following offenses from using Shopify's Theme Check:\n\nERROR: The variable 'some_var' is assigned but not used; SUGGESTED FIXES: Remove the unused variable 'some_var'",
+        "Theme codeblock test.liquid has the following offenses from using Shopify's Theme Check:\n\nERROR: The variable 'some_var' is assigned but not used; SUGGESTED FIXES: Remove the unused variable 'some_var'.",
     });
   });
 
@@ -219,7 +219,7 @@ ERROR: Schema name '${schemaName}' is too long (max 25 characters)`,
       result: ValidationResult.FAILED,
       resultDetail: `Theme codeblock test.liquid has the following offenses from using Shopify's Theme Check:
 
-ERROR: Missing required argument 'param' in render tag for snippet 'example-snippet'.; SUGGESTED FIXES: Add required argument 'param'`,
+ERROR: Missing required argument 'param' in render tag for snippet 'example-snippet'.; SUGGESTED FIXES: Add required argument 'param'.`,
     });
   });
 });
