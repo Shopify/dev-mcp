@@ -2,15 +2,22 @@ import {
   AbstractFileSystem,
   check,
   Config,
+  extractDocDefinition,
   FileStat,
   FileTuple,
   FileType,
+  LiquidHtmlNode,
   Offense,
   path,
   recommended,
+  SectionSchema,
+  SourceCodeType,
+  ThemeBlockSchema,
+  toSchema,
   toSourceCode,
 } from "@shopify/theme-check-common";
 import { ThemeLiquidDocsManager } from "@shopify/theme-check-docs-updater";
+import { normalize } from "path";
 import { ValidationResponse, ValidationResult } from "../types.js";
 
 type ThemeCodeblock = {
@@ -95,6 +102,50 @@ async function runThemeCheck(theme: Theme) {
     fs: mockFs,
     themeDocset: docsManager,
     jsonValidationSet: docsManager,
+    getBlockSchema: async (blockName) => {
+      const blockUri = `file:///blocks/${blockName}.liquid`;
+      const sourceCode = themeSourceCode.find((s) => s.uri === blockUri);
+
+      if (!sourceCode) {
+        return undefined;
+      }
+
+      return toSchema(
+        "theme",
+        blockUri,
+        sourceCode,
+        async () => true,
+      ) as Promise<ThemeBlockSchema | undefined>;
+    },
+    getSectionSchema: async (sectionName) => {
+      const sectionUri = `file:///sections/${sectionName}.liquid`;
+      const sourceCode = themeSourceCode.find((s) => s.uri === sectionUri);
+
+      if (!sourceCode) {
+        return undefined;
+      }
+
+      return toSchema(
+        "theme",
+        sectionUri,
+        sourceCode,
+        async () => true,
+      ) as Promise<SectionSchema | undefined>;
+    },
+    async getDocDefinition(relativePath) {
+      const sourceCode = themeSourceCode.find((s) =>
+        normalize(s.uri).endsWith(normalize(relativePath)),
+      );
+
+      if (!sourceCode || sourceCode.type !== SourceCodeType.LiquidHtml) {
+        return undefined;
+      }
+
+      return extractDocDefinition(
+        sourceCode.uri,
+        sourceCode.ast as LiquidHtmlNode,
+      );
+    },
   });
 }
 

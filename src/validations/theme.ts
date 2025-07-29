@@ -14,7 +14,7 @@ export default async function validateTheme(
   try {
     let configPath: string | undefined = join(
       absoluteThemePath,
-      "theme-check.yml",
+      ".theme-check.yml",
     );
 
     try {
