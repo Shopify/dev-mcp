@@ -46,16 +46,15 @@ export function extractCodeFromBlock(
   // Remove HTML comments
   if (options.removeHtmlComments) {
     const beforeRemoval = extracted;
-    extracted = extracted
-      .replace(/^\s*<!--[\s\S]*?-->\s*$/gm, "") // Remove HTML comments that are on their own line
-      .replace(/<!--[\s\S]*?-->/g, ""); // Remove remaining inline HTML comments
+    extracted = extracted.replace(/<!--[\s\S]*?-->/g, ""); // Remove HTML comments
 
     // Only apply cleanup if comments were actually removed
     if (extracted !== beforeRemoval) {
       extracted = extracted
-        .replace(/\n\s*\n/g, "\n") // Remove double blank lines
-        .replace(/^\s*\n/, "") // Remove leading blank line only
-        .replace(/\n\s*$/, ""); // Remove trailing blank line only
+        .replace(/^\s*$/gm, "") // Remove lines that are now empty (whitespace only)
+        .replace(/\n\n\n+/g, "\n\n") // Only collapse excessive empty lines (3+ → 2)
+        .replace(/^\n/, "") // Remove leading empty line
+        .replace(/\n$/, ""); // Remove trailing empty line
     }
   }
 
@@ -63,17 +62,16 @@ export function extractCodeFromBlock(
   if (options.removeJsComments) {
     const beforeRemoval = extracted;
     extracted = extracted
-      .replace(/^\s*\/\*[\s\S]*?\*\/\s*$/gm, "") // Remove /* */ comments that are on their own line
-      .replace(/\/\*[\s\S]*?\*\//g, "") // Remove remaining inline /* */ comments
-      .replace(/^\s*\/\/.*$/gm, "") // Remove // comments that are on their own line
-      .replace(/(^|\s)\/\/.*$/gm, "$1"); // Remove remaining // comments (at start of line or after whitespace)
+      .replace(/\/\*[\s\S]*?\*\//g, "") // Remove /* */ comments
+      .replace(/(^|\s)\/\/.*$/gm, "$1"); // Remove // comments (at start of line or after whitespace)
 
     // Only apply cleanup if comments were actually removed
     if (extracted !== beforeRemoval) {
       extracted = extracted
-        .replace(/\n\s*\n/g, "\n") // Remove double blank lines
-        .replace(/^\s*\n/, "") // Remove leading blank line only
-        .replace(/\n\s*$/, ""); // Remove trailing blank line only
+        .replace(/^\s*$/gm, "") // Remove lines that are now empty (whitespace only)
+        .replace(/\n\n\n+/g, "\n\n") // Only collapse excessive empty lines (3+ → 2)
+        .replace(/^\n/, "") // Remove leading empty line
+        .replace(/\n$/, ""); // Remove trailing empty line
     }
   }
 
@@ -81,18 +79,20 @@ export function extractCodeFromBlock(
   if (options.removeGraphqlComments) {
     extracted = extracted
       .replace(/^\s*#.*$/gm, "") // Remove # comments
-      .replace(/\n\s*\n/g, "\n") // Remove double blank lines
-      .replace(/^\s*\n/, "") // Remove leading blank line only
-      .replace(/\n\s*$/, ""); // Remove trailing blank line only
+      .replace(/^\s*$/gm, "") // Remove lines that are now empty (whitespace only)
+      .replace(/\n\n+/g, "\n") // Collapse multiple consecutive empty lines into single empty line
+      .replace(/^\n/, "") // Remove leading empty line
+      .replace(/\n$/, ""); // Remove trailing empty line
   }
 
   // Remove GraphQL directives (e.g., @deprecated, @include, @skip)
   if (options.removeGraphqlDirectives) {
     extracted = extracted
       .replace(/\s+@\w+(?:\([^)]*\))?/g, "") // Remove @directive and @directive(args)
-      .replace(/\n\s*\n/g, "\n") // Remove double blank lines
-      .replace(/^\s*\n/, "") // Remove leading blank line only
-      .replace(/\n\s*$/, ""); // Remove trailing blank line only
+      .replace(/^\s*$/gm, "") // Remove lines that are now empty (whitespace only)
+      .replace(/\n\n+/g, "\n") // Collapse multiple consecutive empty lines into single empty line
+      .replace(/^\n/, "") // Remove leading empty line
+      .replace(/\n$/, ""); // Remove trailing empty line
   }
 
   // Remove GraphQL fragment definitions and spread operations
@@ -100,9 +100,10 @@ export function extractCodeFromBlock(
     extracted = extracted
       .replace(/fragment\s+\w+\s+on\s+\w+\s*\{[\s\S]*?\}/g, "") // Remove fragment definitions
       .replace(/\.\.\.\w+/g, "") // Remove fragment spreads
-      .replace(/\n\s*\n/g, "\n") // Clean up extra blank lines
-      .replace(/^\s*\n/, "") // Remove leading blank line
-      .replace(/\n\s*$/, ""); // Remove trailing blank line
+      .replace(/^\s*$/gm, "") // Remove lines that are now empty (whitespace only)
+      .replace(/\n\n+/g, "\n") // Collapse multiple consecutive empty lines into single empty line
+      .replace(/^\n/, "") // Remove leading empty line
+      .replace(/\n$/, ""); // Remove trailing empty line
   }
 
   // Remove GraphQL variable definitions and usages
@@ -110,9 +111,10 @@ export function extractCodeFromBlock(
     extracted = extracted
       .replace(/\(\s*\$[^)]*\)/g, "()") // Remove variable definitions in operation
       .replace(/\$\w+/g, "") // Remove variable usages
-      .replace(/\n\s*\n/g, "\n") // Clean up extra blank lines
-      .replace(/^\s*\n/, "") // Remove leading blank line
-      .replace(/\n\s*$/, ""); // Remove trailing blank line
+      .replace(/^\s*$/gm, "") // Remove lines that are now empty (whitespace only)
+      .replace(/\n\n+/g, "\n") // Collapse multiple consecutive empty lines into single empty line
+      .replace(/^\n/, "") // Remove leading empty line
+      .replace(/\n$/, ""); // Remove trailing empty line
   }
 
   return extracted;
