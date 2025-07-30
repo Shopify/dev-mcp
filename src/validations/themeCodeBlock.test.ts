@@ -168,4 +168,58 @@ describe("validateThemeCodeblocks", () => {
         "Theme codeblock test.liquid has the following offenses from using Shopify's Theme Check:\n\nERROR: 'snippets/non-existent-snippet.liquid' does not exist",
     });
   });
+
+  it("should fail to validate liquid code with schema errors", async () => {
+    const schemaName = "Long long long long long long name";
+    const codeblocks = [
+      {
+        fileName: "test.liquid",
+        fileType: "blocks" as const,
+        content: `
+{% schema %}
+  {
+    "name": "${schemaName}"
+  }
+{% endschema %}`,
+      },
+    ];
+
+    const result = await validateThemeCodeblocks(codeblocks);
+
+    expect(result).toContainEqual({
+      result: ValidationResult.FAILED,
+      resultDetail: `Theme codeblock test.liquid has the following offenses from using Shopify's Theme Check:
+
+ERROR: Schema name '${schemaName}' is too long (max 25 characters)`,
+    });
+  });
+
+  it("should fail to validate liquid code with LiquidDoc errors", async () => {
+    const codeblocks = [
+      {
+        fileName: "example-snippet.liquid",
+        fileType: "snippets" as const,
+        content: `
+{% doc %}
+  @param {string} param
+{% enddoc %}
+{{ param }} 
+`,
+      },
+      {
+        fileName: "test.liquid",
+        fileType: "blocks" as const,
+        content: `{% render 'example-snippet' %}`,
+      },
+    ];
+
+    const result = await validateThemeCodeblocks(codeblocks);
+
+    expect(result).toContainEqual({
+      result: ValidationResult.FAILED,
+      resultDetail: `Theme codeblock test.liquid has the following offenses from using Shopify's Theme Check:
+
+ERROR: Missing required argument 'param' in render tag for snippet 'example-snippet'.; SUGGESTED FIXES: Add required argument 'param'`,
+    });
+  });
 });

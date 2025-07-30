@@ -7,16 +7,19 @@ import validateTheme from "./theme.js";
 
 describe("validateTheme", () => {
   let tempThemeDirectory: string;
+  let blocksDirectory: string;
   let snippetsDirectory: string;
   let localesDirectory: string;
 
   beforeEach(async () => {
     tempThemeDirectory = await mkdtemp(join(tmpdir(), "theme-test-"));
 
+    blocksDirectory = join(tempThemeDirectory, "blocks");
     snippetsDirectory = join(tempThemeDirectory, "snippets");
     localesDirectory = join(tempThemeDirectory, "locales");
 
     await Promise.all([
+      mkdir(blocksDirectory, { recursive: true }),
       mkdir(snippetsDirectory, { recursive: true }),
       mkdir(localesDirectory, { recursive: true }),
     ]);
@@ -41,7 +44,7 @@ describe("validateTheme", () => {
     );
   });
 
-  it("should fail to validate a theme", async () => {
+  it("should fail to validate a theme with an unknown filter", async () => {
     // Create the test.liquid file with the specified content
     const liquidFile = join(snippetsDirectory, "test.liquid");
     await writeFile(liquidFile, "{{ 'hello' | non-existent-filter }}");
@@ -53,6 +56,30 @@ describe("validateTheme", () => {
     expect(result.result).toBe(ValidationResult.FAILED);
     expect(result.resultDetail).toContain(
       "Unknown filter 'non-existent-filter' used.",
+    );
+  });
+
+  it("should fail to validate a theme with an invalid schema", async () => {
+    // Create the test.liquid file with the specified content
+    const liquidFile = join(blocksDirectory, "test.liquid");
+    const schemaName = "Long long long long long long name";
+    await writeFile(
+      liquidFile,
+      `
+{% schema %}
+  {
+    "name": "${schemaName}"
+  }
+{% endschema %}`,
+    );
+
+    // Run validateTheme on the temporary directory
+    const result = await validateTheme(tempThemeDirectory);
+
+    // Assert the response was a success
+    expect(result.result).toBe(ValidationResult.FAILED);
+    expect(result.resultDetail).toContain(
+      `Schema name '${schemaName}' is too long (max 25 characters)`,
     );
   });
 

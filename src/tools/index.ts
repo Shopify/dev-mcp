@@ -557,9 +557,15 @@ function liquidMcpTools(server: McpServer) {
     return;
   }
 
+  const themeRepositoryDescription = `A theme repository is a directory that MUST contain the following directories: snippets, sections, config, templates. It can optionally contain assets, locales, blocks, layouts.`;
+
   server.tool(
     "validate_theme_codeblocks",
-    `This tool validates Liquid codeblocks, Liquid files, and supporting Theme files (e.g. JSON translation files, JSON config files, JSON template files, JavaScript files, CSS files, and SVG files) generated or updated by LLMs to ensure they don't have hallucinated Liquid filters, or incorrect references. If the user asks for an LLM to generate or update Liquid code, this tool should always be used to ensure valid code and supporting files were generated. If the codeblocks reference other files, those files must also be validated by this tool.`,
+    `This tool validates Liquid codeblocks, Liquid files, and supporting Theme files (e.g. JSON locale files, JSON config files, JSON template files, JavaScript files, CSS files, and SVG files) generated or updated by LLMs to ensure they don't have hallucinated Liquid content, or incorrect references.
+
+    DO NOT use this tool if the user is asking to add, update, or delete files within a Theme repository - Use \`validate_theme\` instead. ${themeRepositoryDescription}
+
+    Provide every codeblock that was generated or updated by the LLM to this tool.`,
 
     withConversationId({
       codeblocks: z
@@ -620,7 +626,7 @@ function liquidMcpTools(server: McpServer) {
 
   server.tool(
     "validate_theme",
-    `This tool MUST run if the user asks the LLM to create or modify Liquid code inside their Theme repository. A theme repository is a directory that MUST contain the following directories: snippets, sections, config, templates. It can optionally contain assets, locales, blocks, layouts.
+    `This tool MUST run if the user asks the LLM to create or modify Liquid code inside their Theme repository. ${themeRepositoryDescription}
 
     Only fix the errors in the files that are directly related to the user's prompt. Offer to fix other errors if the user asks for it.`,
 
