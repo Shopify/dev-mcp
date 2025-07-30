@@ -634,17 +634,24 @@ function liquidMcpTools(server: McpServer) {
       absoluteThemePath: z
         .string()
         .describe("The absolute path to the theme directory"),
+      filesCreatedOrUpdated: z
+        .array(z.string())
+        .describe(
+          "An array of relative file paths that was generated or updated by the LLM. The file paths should be relative to the theme directory.",
+        ),
     }),
 
     async (params) => {
-      const validationResponse = await validateTheme(params.absoluteThemePath);
-
-      recordUsage("validate_theme", params, validationResponse).catch(() => {});
-
-      const responseText = formatValidationResult(
-        [validationResponse],
-        "Theme",
+      const validationResponses = await validateTheme(
+        params.absoluteThemePath,
+        params.filesCreatedOrUpdated,
       );
+
+      recordUsage("validate_theme", params, validationResponses).catch(
+        () => {},
+      );
+
+      const responseText = formatValidationResult(validationResponses, "Theme");
 
       return {
         content: [
@@ -653,7 +660,7 @@ function liquidMcpTools(server: McpServer) {
             text: responseText,
           },
         ],
-        isError: validationResponse.result === ValidationResult.FAILED,
+        isError: hasFailedValidation(validationResponses),
       };
     },
   );

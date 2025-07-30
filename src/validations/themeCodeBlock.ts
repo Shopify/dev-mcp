@@ -7,7 +7,6 @@ import {
   FileTuple,
   FileType,
   LiquidHtmlNode,
-  Offense,
   path,
   recommended,
   SectionSchema,
@@ -19,6 +18,7 @@ import {
 import { ThemeLiquidDocsManager } from "@shopify/theme-check-docs-updater";
 import { normalize } from "path";
 import { ValidationResponse, ValidationResult } from "../types.js";
+import { groupOffensesByFileUri } from "./theme.js";
 
 type ThemeCodeblock = {
   fileName: string;
@@ -69,7 +69,7 @@ async function validatePartialTheme(
     if (fileUriToOffenses[uri]) {
       validationResults.push({
         result: ValidationResult.FAILED,
-        resultDetail: `Theme codeblock ${name} has the following offenses from using Shopify's Theme Check:\n\n${fileUriToOffenses[uri].join("\n\n")}`,
+        resultDetail: `Theme codeblock ${name} has the following offenses from using Shopify's Theme Check:\n\n${fileUriToOffenses[uri].join("\n")}`,
       });
     } else {
       validationResults.push({
@@ -155,26 +155,6 @@ function createTheme(codeblocks: ThemeCodeblock[]): Theme {
     theme[uri] = codeblock.content;
     return theme;
   }, {} as Theme);
-}
-
-function groupOffensesByFileUri(offenses: Offense[]) {
-  return offenses.reduce(
-    (acc, o) => {
-      let formattedMessage = `ERROR: ${o.message}`;
-
-      if (o.suggest && o.suggest.length > 0) {
-        formattedMessage += `; SUGGESTED FIXES: ${o.suggest.map((s) => s.message).join("OR ")}`;
-      }
-
-      if (acc[o.uri]) {
-        acc[o.uri].push(formattedMessage);
-      } else {
-        acc[o.uri] = [formattedMessage];
-      }
-      return acc;
-    },
-    {} as Record<string, string[]>,
-  );
 }
 
 // We mimic a theme on a file system to be able to run theme checks
