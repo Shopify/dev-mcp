@@ -747,7 +747,7 @@ describe("validate_graphql_codeblocks tool", () => {
   });
 });
 
-describe("validate_typescript_codeblocks tool", () => {
+describe("validate_component_codeblocks tool", () => {
   let mockServer: any;
   let validateTypeScriptCodeBlockMock: any;
 
@@ -761,7 +761,7 @@ describe("validate_typescript_codeblocks tool", () => {
     // Create a mock server that captures the registered tools
     mockServer = {
       tool: vi.fn((name, description, schema, handler) => {
-        if (name === "validate_typescript_codeblocks") {
+        if (name === "validate_component_codeblocks") {
           mockServer.validateTypescriptHandler = handler;
         }
       }),
@@ -900,7 +900,7 @@ describe("validate_typescript_codeblocks tool", () => {
     // Verify recordUsage was called with correct parameters
     const { recordUsage } = await import("../instrumentation.js");
     expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
-      "validate_typescript_codeblocks",
+      "validate_component_codeblocks",
       testParams,
       expect.arrayContaining([
         expect.objectContaining({

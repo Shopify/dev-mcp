@@ -116,7 +116,7 @@ async function performGraphQLValidation(
 ): Promise<ValidationResponse> {
   const operation = graphqlCode.trim();
 
-  const parseResult = parseGraphQLDocument(graphqlCode);
+  const parseResult = parseGraphQLDocument(operation);
   if (parseResult.success === false) {
     return validationResult(
       ValidationResult.FAILED,
