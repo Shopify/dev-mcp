@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ValidationResponse, ValidationResult } from "../types.js";
-import { validateTypeScriptCodeBlock } from "./typescript.js";
+import { validateComponentCodeBlock } from "./typescript.js";
 
 // Helper function to check if validation response is successful
 function isValidationSuccessful(response: ValidationResponse): boolean {
@@ -8,7 +8,7 @@ function isValidationSuccessful(response: ValidationResponse): boolean {
 }
 
 // Helper function to call the new validation function in a test-friendly way
-async function validateTypescript(
+async function validateComponent(
   codeBlocks: string[],
   packageName: string,
 ): Promise<ValidationResponse[]> {
@@ -24,7 +24,7 @@ async function validateTypescript(
 
   // Validate each code block individually (like the tool does)
   const results = codeBlocks.map((code) => {
-    return validateTypeScriptCodeBlock({
+    return validateComponentCodeBlock({
       code,
       packageName,
     });
@@ -33,11 +33,11 @@ async function validateTypescript(
   return results;
 }
 
-describe("validateTypescript", () => {
+describe("validateComponent", () => {
   describe("package validation", () => {
     it("should fail for unsupported packages", async () => {
       const codeBlock = "```<s-button>Hello, World</s-button>```";
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         [codeBlock],
         "unsupported-package",
       );
@@ -49,7 +49,7 @@ describe("validateTypescript", () => {
     it("should fail for other UI component packages", async () => {
       const codeBlock =
         "```<s-button variant='primary'>Hello, World</s-button>```";
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         [codeBlock],
         "@shopify/polaris",
       );
@@ -59,7 +59,7 @@ describe("validateTypescript", () => {
     });
 
     it("should fail for empty array", async () => {
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         [],
         "@shopify/app-bridge-ui-types",
       );
@@ -71,7 +71,7 @@ describe("validateTypescript", () => {
     it("should fail for fake components when package definitions cannot be loaded", async () => {
       const codeBlock =
         "```<fake-button variant='primary'>Hello, World</fake-button>```";
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         [codeBlock],
         "@shopify/app-bridge-ui-types",
       );
@@ -81,7 +81,7 @@ describe("validateTypescript", () => {
     it("should fail for fake components against @shopify/app-bridge-ui-types", async () => {
       const codeBlock =
         "```<s-fake-component variant='primary'>Hello, World</s-fake-component>```";
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         [codeBlock],
         "@shopify/app-bridge-ui-types",
       );
@@ -97,7 +97,7 @@ describe("validateTypescript", () => {
         "```<s-button>Button 1</s-button>```",
         "```<s-button>Button 2</s-button>```",
       ];
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );
@@ -114,7 +114,7 @@ describe("validateTypescript", () => {
         "```<s-text>Text</s-text>```",
         "```<s-heading>Heading</s-heading>```",
       ];
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );
@@ -132,7 +132,7 @@ describe("validateTypescript", () => {
         "```<s-button>Button</s-button><s-text>Text</s-text>```",
         "```<s-heading>Heading</s-heading>```",
       ];
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );
@@ -147,7 +147,7 @@ describe("validateTypescript", () => {
   describe("@shopify/app-bridge-ui-types package", () => {
     describe("valid components", () => {
       it("s-badge", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-badge>Badge</s-badge>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -155,7 +155,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-banner", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-banner>Banner</s-banner>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -163,7 +163,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-box", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-box>Box</s-box>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -171,7 +171,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-button", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-button>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -179,7 +179,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-checkbox", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-checkbox>Checkbox</s-checkbox>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -187,7 +187,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-text", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-text>Text</s-text>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -195,7 +195,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-heading", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-heading>Heading</s-heading>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -203,7 +203,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-link", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-link>Link</s-link>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -213,7 +213,7 @@ describe("validateTypescript", () => {
 
     describe("valid props", () => {
       it("s-button with variant", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-button variant='primary'>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -221,7 +221,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-button with disabled", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-button disabled>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -229,7 +229,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-badge with tone", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-badge tone='info'>Badge</s-badge>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -237,7 +237,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-icon with type", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-icon type='search'>Icon</s-icon>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -245,7 +245,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-number-field with numeric placeholder should pass", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           [
             "```<s-number-field label='Quantity' placeholder='0'></s-number-field>```",
           ],
@@ -255,7 +255,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-number-field with numeric placeholder (different value) should pass", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           [
             "```<s-number-field label='Quantity' placeholder='10'></s-number-field>```",
           ],
@@ -265,7 +265,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-number-field with text placeholder should pass", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           [
             "```<s-number-field label='Quantity' placeholder='Enter a quantity'></s-number-field>```",
           ],
@@ -275,7 +275,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-number-field with mixed placeholder should pass", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           [
             "```<s-number-field label='Quantity' placeholder='0 items'></s-number-field>```",
           ],
@@ -285,7 +285,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-number-field with no placeholder should pass", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-number-field label='Quantity'></s-number-field>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -293,7 +293,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-number-field with numeric attributes should convert correctly", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           [
             "```<s-number-field label='Quantity' min='0' max='100' step='1' placeholder='Enter quantity'></s-number-field>```",
           ],
@@ -305,7 +305,7 @@ describe("validateTypescript", () => {
 
     describe("components with different prefixes", () => {
       it("p-button (different prefix) - should fail because component doesn't exist", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<p-button>Button</p-button>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -313,7 +313,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-fake-element - should fail because component doesn't exist", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-fake-element>Fake</s-fake-element>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -322,7 +322,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-custom-component - should fail because component doesn't exist", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-custom-component>Custom</s-custom-component>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -333,7 +333,7 @@ describe("validateTypescript", () => {
 
     describe("props validation", () => {
       it("s-button with variant prop - passes basic validation", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-button variant='primary'>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -341,7 +341,7 @@ describe("validateTypescript", () => {
       });
 
       it("s-button with icon prop - passes basic validation", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           ["```<s-button icon='search'>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
@@ -351,7 +351,7 @@ describe("validateTypescript", () => {
 
     describe("complex component combinations", () => {
       it("valid form with multiple field types", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           [
             "```<s-text-field label='Name' /><s-email-field label='Email' /><s-button variant='primary'>Submit</s-button>```",
           ],
@@ -361,7 +361,7 @@ describe("validateTypescript", () => {
       });
 
       it("mix of components with s- prefix", async () => {
-        const validationResults = await validateTypescript(
+        const validationResults = await validateComponent(
           [
             "```<s-button>Button</s-button><s-text>Text</s-text><s-invalid-component>Invalid</s-invalid-component>```",
           ],
@@ -378,7 +378,7 @@ describe("validateTypescript", () => {
       const codeBlocks = [
         "```<s-button variant='primary'>Save</s-button><s-button>Cancel</s-button>```",
       ];
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );
@@ -391,7 +391,7 @@ describe("validateTypescript", () => {
       const codeBlocks = [
         "```<s-text>Hello world</s-text><s-button>Click me</s-button>```",
       ];
-      const validationResults = await validateTypescript(
+      const validationResults = await validateComponent(
         codeBlocks,
         "@shopify/app-bridge-ui-types",
       );

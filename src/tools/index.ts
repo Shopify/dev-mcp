@@ -6,7 +6,7 @@ import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { hasFailedValidation } from "../validations/index.js";
 import validateTheme from "../validations/theme.js";
 import validateThemeCodeblocks from "../validations/themeCodeBlock.js";
-import { validateTypeScriptCodeBlock } from "../validations/typescript.js";
+import { validateComponentCodeBlock } from "../validations/typescript.js";
 import { introspectGraphqlSchema } from "./introspectGraphqlSchema.js";
 import { shopifyDevFetch } from "./shopifyDevFetch.js";
 
@@ -505,7 +505,7 @@ ${responseText}`;
         const validationResponses = await Promise.all(
           code.map(async (snippet) => {
             try {
-              return validateTypeScriptCodeBlock({
+              return validateComponentCodeBlock({
                 code: snippet,
                 packageName,
               });
@@ -646,7 +646,7 @@ function liquidMcpTools(server: McpServer) {
             fileName: z
               .string()
               .describe(
-                "The filename of the codeblock. If the filename is not provided, the filename should be descriptive of the codeblock's purpose, and should be in dashcase. Include file extension in the filename.",
+                "The filename of the codeblock. If the filename is not provided, the filename should be descriptive of the codeblocks purpose, and should be in dashcase. Include file extension in the filename.",
               ),
             fileType: z
               .enum([

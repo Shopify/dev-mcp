@@ -7,7 +7,7 @@ import { extractTypeScriptCode } from "./codeblockExtraction.js";
 // Main Validation Function
 // ============================================================================
 
-export function validateTypeScriptCodeBlock(
+export function validateComponentCodeBlock(
   input: TypeScriptValidationInput,
 ): ValidationResponse {
   try {
