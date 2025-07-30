@@ -2,11 +2,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { generateConversationId, recordUsage } from "../instrumentation.js";
 import { ValidationResult, ValidationToolResult } from "../types.js";
+import { validateComponentCodeBlock } from "../validations/components.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { hasFailedValidation } from "../validations/index.js";
 import validateTheme from "../validations/theme.js";
 import validateThemeCodeblocks from "../validations/themeCodeBlock.js";
-import { validateComponentCodeBlock } from "../validations/typescript.js";
 import { introspectGraphqlSchema } from "./introspectGraphqlSchema.js";
 import { shopifyDevFetch } from "./shopifyDevFetch.js";
 

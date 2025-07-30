@@ -94,7 +94,7 @@ vi.mock("../validations/graphqlSchema.js", () => ({
 }));
 
 // Mock validateTypescript
-vi.mock("../validations/typescript.js", () => ({
+vi.mock("../validations/components.js", () => ({
   validateComponentCodeBlock: vi.fn(),
 }));
 
@@ -754,7 +754,7 @@ describe("validate_component_codeblocks tool", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { validateComponentCodeBlock } = await import(
-      "../validations/typescript.js"
+      "../validations/components.js"
     );
     validateComponentCodeBlockMock = vi.mocked(validateComponentCodeBlock);
 

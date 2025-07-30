@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ValidationResponse, ValidationResult } from "../types.js";
-import { validateComponentCodeBlock } from "./typescript.js";
+import { validateComponentCodeBlock } from "./components.js";
 
 // Helper function to check if validation response is successful
 function isValidationSuccessful(response: ValidationResponse): boolean {
