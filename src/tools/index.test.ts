@@ -280,7 +280,6 @@ describe("fetchGettingStartedApis", () => {
     vi.resetModules();
     // Reset environment to clean state
     process.env = { ...originalEnv };
-    delete process.env.LIQUID_MCP;
   });
 
   afterEach(() => {
@@ -306,14 +305,12 @@ describe("fetchGettingStartedApis", () => {
 
     // Verify fetch was called to get the APIs
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/mcp/getting_started_apis"),
+      expect.stringContaining("/mcp/getting_started_apis?liquid_mcp=true"),
       expect.any(Object),
     );
   });
 
-  test("adds liquid_mcp query parameter when environment variable is set", async () => {
-    process.env.LIQUID_MCP = "true";
-
+  test("adds liquid_mcp query parameter", async () => {
     const { shopifyTools } = await import("./index.js");
 
     const fetchSpy = vi.spyOn(global, "fetch");
@@ -323,22 +320,6 @@ describe("fetchGettingStartedApis", () => {
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/mcp/getting_started_apis?liquid_mcp=true"),
-      expect.any(Object),
-    );
-  });
-
-  test("does not add liquid_mcp query parameter when environment variable is false", async () => {
-    process.env.LIQUID_MCP = "false";
-
-    const { shopifyTools } = await import("./index.js");
-
-    const fetchSpy = vi.spyOn(global, "fetch");
-    const mockServer = { tool: vi.fn() };
-
-    await shopifyTools(mockServer as any);
-
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining("/mcp/getting_started_apis"),
       expect.any(Object),
     );
   });

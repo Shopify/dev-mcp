@@ -13,9 +13,6 @@ import { shopifyDevFetch } from "./shopifyDevFetch.js";
 const polarisUnifiedEnabled =
   process.env.POLARIS_UNIFIED === "true" || process.env.POLARIS_UNIFIED === "1";
 
-const liquidMcpEnabled =
-  process.env.LIQUID_MCP === "true" || process.env.LIQUID_MCP === "1";
-
 const GettingStartedAPISchema = z.object({
   name: z.string(),
   description: z.string(),
@@ -490,7 +487,7 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
   try {
     const parameters: Record<string, string> = {
       ...(polarisUnifiedEnabled && { polaris_unified: "true" }),
-      ...(liquidMcpEnabled && { liquid_mcp: "true" }),
+      ...{ liquid_mcp: "true" },
     };
 
     const responseText = await shopifyDevFetch("/mcp/getting_started_apis", {
@@ -553,10 +550,6 @@ function formatValidationResult(
 }
 
 function liquidMcpTools(server: McpServer) {
-  if (!liquidMcpEnabled) {
-    return;
-  }
-
   const themeRepositoryDescription = `A theme repository is a directory that MUST contain the following directories: snippets, sections, config, templates. It can optionally contain assets, locales, blocks, layouts.`;
 
   server.tool(
