@@ -5,6 +5,8 @@ import type { ValidationToolResult } from "../types.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
 import { hasFailedValidation } from "../validations/index.js";
+import { validateJavaScriptCodeBlock } from "../validations/javascript.js";
+import { validateRustCodeBlock } from "../validations/rust.js";
 import validateTheme from "../validations/theme.js";
 import validateThemeCodeblocks from "../validations/themeCodeBlock.js";
 import { introspectGraphqlSchema } from "./introspectGraphqlSchema.js";
@@ -404,6 +406,60 @@ export async function shopifyTools(server: McpServer): Promise<void> {
     },
   );
 
+  server.tool(
+    "validate_functions",
+    `This tool validates JavaScript and Rust code blocks for Shopify Functions to ensure they don't contain syntax errors or invalid code. If a user asks for an LLM to generate or update Shopify Functions code, this tool should always be used to ensure valid code was generated.
+
+    It returns a comprehensive validation result with details for each code block explaining why it was valid or invalid. This detail is provided so LLMs know how to modify code blocks to remove errors.`,
+
+    hasCLIAccess()
+      ? withConversationId({})
+      : withConversationId({
+          codeblocks: z
+            .array(
+              z.object({
+                code: z
+                  .string()
+                  .describe("The JavaScript or Rust code content to validate"),
+                language: z
+                  .enum(["javascript", "rust"])
+                  .describe("The programming language of the code block"),
+              }),
+            )
+            .describe("Array of code blocks to validate"),
+        }),
+    async (params) => {
+      let validationResponses: ValidationToolResult;
+
+      if (hasCLIAccess()) {
+        validationResponses = await validateWithCLI([]);
+      } else {
+        validationResponses = await validateFunctionCodeblocks(
+          (params as any).codeblocks,
+        );
+      }
+
+      recordUsage("validate_functions", params, validationResponses).catch(
+        () => {},
+      );
+
+      const responseText = formatValidationResult(
+        validationResponses,
+        "Functions Code Blocks",
+      );
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: responseText,
+          },
+        ],
+        isError: hasFailedValidation(validationResponses),
+      };
+    },
+  );
+
   liquidMcpTools(server);
 
   const gettingStartedApis = await fetchGettingStartedApis();
@@ -527,6 +583,56 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
 // ============================================================================
 // Private Helper Functions
 // ============================================================================
+
+/**
+ * Validates function code blocks using tree-sitter (no CLI access required)
+ * @param codeblocks - Array of code blocks to validate
+ * @returns Promise<ValidationToolResult> - Validation results for each code block
+ */
+async function validateFunctionCodeblocks(
+  codeblocks: Array<{ code: string; language: "javascript" | "rust" }>,
+): Promise<ValidationToolResult> {
+  return await Promise.all(
+    codeblocks.map(async (codeblock) => {
+      if (codeblock.language === "javascript") {
+        return validateJavaScriptCodeBlock({ code: codeblock.code });
+      } else if (codeblock.language === "rust") {
+        return validateRustCodeBlock({ code: codeblock.code });
+      }
+      return {
+        result: ValidationResult.FAILED,
+        resultDetail: `Unsupported language: ${codeblock.language}`,
+      };
+    }),
+  );
+}
+
+/**
+ * Validates function code blocks using CLI tools (requires CLI access)
+ * @param codeblocks - Array of code blocks to validate
+ * @returns Promise<ValidationToolResult> - Validation results for each code block
+ */
+async function validateWithCLI(
+  codeblocks: Array<{ code: string; language: "javascript" | "rust" }>,
+): Promise<ValidationToolResult> {
+  // TODO: Implement CLI-based validation using external tools like:
+  // - node --check for JavaScript
+  // - rustc --check for Rust
+  // For now, fall back to the non-CLI implementation
+  return await validateFunctionCodeblocks(codeblocks);
+}
+
+/**
+ * Checks if CLI access is available for running external validation tools
+ * @returns boolean - true if CLI access is available
+ */
+function hasCLIAccess(): boolean {
+  // Check for environment variable that indicates CLI access
+  return (
+    process.env.FUNCTIONS_CLI_VALIDATION === "true" ||
+    process.env.FUNCTIONS_CLI_VALIDATION === "1"
+  );
+}
 
 /**
  * Formats a ValidationToolResult into a readable markdown response

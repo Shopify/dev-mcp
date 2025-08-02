@@ -93,6 +93,15 @@ vi.mock("../validations/graphqlSchema.js", () => ({
   default: vi.fn(),
 }));
 
+// Mock JavaScript and Rust validation functions
+vi.mock("../validations/javascript.js", () => ({
+  validateJavaScriptCodeBlock: vi.fn(),
+}));
+
+vi.mock("../validations/rust.js", () => ({
+  validateRustCodeBlock: vi.fn(),
+}));
+
 vi.mock("../../package.json", () => ({
   default: { version: "1.0.0" },
 }));
@@ -720,5 +729,470 @@ describe("validate_graphql_codeblocks tool", () => {
       },
       expect.any(Array), // The validation responses array
     );
+  });
+});
+
+describe("validate_functions tool", () => {
+  let mockServer: any;
+  let validateJavaScriptCodeBlockMock: any;
+  let validateRustCodeBlockMock: any;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { validateJavaScriptCodeBlock } = await import(
+      "../validations/javascript.js"
+    );
+    const { validateRustCodeBlock } = await import("../validations/rust.js");
+    validateJavaScriptCodeBlockMock = vi.mocked(validateJavaScriptCodeBlock);
+    validateRustCodeBlockMock = vi.mocked(validateRustCodeBlock);
+
+    // Mock fetch for getting started APIs
+    const fetchMock = global.fetch as any;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(sampleGettingStartedApisResponse),
+    });
+
+    // Create a mock server that captures the registered tools
+    mockServer = {
+      tool: vi.fn((name, description, schema, handler) => {
+        if (name === "validate_functions") {
+          mockServer.validateFunctionsHandler = handler;
+        }
+      }),
+      validateFunctionsHandler: null,
+    };
+
+    // Mock instrumentation
+    vi.mocked(instrumentationData).mockReturnValue({
+      packageVersion: "1.0.0",
+      timestamp: "2024-01-01T00:00:00.000Z",
+    });
+    vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
+  });
+
+  test("validates JavaScript code blocks successfully", async () => {
+    // Setup mock responses
+    validateJavaScriptCodeBlockMock.mockResolvedValueOnce({
+      result: ValidationResult.SUCCESS,
+      resultDetail: "JavaScript code has valid syntax",
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Ensure the handler was registered
+    expect(mockServer.validateFunctionsHandler).not.toBeNull();
+
+    const testCodeblocks = [
+      {
+        code: 'function test() { return "hello"; }',
+        language: "javascript",
+      },
+    ];
+
+    // Call the handler
+    const result = await mockServer.validateFunctionsHandler({
+      codeblocks: testCodeblocks,
+      conversationId: "test-id",
+    });
+
+    // Verify validateJavaScriptCodeBlock was called correctly
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledTimes(1);
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledWith({
+      code: 'function test() { return "hello"; }',
+    });
+
+    // Verify the response
+    expect(result.content[0].type).toBe("text");
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+    expect(responseText).toContain("**Total Functions Code Blocks:** 1");
+    expect(responseText).toContain("JavaScript code has valid syntax");
+  });
+
+  test("validates Rust code blocks successfully", async () => {
+    // Setup mock responses
+    validateRustCodeBlockMock.mockResolvedValueOnce({
+      result: ValidationResult.SUCCESS,
+      resultDetail: "Rust code has valid syntax",
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeblocks = [
+      {
+        code: "fn main() { println!('Hello, world!'); }",
+        language: "rust",
+      },
+    ];
+
+    // Call the handler
+    const result = await mockServer.validateFunctionsHandler({
+      codeblocks: testCodeblocks,
+      conversationId: "test-id",
+    });
+
+    // Verify validateRustCodeBlock was called correctly
+    expect(validateRustCodeBlockMock).toHaveBeenCalledTimes(1);
+    expect(validateRustCodeBlockMock).toHaveBeenCalledWith({
+      code: "fn main() { println!('Hello, world!'); }",
+    });
+
+    // Verify the response
+    expect(result.content[0].type).toBe("text");
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+    expect(responseText).toContain("**Total Functions Code Blocks:** 1");
+    expect(responseText).toContain("Rust code has valid syntax");
+  });
+
+  test("validates mixed JavaScript and Rust code blocks", async () => {
+    // Setup mock responses
+    validateJavaScriptCodeBlockMock.mockResolvedValueOnce({
+      result: ValidationResult.SUCCESS,
+      resultDetail: "JavaScript code has valid syntax",
+    });
+    validateRustCodeBlockMock.mockResolvedValueOnce({
+      result: ValidationResult.FAILED,
+      resultDetail: "Rust syntax errors: Line 1, Column 10: unexpected token",
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeblocks = [
+      {
+        code: 'function test1() { return "hello"; }',
+        language: "javascript",
+      },
+      {
+        code: "fn broken( { }",
+        language: "rust",
+      },
+    ];
+
+    // Call the handler
+    const result = await mockServer.validateFunctionsHandler({
+      codeblocks: testCodeblocks,
+      conversationId: "test-id",
+    });
+
+    // Verify both validation functions were called
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledTimes(1);
+    expect(validateRustCodeBlockMock).toHaveBeenCalledTimes(1);
+
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledWith({
+      code: 'function test1() { return "hello"; }',
+    });
+    expect(validateRustCodeBlockMock).toHaveBeenCalledWith({
+      code: "fn broken( { }",
+    });
+
+    // Verify the response shows mixed results
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("❌ INVALID"); // Overall status should be invalid due to Rust failure
+    expect(responseText).toContain("**Total Functions Code Blocks:** 2");
+    expect(responseText).toContain(
+      "Functions Code Block 1\n**Status:** ✅ SUCCESS",
+    );
+    expect(responseText).toContain(
+      "Functions Code Block 2\n**Status:** ❌ FAILED",
+    );
+    expect(responseText).toContain("JavaScript code has valid syntax");
+    expect(responseText).toContain(
+      "Rust syntax errors: Line 1, Column 10: unexpected token",
+    );
+  });
+
+  test("handles validation failures correctly", async () => {
+    // Setup mock responses with failures
+    validateJavaScriptCodeBlockMock.mockResolvedValueOnce({
+      result: ValidationResult.FAILED,
+      resultDetail:
+        "JavaScript syntax errors: Line 2, Column 5: missing closing brace",
+    });
+    validateRustCodeBlockMock.mockResolvedValueOnce({
+      result: ValidationResult.FAILED,
+      resultDetail: "Rust syntax errors: Line 1, Column 8: expected expression",
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeblocks = [
+      {
+        code: "function broken() {\n  let x = 5;",
+        language: "javascript",
+      },
+      {
+        code: "fn test() -> { }",
+        language: "rust",
+      },
+    ];
+
+    // Call the handler
+    const result = await mockServer.validateFunctionsHandler({
+      codeblocks: testCodeblocks,
+      conversationId: "test-id",
+    });
+
+    // Verify both validation functions were called
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledTimes(1);
+    expect(validateRustCodeBlockMock).toHaveBeenCalledTimes(1);
+
+    // Verify the response shows all failures
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("❌ INVALID");
+    expect(responseText).toContain("**Total Functions Code Blocks:** 2");
+    expect(responseText).toContain("missing closing brace");
+    expect(responseText).toContain("expected expression");
+    expect(result.isError).toBe(true);
+  });
+
+  test("handles empty code blocks array", async () => {
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Call the handler with empty array
+    const result = await mockServer.validateFunctionsHandler({
+      codeblocks: [],
+      conversationId: "test-id",
+    });
+
+    // Verify validation functions were not called
+    expect(validateJavaScriptCodeBlockMock).not.toHaveBeenCalled();
+    expect(validateRustCodeBlockMock).not.toHaveBeenCalled();
+
+    // Verify the response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+    expect(responseText).toContain("**Total Functions Code Blocks:** 0");
+    expect(result.isError).toBe(false);
+  });
+
+  test("handles unsupported language type", async () => {
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeblocks = [
+      {
+        code: "print('Hello, world!')",
+        language: "python" as any, // Unsupported language
+      },
+    ];
+
+    // Call the handler
+    const result = await mockServer.validateFunctionsHandler({
+      codeblocks: testCodeblocks,
+      conversationId: "test-id",
+    });
+
+    // Verify validation functions were not called for unsupported language
+    expect(validateJavaScriptCodeBlockMock).not.toHaveBeenCalled();
+    expect(validateRustCodeBlockMock).not.toHaveBeenCalled();
+
+    // Verify the response shows error for unsupported language
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("❌ INVALID");
+    expect(responseText).toContain("Unsupported language: python");
+    expect(result.isError).toBe(true);
+  });
+
+  test("records usage data correctly", async () => {
+    // Setup successful validation
+    validateJavaScriptCodeBlockMock.mockResolvedValueOnce({
+      result: ValidationResult.SUCCESS,
+      resultDetail: "JavaScript code has valid syntax",
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeblocks = [
+      {
+        code: 'function test() { return "hello"; }',
+        language: "javascript",
+      },
+    ];
+
+    // Call the handler
+    await mockServer.validateFunctionsHandler({
+      codeblocks: testCodeblocks,
+      conversationId: "test-id",
+    });
+
+    // Verify recordUsage was called with correct parameters
+    const { recordUsage } = await import("../instrumentation.js");
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "validate_functions",
+      {
+        codeblocks: testCodeblocks,
+        conversationId: "test-id",
+      },
+      expect.any(Array), // The validation responses array
+    );
+  });
+
+  test("validates code blocks in parallel", async () => {
+    // Setup mock responses with delays to test parallel execution
+    validateJavaScriptCodeBlockMock.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                result: ValidationResult.SUCCESS,
+                resultDetail: "JavaScript code has valid syntax",
+              }),
+            50,
+          ),
+        ),
+    );
+    validateRustCodeBlockMock.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                result: ValidationResult.SUCCESS,
+                resultDetail: "Rust code has valid syntax",
+              }),
+            50,
+          ),
+        ),
+    );
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeblocks = [
+      {
+        code: 'function test1() { return "hello"; }',
+        language: "javascript",
+      },
+      {
+        code: 'fn test1() -> String { String::from("hello") }',
+        language: "rust",
+      },
+      {
+        code: 'function test2() { return "world"; }',
+        language: "javascript",
+      },
+    ];
+
+    const startTime = Date.now();
+
+    // Call the handler
+    const result = await mockServer.validateFunctionsHandler({
+      codeblocks: testCodeblocks,
+      conversationId: "test-id",
+    });
+
+    const endTime = Date.now();
+    const executionTime = endTime - startTime;
+
+    // Verify all validation functions were called
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledTimes(2);
+    expect(validateRustCodeBlockMock).toHaveBeenCalledTimes(1);
+
+    // Verify parallel execution (should be less than 150ms for 3 x 50ms operations)
+    expect(executionTime).toBeLessThan(150);
+
+    // Verify successful response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+    expect(responseText).toContain("**Total Functions Code Blocks:** 3");
+  });
+
+  test("uses non-CLI validation by default", async () => {
+    // Ensure no CLI environment variable is set
+    delete process.env.FUNCTIONS_CLI_VALIDATION;
+
+    // Setup mock responses
+    validateJavaScriptCodeBlockMock.mockResolvedValueOnce({
+      result: ValidationResult.SUCCESS,
+      resultDetail: "JavaScript code has valid syntax",
+    });
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    const testCodeblocks = [
+      {
+        code: 'function test() { return "hello"; }',
+        language: "javascript",
+      },
+    ];
+
+    // Call the handler with codeblocks (non-CLI mode)
+    const result = await mockServer.validateFunctionsHandler({
+      codeblocks: testCodeblocks,
+      conversationId: "test-id",
+    });
+
+    // Verify validateJavaScriptCodeBlock was called (non-CLI implementation)
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledTimes(1);
+    expect(validateJavaScriptCodeBlockMock).toHaveBeenCalledWith({
+      code: 'function test() { return "hello"; }',
+    });
+
+    // Verify successful response
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+  });
+
+  test("uses CLI validation when environment variable is set", async () => {
+    // Set environment variable to enable CLI validation
+    process.env.FUNCTIONS_CLI_VALIDATION = "true";
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Call the handler with only conversationId (CLI mode)
+    const result = await mockServer.validateFunctionsHandler({
+      conversationId: "test-id",
+    });
+
+    // In CLI mode, validateWithCLI is called with an empty array
+    // So no individual language validation functions should be called
+    expect(validateJavaScriptCodeBlockMock).not.toHaveBeenCalled();
+    expect(validateRustCodeBlockMock).not.toHaveBeenCalled();
+
+    // Verify successful response (empty validation should be valid)
+    const responseText = result.content[0].text;
+    expect(responseText).toContain("✅ VALID");
+    expect(responseText).toContain("**Total Functions Code Blocks:** 0");
+
+    // Clean up environment variable
+    delete process.env.FUNCTIONS_CLI_VALIDATION;
+  });
+
+  test("records usage correctly for CLI mode", async () => {
+    // Set environment variable to enable CLI validation
+    process.env.FUNCTIONS_CLI_VALIDATION = "true";
+
+    // Register the tools
+    await shopifyTools(mockServer);
+
+    // Call the handler with only conversationId (CLI mode)
+    await mockServer.validateFunctionsHandler({
+      conversationId: "test-id",
+    });
+
+    // Verify recordUsage was called with correct parameters for CLI mode
+    const { recordUsage } = await import("../instrumentation.js");
+    expect(vi.mocked(recordUsage)).toHaveBeenCalledWith(
+      "validate_functions",
+      {
+        conversationId: "test-id",
+      },
+      expect.any(Array), // The validation responses array
+    );
+
+    // Clean up environment variable
+    delete process.env.FUNCTIONS_CLI_VALIDATION;
   });
 });
