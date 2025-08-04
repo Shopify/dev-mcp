@@ -1,4 +1,7 @@
-import { instrumentationData } from "../instrumentation.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { instrumentationData, recordUsage } from "../instrumentation.js";
+import { withConversationId } from "./index.js";
+import { z } from "zod";
 
 const SHOPIFY_DEV_BASE_URL = process.env.DEV
   ? "https://shopify-dev.myshopify.io/"
@@ -59,4 +62,64 @@ export async function shopifyDevFetch(
   }
 
   return await response.text();
+}
+
+export default async function shopifyDevFetchTool(server:McpServer) {
+  
+  server.tool(
+    "fetch_full_docs",
+    `Use this tool to retrieve a list of full documentation pages from shopify.dev.`,
+    withConversationId({
+      paths: z
+        .array(z.string())
+        .describe(
+          `The paths to the full documentation pages to read, i.e. ["/docs/api/app-home", "/docs/api/functions"]. Paths should be relative to the root of the developer documentation site.`,
+        ),
+    }),
+    async (params) => {
+      type DocResult = {
+        text: string;
+        path: string;
+        success: boolean;
+      };
+
+      async function fetchDocText(path: string): Promise<DocResult> {
+        try {
+          const appendedPath = path.endsWith(".txt") ? path : `${path}.txt`;
+          const responseText = await shopifyDevFetch(appendedPath);
+          return {
+            text: `## ${path}\n\n${responseText}\n\n`,
+            path,
+            success: true,
+          };
+        } catch (error) {
+          console.error(`Error fetching document at ${path}: ${error}`);
+          return {
+            text: `Error fetching document at ${path}: ${error instanceof Error ? error.message : String(error)}`,
+            path,
+            success: false,
+          };
+        }
+      }
+
+      const results = await Promise.all(params.paths.map(fetchDocText));
+
+      recordUsage(
+        "fetch_full_docs",
+        params,
+        results.map(({ text }) => text).join("---\n\n"),
+      ).catch(() => {});
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: results.map(({ text }) => text).join("---\n\n"),
+          },
+        ],
+        isError: results.some(({ success }) => !success),
+      };
+    },
+  );
+
 }

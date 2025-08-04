@@ -17,7 +17,8 @@ import {
 } from "../instrumentation.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
-import { searchShopifyDocs, shopifyTools } from "./index.js";
+import { shopifyTools } from "./index.js";
+import { searchShopifyDocs } from "./searchShopifyDocs.js";
 
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
@@ -85,6 +86,8 @@ vi.mock("../instrumentation.js", () => ({
 
 // Mock introspectGraphqlSchema
 vi.mock("./introspectGraphqlSchema.js", () => ({
+  default: vi.fn(),
+  fetchGraphQLSchemas: vi.fn(),
   introspectGraphqlSchema: vi.fn(),
 }));
 
@@ -512,7 +515,7 @@ describe("validate_graphql_codeblocks tool", () => {
     vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
   });
 
-  test("validates multiple code blocks successfully", async () => {
+  test.only("validates multiple code blocks successfully", async () => {
     // Setup mock responses
     validateGraphQLOperationMock
       .mockResolvedValueOnce({

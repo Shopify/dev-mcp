@@ -1,8 +1,102 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { shopifyDevFetch } from "./shopifyDevFetch.js";
+import { withConversationId } from "./index.js";
+import { recordUsage } from "../instrumentation.js";
+import { z } from "zod";
+type GraphQLSchemasResponse = z.infer<typeof GraphQLSchemasResponseSchema>;
+
+// Schema for individual GraphQL schema objects
+const GraphQLSchemaSchema = z.object({
+  id: z.string(),
+  version: z.string(),
+  url: z.string(),
+});
+
+// Schema for API objects
+const APISchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  schemas: z.array(GraphQLSchemaSchema),
+});
+
+// Schema for the complete GraphQL schemas response
+const GraphQLSchemasResponseSchema = z.object({
+  latest_version: z.string(),
+  apis: z.array(APISchema),
+});
+
+let memoized: ReturnType<typeof fetchGraphQLSchemas> | null = null;
+
+/**
+ * Fetches available GraphQL schemas from Shopify
+ * @returns Object containing available APIs and versions
+ */
+export async function fetchGraphQLSchemas(): Promise<{
+  schemas: { api: string; id: string; version: string; url: string }[];
+  apis: { name: string; description: string }[];
+  versions: string[];
+  latestVersion?: string;
+}> {
+  if(memoized) return memoized;
+  memoized = (async () => {
+  try {
+    const responseText = await shopifyDevFetch("/mcp/graphql_schemas");
+
+    let parsedResponse: GraphQLSchemasResponse;
+    try {
+      const jsonData = JSON.parse(responseText);
+      parsedResponse = GraphQLSchemasResponseSchema.parse(jsonData);
+    } catch (parseError) {
+      console.error(`Error parsing schemas JSON: ${parseError}`);
+      console.error(`Response text: ${responseText.substring(0, 500)}...`);
+      return {
+        schemas: [],
+        apis: [],
+        versions: [],
+      };
+    }
+
+    // Extract unique APIs and versions
+    const apisMap = new Map<string, { name: string; description: string }>();
+    const versions = new Set<string>();
+    const schemas: { api: string; id: string; version: string; url: string }[] =
+      [];
+
+    parsedResponse.apis.forEach((api) => {
+      apisMap.set(api.name, { name: api.name, description: api.description });
+
+      api.schemas.forEach((schema) => {
+        versions.add(schema.version);
+        schemas.push({
+          api: api.name,
+          id: schema.id,
+          version: schema.version,
+          url: schema.url,
+        });
+      });
+    });
+
+    return {
+      schemas,
+      apis: Array.from(apisMap.values()),
+      versions: Array.from(versions),
+      latestVersion: parsedResponse.latest_version,
+    };
+  } catch (error) {
+    console.error(`Error fetching schemas: ${error}`);
+    return {
+      schemas: [],
+      apis: [],
+      versions: [],
+    };
+  }
+  })();
+  return memoized;
+}
 
 export type Schema = {
   api: string;
@@ -406,4 +500,76 @@ export async function introspectGraphqlSchema(
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+export default async function mcpTool(server: McpServer) {
+  
+  const { schemas, apis, versions, latestVersion } =
+    await fetchGraphQLSchemas();
+
+  // Extract just the API names for enum definitions
+  const apiNames = apis.map((api) => api.name);
+
+  server.tool(
+    "introspect_graphql_schema",
+    `This tool introspects and returns the portion of the Shopify Admin API GraphQL schema relevant to the user prompt. Only use this for the Shopify Admin API, and not any other APIs like the Shopify Storefront API or the Shopify Functions API.`,
+    withConversationId({
+      query: z
+        .string()
+        .describe(
+          "Search term to filter schema elements by name. Only pass simple terms like 'product', 'discountProduct', etc.",
+        ),
+      filter: z
+        .array(z.enum(["all", "types", "queries", "mutations"]))
+        .optional()
+        .default(["all"])
+        .describe(
+          "Filter results to show specific sections. Valid values are 'types', 'queries', 'mutations', or 'all' (default)",
+        ),
+      api: z
+        .enum(apiNames as [string, ...string[]])
+        .optional()
+        .default("admin")
+        .describe(
+          `The API to introspect. Valid options are:\n${apis
+            .map((api) => `- '${api.name}': ${api.description}`)
+            .join("\n")}\nDefault is 'admin'.`,
+        ),
+      version: z
+        .enum(versions as [string, ...string[]])
+        .optional()
+        .default(latestVersion!)
+        .describe(
+          `The version of the API to introspect. MUST be one of ${versions
+            .map((v) => `'${v}'`)
+            .join(" or ")}. Default is '${latestVersion}'.`,
+        ),
+    }),
+    async (params) => {
+      const result = await introspectGraphqlSchema(params.query, {
+        schemas: schemas,
+        api: params.api,
+        version: params.version,
+        filter: params.filter,
+      });
+
+      recordUsage(
+        "introspect_graphql_schema",
+        params,
+        result.responseText,
+      ).catch(() => {});
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.success
+              ? result.responseText
+              : `Error processing Shopify GraphQL schema: ${result.error}. Make sure the schema file exists.`,
+          },
+        ],
+        isError: !result.success,
+      };
+    },
+  );
 }
