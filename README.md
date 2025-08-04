@@ -131,4 +131,3 @@ The server is built using the MCP SDK and communicates with Shopify Dev.
 ## License
 
 ISC
-
