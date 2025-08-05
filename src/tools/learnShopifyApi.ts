@@ -1,8 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { polarisUnifiedEnabled } from "../flags.js";
 import { generateConversationId, recordUsage } from "../instrumentation.js";
 import { shopifyDevFetch } from "./shopifyDevFetch.js";
-import { polarisUnifiedEnabled } from "../flags.js";
 
 const GettingStartedAPISchema = z.object({
   name: z.string(),
@@ -69,13 +69,16 @@ export default async function learnShopifyApiTool(server: McpServer) {
     ⚠️  ALL OTHER SHOPIFY TOOLS WILL FAIL without a conversationId from this tool.
     This tool generates a conversationId that is REQUIRED for all subsequent tool calls. After calling this tool, you MUST extract the conversationId from the response and pass it to every other Shopify tool call.
 
+    🔄 MULTIPLE API SUPPORT: You can call this tool multiple times in the same conversation when switching between different Shopify APIs. Just pass the existing conversationId to maintain conversation continuity while loading the new API context.
+
     Valid arguments for \`api\` are:
     ${gettingStartedApis.map((api) => `    - ${api.name}: ${api.description}`).join("\n")}
 
     🔄 WORKFLOW:
-    1. Call learn_shopify_api first
+    1. Call learn_shopify_api first with the initial API
     2. Extract the conversationId from the response
     3. Pass that same conversationId to ALL other Shopify tools
+    4. If the user's question changes to a different API, call learn_shopify_api again with the new API and the same conversationId
 
     DON'T SEARCH THE WEB WHEN REFERENCING INFORMATION FROM THIS DOCUMENTATION. IT WILL NOT BE ACCURATE.
     PREFER THE USE OF THE fetch_full_docs TOOL TO RETRIEVE INFORMATION FROM THE DEVELOPER DOCUMENTATION SITE.
