@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+    "build": "tsc --sourceMap && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
     "build:watch": "tsc --watch",
     "changeset": "changeset",
     "test": "vitest run",

@@ -17,7 +17,8 @@ import {
 } from "../instrumentation.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "../validations/graphqlSchema.js";
-import { searchShopifyDocs, shopifyTools } from "./index.js";
+import { shopifyTools } from "./index.js";
+import { searchShopifyDocs } from "./searchShopifyDocs.js";
 
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
@@ -84,9 +85,7 @@ vi.mock("../instrumentation.js", () => ({
 }));
 
 // Mock introspectGraphqlSchema
-vi.mock("./introspectGraphqlSchema.js", () => ({
-  introspectGraphqlSchema: vi.fn(),
-}));
+vi.mock("./introspectGraphqlSchema.js", { spy: true });
 
 // Mock validateGraphQLOperation
 vi.mock("../validations/graphqlSchema.js", () => ({
