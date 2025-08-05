@@ -64,8 +64,7 @@ export async function shopifyDevFetch(
   return await response.text();
 }
 
-export default async function shopifyDevFetchTool(server:McpServer) {
-  
+export default async function shopifyDevFetchTool(server: McpServer) {
   server.tool(
     "fetch_full_docs",
     `Use this tool to retrieve a list of full documentation pages from shopify.dev.`,
@@ -121,5 +120,4 @@ export default async function shopifyDevFetchTool(server:McpServer) {
       };
     },
   );
-
 }

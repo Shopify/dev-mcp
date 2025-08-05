@@ -85,11 +85,7 @@ vi.mock("../instrumentation.js", () => ({
 }));
 
 // Mock introspectGraphqlSchema
-vi.mock("./introspectGraphqlSchema.js", () => ({
-  default: vi.fn(),
-  fetchGraphQLSchemas: vi.fn(),
-  introspectGraphqlSchema: vi.fn(),
-}));
+vi.mock("./introspectGraphqlSchema.js", { spy: true });
 
 // Mock validateGraphQLOperation
 vi.mock("../validations/graphqlSchema.js", () => ({
@@ -515,7 +511,7 @@ describe("validate_graphql_codeblocks tool", () => {
     vi.mocked(isInstrumentationDisabled).mockReturnValue(false);
   });
 
-  test.only("validates multiple code blocks successfully", async () => {
+  test("validates multiple code blocks successfully", async () => {
     // Setup mock responses
     validateGraphQLOperationMock
       .mockResolvedValueOnce({

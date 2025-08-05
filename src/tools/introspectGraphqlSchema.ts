@@ -41,59 +41,63 @@ export async function fetchGraphQLSchemas(): Promise<{
   versions: string[];
   latestVersion?: string;
 }> {
-  if(memoized) return memoized;
+  if (memoized) return memoized;
   memoized = (async () => {
-  try {
-    const responseText = await shopifyDevFetch("/mcp/graphql_schemas");
-
-    let parsedResponse: GraphQLSchemasResponse;
     try {
-      const jsonData = JSON.parse(responseText);
-      parsedResponse = GraphQLSchemasResponseSchema.parse(jsonData);
-    } catch (parseError) {
-      console.error(`Error parsing schemas JSON: ${parseError}`);
-      console.error(`Response text: ${responseText.substring(0, 500)}...`);
+      const responseText = await shopifyDevFetch("/mcp/graphql_schemas");
+
+      let parsedResponse: GraphQLSchemasResponse;
+      try {
+        const jsonData = JSON.parse(responseText);
+        parsedResponse = GraphQLSchemasResponseSchema.parse(jsonData);
+      } catch (parseError) {
+        console.error(`Error parsing schemas JSON: ${parseError}`);
+        console.error(`Response text: ${responseText.substring(0, 500)}...`);
+        return {
+          schemas: [],
+          apis: [],
+          versions: [],
+        };
+      }
+
+      // Extract unique APIs and versions
+      const apisMap = new Map<string, { name: string; description: string }>();
+      const versions = new Set<string>();
+      const schemas: {
+        api: string;
+        id: string;
+        version: string;
+        url: string;
+      }[] = [];
+
+      parsedResponse.apis.forEach((api) => {
+        apisMap.set(api.name, { name: api.name, description: api.description });
+
+        api.schemas.forEach((schema) => {
+          versions.add(schema.version);
+          schemas.push({
+            api: api.name,
+            id: schema.id,
+            version: schema.version,
+            url: schema.url,
+          });
+        });
+      });
+
+      return {
+        schemas,
+        apis: Array.from(apisMap.values()),
+        versions: Array.from(versions),
+        latestVersion: parsedResponse.latest_version,
+      };
+    } catch (error) {
+      console.error(`Error fetching schemas: ${error}`);
       return {
         schemas: [],
         apis: [],
         versions: [],
       };
     }
-
-    // Extract unique APIs and versions
-    const apisMap = new Map<string, { name: string; description: string }>();
-    const versions = new Set<string>();
-    const schemas: { api: string; id: string; version: string; url: string }[] =
-      [];
-
-    parsedResponse.apis.forEach((api) => {
-      apisMap.set(api.name, { name: api.name, description: api.description });
-
-      api.schemas.forEach((schema) => {
-        versions.add(schema.version);
-        schemas.push({
-          api: api.name,
-          id: schema.id,
-          version: schema.version,
-          url: schema.url,
-        });
-      });
-    });
-
-    return {
-      schemas,
-      apis: Array.from(apisMap.values()),
-      versions: Array.from(versions),
-      latestVersion: parsedResponse.latest_version,
-    };
-  } catch (error) {
-    console.error(`Error fetching schemas: ${error}`);
-    return {
-      schemas: [],
-      apis: [],
-      versions: [],
-    };
-  }
   })();
   return memoized;
 }
@@ -503,7 +507,6 @@ export async function introspectGraphqlSchema(
 }
 
 export default async function mcpTool(server: McpServer) {
-  
   const { schemas, apis, versions, latestVersion } =
     await fetchGraphQLSchemas();
 

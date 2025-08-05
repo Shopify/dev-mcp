@@ -1,4 +1,3 @@
-
 export const polarisUnifiedEnabled =
   process.env.POLARIS_UNIFIED === "true" || process.env.POLARIS_UNIFIED === "1";
 

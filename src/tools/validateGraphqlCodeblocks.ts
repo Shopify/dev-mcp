@@ -6,9 +6,7 @@ import { recordUsage } from "../instrumentation.js";
 import { hasFailedValidation } from "../validations/index.js";
 import { fetchGraphQLSchemas } from "./introspectGraphqlSchema.js";
 
-
-export default async function validateGraphqlCodeblocksTool(server:McpServer) {
-	
+export default async function validateGraphqlCodeblocksTool(server: McpServer) {
   const { schemas, apis, versions, latestVersion } =
     await fetchGraphQLSchemas();
 
@@ -77,5 +75,4 @@ export default async function validateGraphqlCodeblocksTool(server:McpServer) {
       };
     },
   );
-
 }

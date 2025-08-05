@@ -6,7 +6,7 @@ import { hasFailedValidation } from "../validations/index.js";
 
 import introspectGraphqlSchemaTool from "./introspectGraphqlSchema.js";
 import shopifyDevFetchTool from "./shopifyDevFetch.js";
-import searchShopifyDocsTool  from "./searchShopifyDocs.js";
+import searchShopifyDocsTool from "./searchShopifyDocs.js";
 import validateGraphqlCodeblocksTool from "./validateGraphqlCodeblocks.js";
 import learnShopifyApiTool from "./learnShopifyApi.js";
 import liquidMcpTools from "./liquid-mcp-tools.js";
@@ -59,5 +59,3 @@ export function formatValidationResult(
 
   return responseText;
 }
-
-

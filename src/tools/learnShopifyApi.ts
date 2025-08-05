@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { generateConversationId, recordUsage } from "../instrumentation.js";
-import {shopifyDevFetch} from "./shopifyDevFetch.js";
+import { shopifyDevFetch } from "./shopifyDevFetch.js";
 import { polarisUnifiedEnabled } from "../flags.js";
 
 const GettingStartedAPISchema = z.object({
@@ -53,8 +53,6 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
 }
 
 export default async function learnShopifyApiTool(server: McpServer) {
-  
-
   const gettingStartedApis = await fetchGettingStartedApis();
 
   const gettingStartedApiNames = gettingStartedApis.map((api) => api.name);
@@ -130,5 +128,4 @@ ${responseText}`;
       }
     },
   );
-
 }
