@@ -4,9 +4,10 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { SCHEMAS_CACHE_DIR } from "./tools/introspect_graphql_schema/index.js";
 
-const mockSchemas = import.meta.glob<string>("../data/*.mock*.json", {
+const mockSchemas = import.meta.glob<string>("../data/*", {
   eager: true,
   query: "raw",
+  import: "default",
 });
 
 export async function injectMockSchemasIntoCache() {
