@@ -1,8 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { generateConversationId, recordUsage } from "../instrumentation.js";
-import { shopifyDevFetch } from "./shopifyDevFetch.js";
-import { polarisUnifiedEnabled } from "../flags.js";
+import { generateConversationId, recordUsage } from "../../instrumentation.js";
+import { shopifyDevFetch } from "../shopify_dev_fetch/index.js";
+import { polarisUnifiedEnabled } from "../../flags.js";
 
 const GettingStartedAPISchema = z.object({
   name: z.string(),

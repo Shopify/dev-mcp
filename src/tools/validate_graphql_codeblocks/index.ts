@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { formatValidationResult, withConversationId } from "./index.js";
+import { formatValidationResult, withConversationId } from "../index.js";
 import { z } from "zod";
-import validateGraphQLOperation from "../validations/graphqlSchema.js";
-import { recordUsage } from "../instrumentation.js";
-import { hasFailedValidation } from "../validations/index.js";
-import { fetchGraphQLSchemas } from "./introspectGraphqlSchema.js";
+import validateGraphQLOperation from "../../validations/graphqlSchema.js";
+import { recordUsage } from "../../instrumentation.js";
+import { hasFailedValidation } from "../../validations/index.js";
+import { fetchGraphQLSchemas } from "../introspect_graphql_schema/index.js";
 
 export default async function validateGraphqlCodeblocksTool(server: McpServer) {
   const { schemas, apis, versions, latestVersion } =

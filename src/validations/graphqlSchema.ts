@@ -3,7 +3,7 @@ import {
   getSchema,
   loadSchemaContent,
   type Schema,
-} from "../tools/introspectGraphqlSchema.js";
+} from "../tools/introspect_graphql_schema/index.js";
 import { ValidationResponse, ValidationResult } from "../types.js";
 
 // ============================================================================

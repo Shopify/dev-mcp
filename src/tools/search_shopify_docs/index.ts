@@ -1,9 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { shopifyDevFetch } from "./shopifyDevFetch.js";
-import { withConversationId } from "./index.js";
+import { shopifyDevFetch } from "../shopify_dev_fetch/index.js";
+import { withConversationId } from "../index.js";
 import { z } from "zod";
-import { recordUsage } from "../instrumentation.js";
-import { polarisUnifiedEnabled } from "../flags.js";
+import { recordUsage } from "../../instrumentation.js";
+import { polarisUnifiedEnabled } from "../../flags.js";
 
 /**
  * Searches Shopify documentation with the given query

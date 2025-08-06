@@ -8,12 +8,7 @@ import { fileURLToPath } from "url";
 import { shopifyPrompts } from "./prompts/index.js";
 import { shopifyTools } from "./tools/index.js";
 
-// Get package.json version
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageJson = JSON.parse(
-  readFileSync(resolve(__dirname, "../package.json"), "utf8"),
-);
+import packageJson from "../package.json" with { type: "json" };
 const VERSION = packageJson.version;
 
 async function main() {
