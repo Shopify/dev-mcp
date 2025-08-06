@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import { shopifyPrompts } from "./prompts/index.js";
 import { shopifyTools } from "./tools/index.js";
 
-import packageJson from "../package.json";
+import packageJson from "../package.json" with { type: "json" };
 const VERSION = packageJson.version;
 
 async function main() {

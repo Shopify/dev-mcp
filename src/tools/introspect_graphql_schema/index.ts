@@ -112,8 +112,7 @@ export type Schema = {
 
 // Path to the schemas cache directory
 export const SCHEMAS_CACHE_DIR = path.join(
-  xdgAppPaths.cache(),
-  "shopify-dev-mcp",
+  xdgAppPaths("shopify-dev-mcp").cache(),
 );
 
 // Function to get the schema ID for a specific API
