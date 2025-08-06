@@ -4,13 +4,6 @@ import type { ValidationToolResult } from "../types.js";
 import { ValidationResult } from "../types.js";
 import { hasFailedValidation } from "../validations/index.js";
 
-import introspectGraphqlSchemaTool from "./introspectGraphqlSchema.js";
-import shopifyDevFetchTool from "./shopifyDevFetch.js";
-import searchShopifyDocsTool from "./searchShopifyDocs.js";
-import validateGraphqlCodeblocksTool from "./validateGraphqlCodeblocks.js";
-import learnShopifyApiTool from "./learnShopifyApi.js";
-import liquidMcpTools from "./liquid-mcp-tools.js";
-
 // Common conversationId parameter schema
 const ConversationIdSchema = z.object({
   conversationId: z
@@ -26,13 +19,14 @@ export const withConversationId = <T extends z.ZodRawShape>(schema: T) => ({
   ...schema,
 });
 
+interface ToolModule {
+  default(server: McpServer): Promise<unknown>;
+}
+const tools = import.meta.glob<ToolModule>("./*/index.ts", { eager: true });
 export async function shopifyTools(server: McpServer): Promise<void> {
-  await introspectGraphqlSchemaTool(server);
-  await searchShopifyDocsTool(server);
-  await shopifyDevFetchTool(server);
-  await validateGraphqlCodeblocksTool(server);
-  await learnShopifyApiTool(server);
-  await liquidMcpTools(server);
+  for (const tool of Object.values(tools)) {
+    await tool.default(server);
+  }
 }
 
 /**

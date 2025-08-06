@@ -3,9 +3,9 @@ import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { shopifyDevFetch } from "./shopifyDevFetch.js";
-import { withConversationId } from "./index.js";
-import { recordUsage } from "../instrumentation.js";
+import { shopifyDevFetch } from "../shopify_dev_fetch/index.js";
+import { withConversationId } from "../index.js";
+import { recordUsage } from "../../instrumentation.js";
 import { z } from "zod";
 type GraphQLSchemasResponse = z.infer<typeof GraphQLSchemasResponseSchema>;
 
@@ -111,7 +111,7 @@ export type Schema = {
 
 // Path to the schemas cache directory
 export const SCHEMAS_CACHE_DIR = fileURLToPath(
-  new URL(/* @vite-ignore */ "../../data", import.meta.url),
+  new URL(/* @vite-ignore */ "../../../data", import.meta.url),
 );
 
 // Function to get the schema ID for a specific API

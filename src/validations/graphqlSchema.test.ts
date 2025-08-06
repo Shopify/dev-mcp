@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("node:fs");
 vi.mock("node:fs/promises");
 
-import * as introspectGraphqlSchema from "../tools/introspectGraphqlSchema.js";
+import * as introspectGraphqlSchema from "../tools/introspect_graphql_schema/index.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "./graphqlSchema.js";
 

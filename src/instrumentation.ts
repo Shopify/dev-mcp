@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import pkg from "../package.json" with { type: "json" };
-import { shopifyDevFetch } from "./tools/shopifyDevFetch.js";
+import { shopifyDevFetch } from "./tools/shopify_dev_fetch/index.js";
 
 const packageVersion = pkg.version;
 

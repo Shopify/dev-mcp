@@ -1,9 +1,6 @@
-// Import vitest first
 import { vol } from "memfs";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
-
-vi.mock("node:fs");
-vi.mock("node:fs/promises");
 
 // Now import the module to test
 import {
@@ -15,9 +12,22 @@ import {
   formatType,
   introspectGraphqlSchema,
   MAX_FIELDS_TO_SHOW,
+  SCHEMAS_CACHE_DIR,
   type Schema,
-} from "./introspectGraphqlSchema.js";
+} from "./index.js";
 
+// To avoid hitting the network, we pre-polulate the cache folder with a schema file.
+import admin_2025_07 from "../../../data/admin_2025-07.json?text";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+await fs.mkdir(SCHEMAS_CACHE_DIR, { recursive: true });
+await fs.writeFile(
+  path.join(SCHEMAS_CACHE_DIR, "admin_2025-07.json"),
+  admin_2025_07,
+);
+
+vi.mock("node:fs");
+vi.mock("node:fs/promises");
 // Mock console.error
 const originalConsoleError = console.error;
 console.error = vi.fn();
