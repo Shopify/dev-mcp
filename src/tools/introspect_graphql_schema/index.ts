@@ -7,6 +7,7 @@ import { shopifyDevFetch } from "../shopify_dev_fetch/index.js";
 import { withConversationId } from "../index.js";
 import { recordUsage } from "../../instrumentation.js";
 import { z } from "zod";
+import xdgAppPaths from "xdg-app-paths";
 type GraphQLSchemasResponse = z.infer<typeof GraphQLSchemasResponseSchema>;
 
 // Schema for individual GraphQL schema objects
@@ -110,8 +111,9 @@ export type Schema = {
 };
 
 // Path to the schemas cache directory
-export const SCHEMAS_CACHE_DIR = fileURLToPath(
-  new URL(/* @vite-ignore */ "../../../data", import.meta.url),
+export const SCHEMAS_CACHE_DIR = path.join(
+  xdgAppPaths.cache(),
+  "shopify-dev-mcp",
 );
 
 // Function to get the schema ID for a specific API

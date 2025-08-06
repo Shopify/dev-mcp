@@ -92,10 +92,6 @@ vi.mock("../validations/graphqlSchema.js", () => ({
   default: vi.fn(),
 }));
 
-vi.mock("../../package.json", () => ({
-  default: { version: "1.0.0" },
-}));
-
 // Mock fetch globally
 const fetchMock = vi.fn();
 global.fetch = fetchMock;
