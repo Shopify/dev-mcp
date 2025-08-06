@@ -111,7 +111,7 @@ export type Schema = {
 
 // Path to the schemas cache directory
 export const SCHEMAS_CACHE_DIR = fileURLToPath(
-  new URL("../../data", import.meta.url),
+  new URL(/* @vite-ignore */ "../../data", import.meta.url),
 );
 
 // Function to get the schema ID for a specific API
