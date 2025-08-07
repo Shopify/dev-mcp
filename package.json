@@ -10,7 +10,7 @@
     "test:watch": "vitest",
     "lint:fix": "prettier --write --ignore-unknown .",
     "lint": "prettier --check --cache --ignore-unknown .",
-    "inspector": "npm run build && npm exec @modelcontextprotocol/inspector dist/index.js",
+    "inspector": "npm run build && chmod +x dist/index.js && npx @modelcontextprotocol/inspector ./dist/index.js",
     "typecheck": "tsc --noEmit"
   },
   "author": "",
