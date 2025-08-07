@@ -69,7 +69,7 @@ export default async function learnShopifyApiTool(server: McpServer) {
     ⚠️  ALL OTHER SHOPIFY TOOLS WILL FAIL without a conversationId from this tool.
     This tool generates a conversationId that is REQUIRED for all subsequent tool calls. After calling this tool, you MUST extract the conversationId from the response and pass it to every other Shopify tool call.
 
-    🔄 MULTIPLE API SUPPORT: You can call this tool multiple times in the same conversation when you need to learn about  different Shopify APIs. Just pass the existing conversationId to maintain conversation continuity while loading the new API context.
+    🔄 MULTIPLE API SUPPORT: You MUST call this tool multiple times in the same conversation when you need to learn about different Shopify APIs. THIS IS NOT OPTIONAL. Just pass the existing conversationId to maintain conversation continuity while loading the new API context.
 
     For example, a user might ask a question about the Admin API, then switch to the Functions API, then ask a question about ui components. In this case I would expect you to call learn_shopify_apis three times with the following arguments:
 
