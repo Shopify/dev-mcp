@@ -4,6 +4,7 @@ import {
   loadSchemaContent,
   type Schema,
 } from "../tools/introspect_graphql_schema/index.js";
+import { shopifyDevFetch } from "../tools/shopify_dev_fetch/index.js";
 import { ValidationResponse, ValidationResult } from "../types.js";
 
 // ============================================================================
@@ -136,8 +137,34 @@ async function performGraphQLValidation(
   }
 
   const operationType = getOperationType(parseResult.document);
-  return validationResult(
-    ValidationResult.SUCCESS,
-    `Successfully validated GraphQL ${operationType} against schema.`,
-  );
+  let resultMsg = `Successfully validated GraphQL ${operationType} against schema.`;
+
+  const scopes = await getScopes(operation);
+  if (scopes.length > 0) {
+    resultMsg += ` The scopes required are ${scopes.join(", ")}`;
+  }
+
+  return validationResult(ValidationResult.SUCCESS, resultMsg);
+
+  async function getScopes(operation: any): Promise<string[]> {
+    try {
+      const responseText = await shopifyDevFetch(
+        "https://shopify-dev.myshopify.io/mcp/access_scopes",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query: operation,
+          }),
+        },
+      );
+
+      const scopes = JSON.parse(responseText);
+      return scopes;
+    } catch (error) {
+      return [];
+    }
+  }
 }
