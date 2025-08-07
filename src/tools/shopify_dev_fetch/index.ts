@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { instrumentationData, recordUsage } from "../instrumentation.js";
-import { withConversationId } from "./index.js";
+import { instrumentationData, recordUsage } from "../../instrumentation.js";
+import { withConversationId } from "../index.js";
 import { z } from "zod";
 
 const SHOPIFY_DEV_BASE_URL = process.env.DEV

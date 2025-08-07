@@ -3,10 +3,11 @@ import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { shopifyDevFetch } from "./shopifyDevFetch.js";
-import { withConversationId } from "./index.js";
-import { recordUsage } from "../instrumentation.js";
+import { shopifyDevFetch } from "../shopify_dev_fetch/index.js";
+import { withConversationId } from "../index.js";
+import { recordUsage } from "../../instrumentation.js";
 import { z } from "zod";
+import xdgAppPaths from "xdg-app-paths";
 type GraphQLSchemasResponse = z.infer<typeof GraphQLSchemasResponseSchema>;
 
 // Schema for individual GraphQL schema objects
@@ -110,8 +111,8 @@ export type Schema = {
 };
 
 // Path to the schemas cache directory
-export const SCHEMAS_CACHE_DIR = fileURLToPath(
-  new URL("../../data", import.meta.url),
+export const SCHEMAS_CACHE_DIR = path.join(
+  xdgAppPaths("shopify-dev-mcp").cache(),
 );
 
 // Function to get the schema ID for a specific API
