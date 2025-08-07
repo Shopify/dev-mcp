@@ -1,5 +1,5 @@
-import { fileURLToPath } from "node:url";
 import { builtinModules } from "module";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -7,6 +7,7 @@ export default defineConfig({
     lib: {
       entry: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
       formats: ["esm"],
+      fileName: () => "index.js",
     },
     outDir: "dist",
     emptyOutDir: true,
