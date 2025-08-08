@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { polarisUnifiedEnabled } from "../../flags.js";
+import { liquidEnabled, polarisUnifiedEnabled } from "../../flags.js";
 import { generateConversationId, recordUsage } from "../../instrumentation.js";
 import { shopifyDevFetch } from "../shopify_dev_fetch/index.js";
 
@@ -19,7 +19,7 @@ async function fetchGettingStartedApis(): Promise<GettingStartedAPI[]> {
   try {
     const parameters: Record<string, string> = {
       ...(polarisUnifiedEnabled && { polaris_unified: "true" }),
-      ...{ liquid_mcp: "true" },
+      ...(liquidEnabled && { liquid_mcp: "true" }),
     };
 
     const responseText = await shopifyDevFetch("/mcp/getting_started_apis", {

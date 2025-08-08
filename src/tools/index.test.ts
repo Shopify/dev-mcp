@@ -300,12 +300,18 @@ describe("fetchGettingStartedApis", () => {
 
     // Verify fetch was called to get the APIs
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/mcp/getting_started_apis?liquid_mcp=true"),
+      expect.stringContaining("/mcp/getting_started_apis"),
       expect.any(Object),
     );
   });
 
   test("adds liquid_mcp query parameter", async () => {
+    vi.doMock("../flags.js", () => ({
+      liquidEnabled: true,
+      polarisUnifiedEnabled: false,
+      liquidMcpValidationMode: "full",
+    }));
+
     const { shopifyTools } = await import("./index.js");
 
     const fetchSpy = vi.spyOn(global, "fetch");

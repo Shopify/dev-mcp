@@ -1,13 +1,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { liquidMcpValidationMode } from "../../flags.js";
-import { formatValidationResult, withConversationId } from "../index.js";
 import { z } from "zod";
-import validateThemeCodeblocks from "../../validations/themeCodeBlock.js";
+import { liquidEnabled, liquidMcpValidationMode } from "../../flags.js";
 import { recordUsage } from "../../instrumentation.js";
 import { hasFailedValidation } from "../../validations/index.js";
 import validateTheme from "../../validations/theme.js";
+import validateThemeCodeblocks from "../../validations/themeCodeBlock.js";
+import { formatValidationResult, withConversationId } from "../index.js";
 
 export default async function liquidMcpTools(server: McpServer) {
+  if (!liquidEnabled) {
+    return;
+  }
+
   const toolDescription = `This tool validates Liquid codeblocks, Liquid files, and supporting Theme files (e.g. JSON locale files, JSON config files, JSON template files, JavaScript files, CSS files, and SVG files) generated or updated by LLMs to ensure they don't have hallucinated Liquid content, invalid syntax, or incorrect references`;
 
   if (liquidMcpValidationMode === "partial") {
