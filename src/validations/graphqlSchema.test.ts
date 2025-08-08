@@ -1,9 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { injectMockSchemasIntoCache } from "../test-utils.js";
 import * as introspectGraphqlSchema from "../tools/introspect_graphql_schema/index.js";
 import { ValidationResult } from "../types.js";
 import validateGraphQLOperation from "./graphqlSchema.js";
-import { injectMockSchemasIntoCache } from "../test-utils.js";
 
 beforeAll(async () => {
   await injectMockSchemasIntoCache();
@@ -65,15 +65,15 @@ describe("validateGraphQLOperation", () => {
       const schemasWithVersions: introspectGraphqlSchema.Schema[] = [
         {
           api: "admin",
-          id: "admin_2025-01",
+          id: "admin_2025-01-mock2",
           version: "2025-01-mock2",
-          url: "https://example.com/admin_2025-01.json",
+          url: "https://example.com/admin_2025-01-mock2.json",
         },
         {
           api: "admin",
-          id: "admin_2024-10",
-          version: "2024-10",
-          url: "https://example.com/admin_2024-10.json",
+          id: "admin_2025-01-mock",
+          version: "2025-01-mock",
+          url: "https://example.com/admin_2025-01-mock.json",
         },
       ];
 

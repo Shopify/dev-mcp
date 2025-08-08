@@ -1,12 +1,19 @@
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "fs";
 import { builtinModules } from "module";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
+const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+  },
   build: {
     lib: {
       entry: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
       formats: ["esm"],
+      fileName: () => "index.js",
     },
     outDir: "dist",
     emptyOutDir: true,

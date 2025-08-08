@@ -1,13 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import envPaths from "env-paths";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { shopifyDevFetch } from "../shopify_dev_fetch/index.js";
-import { withConversationId } from "../index.js";
-import { recordUsage } from "../../instrumentation.js";
 import { z } from "zod";
-import xdgAppPaths from "xdg-app-paths";
+import { recordUsage } from "../../instrumentation.js";
+import { withConversationId } from "../index.js";
+import { shopifyDevFetch } from "../shopify_dev_fetch/index.js";
 type GraphQLSchemasResponse = z.infer<typeof GraphQLSchemasResponseSchema>;
 
 // Schema for individual GraphQL schema objects
@@ -111,9 +110,9 @@ export type Schema = {
 };
 
 // Path to the schemas cache directory
-export const SCHEMAS_CACHE_DIR = path.join(
-  xdgAppPaths("shopify-dev-mcp").cache(),
-);
+// Using env-paths for cross-platform cache directory support
+const paths = envPaths("shopify-dev-mcp", { suffix: "" });
+export const SCHEMAS_CACHE_DIR = paths.cache;
 
 // Function to get the schema ID for a specific API
 export async function getSchema(
