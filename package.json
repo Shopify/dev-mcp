@@ -3,14 +3,14 @@
   "version": "1.1.0",
   "main": "dist/index.js",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && chmod +x dist/index.js",
     "build:watch": "vite watch",
     "changeset": "changeset",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:fix": "prettier --write --ignore-unknown .",
     "lint": "prettier --check --cache --ignore-unknown .",
-    "inspector": "npm run build && chmod +x dist/index.js && npx @modelcontextprotocol/inspector ./dist/index.js",
+    "inspector": "npm run build && npx @modelcontextprotocol/inspector dist/index.js",
     "typecheck": "tsc --noEmit"
   },
   "author": "",
