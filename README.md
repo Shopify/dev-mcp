@@ -1,5 +1,7 @@
 # Shopify Dev MCP Server
 
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/Shopify/dev-mcp)](https://archestra.ai/mcp-catalog/shopify__dev-mcp)
+
 This project implements a Model Context Protocol (MCP) server that interacts with Shopify Dev. This protocol supports various tools to interact with different Shopify APIs. At the moment the following APIs are supported:
 
 - Admin GraphQL API
