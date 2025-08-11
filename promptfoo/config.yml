@@ -5,10 +5,22 @@ prompts:
 
 providers:
   - id: 'file://./provider.cjs'
-    label: 'Dev Assistant Agent'
+    label: 'Dev Assistant Agent — GPT-4o mini'
     config:
       systemPrompt: "You are a very clever assistant."
       model: "gpt-4o-mini"
+
+  - id: 'file://./provider.cjs'
+    label: 'Dev Assistant Agent — Claude Opus 4.1'
+    config:
+      systemPrompt: "You are a very clever assistant."
+      model: "anthropic:claude-opus-4-1"
+
+  - id: 'file://./provider.cjs'
+    label: 'Dev Assistant Agent — Gemini 2.5 Pro'
+    config:
+      systemPrompt: "You are a very clever assistant."
+      model: "google:gemini-2.5-pro"
 
 tests:
   - description: polaris web components

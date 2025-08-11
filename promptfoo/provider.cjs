@@ -52,6 +52,7 @@ module.exports = class DevMCPProvider {
     const result = await agent.invoke({
       messages: [{ role: "user", content: prompt }],
     });
+    await mcp.close();
     return {
       output: JSON.stringify(result),
     };
