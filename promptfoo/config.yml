@@ -1,0 +1,19 @@
+description: Evals for the MCP server
+
+prompts:
+  - '{{ prompt }}'
+
+providers:
+  - id: 'file://./provider.cjs'
+    label: 'Dev Assistant Agent'
+    config:
+      systemPrompt: "You are a very clever assistant."
+      model: "gpt-4o-mini"
+
+tests:
+  - description: polaris web components
+    vars:
+      prompt: How do I use Shopify Polaris Web Components??
+    assert:
+      - type: contains
+        value: 'Called tool get_started with arguments: {"api":"polaris"}'
