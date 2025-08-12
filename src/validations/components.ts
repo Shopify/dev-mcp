@@ -1,5 +1,10 @@
+import { Parser } from "acorn";
+import jsx from "acorn-jsx";
+import tsPlugin from "acorn-typescript";
+import { full as walkFull } from "acorn-walk";
 import { z } from "zod";
 import * as AppHomeSchemas from "../data/typescriptSchemas/appHome.js";
+import * as PosSchemas from "../data/typescriptSchemas/pos.js";
 import { ValidationResponse, ValidationResult } from "../types.js";
 import { extractTypeScriptCode } from "./codeblockExtraction.js";
 
@@ -8,11 +13,11 @@ import { extractTypeScriptCode } from "./codeblockExtraction.js";
 // ============================================================================
 
 export function validateComponentCodeBlock(
-  input: TypeScriptValidationInput,
+  input: ComponentValidationInput,
 ): ValidationResponse {
   try {
     // Validate input
-    const validationResult = TypeScriptValidationInputSchema.safeParse(input);
+    const validationResult = ComponentValidationInputSchema.safeParse(input);
     if (!validationResult.success) {
       return {
         result: ValidationResult.FAILED,
@@ -22,19 +27,16 @@ export function validateComponentCodeBlock(
       };
     }
 
-    const { code, packageName } = validationResult.data;
+    const data = validationResult.data;
 
-    // Check if package is supported
-    if (!(packageName in PACKAGE_SCHEMA_MAP)) {
-      const supportedPackages = Object.keys(PACKAGE_SCHEMA_MAP);
-      return {
-        result: ValidationResult.FAILED,
-        resultDetail: `Unsupported package: ${packageName}. Supported packages are: ${supportedPackages.join(", ")}`,
-      };
-    }
+    // Create a resolver that provides Zod schemas on-demand (no pre-built maps)
+    const resolveSchema =
+      "schemas" in data
+        ? createExplicitSchemaResolver(data.schemas)
+        : createPackageSchemaResolver(data.packageName);
 
-    // Validate the code block and return the result directly
-    return validateCodeBlock(code, packageName);
+    // Parse components from code and validate against schemas
+    return validateCodeBlock(data.code, resolveSchema);
   } catch (error) {
     return {
       result: ValidationResult.FAILED,
@@ -43,91 +45,34 @@ export function validateComponentCodeBlock(
   }
 }
 
-/**
- * Maps package names to their corresponding schema modules
- * Each schema module is expected to export TAG_TO_TYPE_MAPPING
- */
-const PACKAGE_SCHEMA_MAP = {
-  "@shopify/app-bridge-ui-types": AppHomeSchemas,
-} as const;
-
-type SupportedPackage = keyof typeof PACKAGE_SCHEMA_MAP;
-
 // ============================================================================
-// Component Tag Name to Schema Mapping
+// Schema Types and Interfaces
 // ============================================================================
 
-/**
- * Gets the zod schema for a component tag name from a package
- */
-function getComponentSchema(
-  tagName: string,
-  packageName: string,
-): z.ZodType<any> | null {
-  if (!(packageName in PACKAGE_SCHEMA_MAP)) {
-    return null;
-  }
-
-  const packageInfo = PACKAGE_SCHEMA_MAP[packageName as SupportedPackage];
-  const tagMapping = (packageInfo as any).TAG_TO_TYPE_MAPPING;
-
-  if (!tagMapping) {
-    return null;
-  }
-
-  const typeName = tagMapping[tagName as keyof typeof tagMapping];
-
-  if (!typeName) {
-    return null;
-  }
-
-  const schemaName = `${typeName}Schema`;
-  const schema = (packageInfo as any)[schemaName];
-
-  return schema instanceof z.ZodSchema ? schema : null;
-}
-
-/**
- * Gets all available component schemas for a package
- */
-function getAvailableComponents(packageName: string): string[] {
-  if (!(packageName in PACKAGE_SCHEMA_MAP)) {
-    return [];
-  }
-
-  const packageInfo = PACKAGE_SCHEMA_MAP[packageName as SupportedPackage];
-  const tagMapping = (packageInfo as any).TAG_TO_TYPE_MAPPING;
-
-  if (!tagMapping) {
-    return [];
-  }
-
-  // Simply return all tag names from the mapping
-  return Object.keys(tagMapping);
-}
-
-// ============================================================================
-// Interfaces
-// ============================================================================
-
-const TypeScriptValidationInputSchema = z.object({
+const ExplicitSchemasInputSchema = z.object({
   code: z
     .string()
     .min(1, "Code block is required")
-    .describe(
-      "Markdown code block containing HTML with custom elements to validate",
-    ),
-  packageName: z
-    .string()
-    .min(1, "Package name is required")
-    .describe(
-      "TypeScript package name to validate against (e.g., '@shopify/app-bridge-ui-types')",
-    ),
+    .describe("Code block containing components to validate"),
+  schemas: z
+    .record(z.string(), z.any())
+    .describe("Object mapping component names to their Zod schemas"),
 });
 
-type TypeScriptValidationInput = z.infer<
-  typeof TypeScriptValidationInputSchema
->;
+const PackageNameInputSchema = z.object({
+  code: z
+    .string()
+    .min(1, "Code block is required")
+    .describe("Code block containing components to validate"),
+  packageName: z.string().min(1),
+});
+
+const ComponentValidationInputSchema = z.union([
+  ExplicitSchemasInputSchema,
+  PackageNameInputSchema,
+]);
+
+type ComponentValidationInput = z.infer<typeof ComponentValidationInputSchema>;
 
 interface ComponentInfo {
   tagName: string;
@@ -135,122 +80,85 @@ interface ComponentInfo {
   content: string;
 }
 
-function validateComponentProps(
-  tagName: string,
-  props: Record<string, any>,
-  packageName: string,
-): {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-} {
-  const schema = getComponentSchema(tagName, packageName);
+// ============================================================================
+// On-demand Schema Resolution (no pre-built maps, no aliasing)
+// ============================================================================
 
-  if (!schema) {
-    return {
-      isValid: false,
-      errors: [`Unknown component: ${tagName} for package ${packageName}`],
-      warnings: [],
-    };
+type SchemaResolver = (tagName: string) => z.ZodType<any> | null;
+
+// Back-compat: known packages
+const PACKAGE_SCHEMA_MAP = {
+  "@shopify/app-bridge-ui-types": AppHomeSchemas,
+  "@shopify/ui-extensions-react/point-of-sale": PosSchemas,
+} as const;
+
+type SupportedPackage = keyof typeof PACKAGE_SCHEMA_MAP;
+
+function createPackageSchemaResolver(packageName: string): SchemaResolver {
+  if (!(packageName in PACKAGE_SCHEMA_MAP)) {
+    throw new Error(
+      `Unsupported package: ${packageName}. Supported packages are: ${Object.keys(
+        PACKAGE_SCHEMA_MAP,
+      ).join(", ")}`,
+    );
   }
 
-  try {
-    schema.parse(props);
-    return {
-      isValid: true,
-      errors: [],
-      warnings: [],
-    };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const errors = error.errors.map((err: any) => {
-        const path = err.path.length > 0 ? err.path.join(".") : "root";
-        return `Property '${path}': ${err.message}`;
-      });
+  const pkg = PACKAGE_SCHEMA_MAP[packageName as SupportedPackage] as any;
+  const tagMapping = (pkg as any).TAG_TO_TYPE_MAPPING as
+    | Record<string, string>
+    | undefined;
 
+  if (!tagMapping) {
+    throw new Error(
+      `Package ${packageName} does not expose TAG_TO_TYPE_MAPPING for component resolution`,
+    );
+  }
+
+  return (tagName: string) => {
+    const typeName = tagMapping[tagName];
+    if (!typeName) return null;
+    const schemaName = `${typeName}Schema`;
+    const schema = pkg[schemaName];
+    return schema instanceof z.ZodSchema ? (schema as z.ZodType<any>) : null;
+  };
+}
+
+function createExplicitSchemaResolver(
+  schemas: Record<string, z.ZodType<any>>,
+): SchemaResolver {
+  // Strict: only exact key matches; no aliasing or name variants
+  return (tagName: string) => schemas[tagName] ?? null;
+}
+
+// ============================================================================
+// Core Validation Logic
+// ============================================================================
+
+function validateCodeBlock(
+  codeblock: string,
+  resolveSchema: SchemaResolver,
+): ValidationResponse {
+  try {
+    const components = parseComponents(codeblock, resolveSchema);
+
+    if (components.length === 0) {
       return {
-        isValid: false,
-        errors,
-        warnings: [],
+        result: ValidationResult.SUCCESS,
+        resultDetail: "No components found to validate.",
       };
     }
 
-    return {
-      isValid: false,
-      errors: [
-        `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
-      ],
-      warnings: [],
-    };
-  }
-}
+    const errors: string[] = [];
+    const validComponents: string[] = [];
 
-function validateSingleComponent(
-  component: ComponentInfo,
-  packageName: string,
-): { isValid: boolean; error?: string; tagName: string } {
-  const schema = getComponentSchema(component.tagName, packageName);
-
-  if (!schema) {
-    const availableComponents = getAvailableComponents(packageName);
-    return {
-      isValid: false,
-      error: `Unknown component: ${component.tagName}. Available components for ${packageName}: ${availableComponents.join(", ")}`,
-      tagName: component.tagName,
-    };
-  }
-
-  const validationResult = validateComponentProps(
-    component.tagName,
-    component.props,
-    packageName,
-  );
-
-  if (validationResult.errors.length > 0) {
-    return {
-      isValid: false,
-      error: validationResult.errors.join("; "),
-      tagName: component.tagName,
-    };
-  }
-
-  return {
-    isValid: true,
-    tagName: component.tagName,
-  };
-}
-
-/**
- * Validates all components and collects results
- * Eliminates nested loops by using functional approach
- */
-function validateAllComponents(
-  components: ComponentInfo[],
-  packageName: string,
-): { errors: string[]; validComponents: string[] } {
-  const results = components.map((component) =>
-    validateSingleComponent(component, packageName),
-  );
-
-  return {
-    errors: results.filter((r) => !r.isValid).map((r) => r.error!),
-    validComponents: results.filter((r) => r.isValid).map((r) => r.tagName),
-  };
-}
-
-/**
- * Validates a code block - simplified without nested loops
- */
-function validateCodeBlock(
-  codeblock: string,
-  packageName: string,
-): ValidationResponse {
-  try {
-    const components = parseCodeBlock(codeblock);
-    const { errors, validComponents } = validateAllComponents(
-      components,
-      packageName,
-    );
+    for (const component of components) {
+      const result = validateSingleComponent(component, resolveSchema);
+      if (result.isValid) {
+        validComponents.push(result.tagName);
+      } else if (result.error) {
+        errors.push(result.error);
+      }
+    }
 
     if (errors.length === 0) {
       const componentsList =
@@ -259,13 +167,13 @@ function validateCodeBlock(
           : "";
       return {
         result: ValidationResult.SUCCESS,
-        resultDetail: `Code block successfully validated against ${packageName} schemas.${componentsList}`,
+        resultDetail: `All components validated successfully.${componentsList}`,
       };
     }
 
     return {
       result: ValidationResult.FAILED,
-      resultDetail: `Errors: ${errors.join("; ")}`,
+      resultDetail: `Validation errors: ${errors.join("; ")}`,
     };
   } catch (error) {
     return {
@@ -275,75 +183,243 @@ function validateCodeBlock(
   }
 }
 
-// ============================================================================
-// Component Validation (Legacy - keeping for compatibility)
-// ============================================================================
-
-/**
- * Validates a single component against the package schemas
- * @deprecated Use validateSingleComponent instead
- */
-function validateComponent(
+function validateSingleComponent(
   component: ComponentInfo,
-  packageName: string,
-): ValidationResponse {
-  const result = validateSingleComponent(component, packageName);
+  resolveSchema: SchemaResolver,
+): { isValid: boolean; error?: string; tagName: string } {
+  const schema = resolveSchema(component.tagName);
 
-  if (!result.isValid) {
+  if (!schema) {
     return {
-      result: ValidationResult.FAILED,
-      resultDetail: result.error!,
+      isValid: false,
+      error: `Unknown component: ${component.tagName}`,
+      tagName: component.tagName,
     };
   }
 
-  return {
-    result: ValidationResult.SUCCESS,
-    resultDetail: `Component ${result.tagName} validated successfully`,
-  };
+  try {
+    schema.parse(component.props);
+    return {
+      isValid: true,
+      tagName: component.tagName,
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const errorMessages = error.errors.map((err) => {
+        const path = err.path.length > 0 ? err.path.join(".") : "root";
+        return `Property '${path}': ${err.message}`;
+      });
+
+      return {
+        isValid: false,
+        error: `${component.tagName} validation failed: ${errorMessages.join("; ")}`,
+        tagName: component.tagName,
+      };
+    }
+
+    return {
+      isValid: false,
+      error: `${component.tagName} validation failed: ${error instanceof Error ? error.message : String(error)}`,
+      tagName: component.tagName,
+    };
+  }
 }
 
 // ============================================================================
-// Code Block Parsing
+// Component Parsing (Acorn-based)
 // ============================================================================
 
-/**
- * Parses a code block to extract component information
- * Uses shared cleaning utility for consistent code processing
- */
-function parseCodeBlock(codeblock: string): ComponentInfo[] {
+function parseComponents(
+  codeblock: string,
+  resolveSchema: SchemaResolver,
+): ComponentInfo[] {
   const components: ComponentInfo[] = [];
-
-  // Use shared cleaning utility - removes markdown blocks, HTML comments, and trims
   const cleanedCode = extractTypeScriptCode(codeblock);
 
-  // Simple regex to find all s- component opening tags
-  // Works perfectly for LLM-generated HTML
-  const tagMatches = cleanedCode.matchAll(
-    /<(s-[a-zA-Z0-9-]+)([^>]*?)(?:\s*\/?>)/g,
+  const ExtendedParser = (Parser as any).extend(
+    (jsx as any)(),
+    (tsPlugin as any)(),
   );
 
-  for (const match of tagMatches) {
-    const tagName = match[1];
-    const attributeString = match[2].trim();
-
-    // Parse attributes
-    const props = parseAttributes(attributeString);
-
-    components.push({
-      tagName,
-      props,
-      content: match[0],
+  try {
+    // Parse full code with JSX/TS support
+    const ast: any = ExtendedParser.parse(cleanedCode, {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      allowHashBang: true,
+      locations: true,
+      ranges: true,
     });
+
+    // Walk all nodes to find JSXOpeningElement
+    walkFull(ast, (node: any) => {
+      if (node && node.type === "JSXOpeningElement") {
+        const nameNode = node.name;
+        const tagName = jsxNameToString(nameNode);
+        if (!tagName) return;
+
+        // Skip common HTML elements
+        if (isCommonHtmlElement(tagName)) return;
+
+        // Include only tags that have a resolvable Zod schema
+        const schema = resolveSchema(tagName);
+        if (!schema) return;
+
+        const props = extractJsxAttributes(node.attributes, cleanedCode);
+
+        components.push({
+          tagName,
+          props,
+          content: cleanedCode.slice(node.start, node.end),
+        });
+      }
+    });
+  } catch (e) {
+    // Fallback: no components if parsing fails
+    return components;
   }
 
   return components;
 }
 
-/**
- * Determines if an attribute should be converted to a number based on common HTML/component patterns
- */
+function jsxNameToString(nameNode: any): string | null {
+  if (!nameNode) return null;
+  switch (nameNode.type) {
+    case "JSXIdentifier":
+      return nameNode.name as string;
+    case "JSXMemberExpression": {
+      // e.g., UI.Button -> take the rightmost identifier "Button"
+      let current: any = nameNode;
+      while (current.object && current.property) {
+        if (current.property && current.property.type === "JSXIdentifier") {
+          return current.property.name as string;
+        }
+        current = current.object;
+      }
+      return null;
+    }
+    case "JSXNamespacedName":
+      // e.g., svg:path -> take local name
+      return nameNode.name?.name ?? nameNode.local?.name ?? null;
+    default:
+      return null;
+  }
+}
+
+function extractJsxAttributes(
+  attrs: any[],
+  source: string,
+): Record<string, any> {
+  const props: Record<string, any> = {};
+
+  for (const attr of attrs) {
+    if (attr.type === "JSXAttribute") {
+      const key = attr.name?.name;
+      if (!key) continue;
+
+      if (attr.value == null) {
+        // <Comp disabled />
+        props[key] = true;
+        continue;
+      }
+
+      if (attr.value.type === "Literal") {
+        props[key] = attr.value.value;
+        continue;
+      }
+
+      if (attr.value.type === "JSXExpressionContainer") {
+        const expr = attr.value.expression;
+        // Handle simple literal expressions
+        if (expr.type === "Literal") {
+          props[key] = expr.value;
+          continue;
+        }
+        if (expr.type === "Identifier") {
+          if (expr.name === "true") props[key] = true;
+          else if (expr.name === "false") props[key] = false;
+          else props[key] = expr.name; // keep identifier name as string placeholder
+          continue;
+        }
+        // Fallback: keep raw expression text as string
+        props[key] = source.slice(expr.start, expr.end);
+        continue;
+      }
+    } else if (attr.type === "JSXSpreadAttribute") {
+      // Skip spreads; cannot safely evaluate at validation time
+      continue;
+    }
+  }
+
+  return props;
+}
+
+function isCommonHtmlElement(tagName: string): boolean {
+  const commonElements = new Set([
+    "div",
+    "span",
+    "p",
+    "a",
+    "img",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "li",
+    "table",
+    "tr",
+    "td",
+    "th",
+    "thead",
+    "tbody",
+    "form",
+    "input",
+    "button",
+    "select",
+    "option",
+    "textarea",
+    "nav",
+    "header",
+    "footer",
+    "main",
+    "section",
+    "article",
+    "aside",
+    "br",
+    "hr",
+    "strong",
+    "em",
+    "code",
+    "pre",
+  ]);
+
+  return commonElements.has(tagName.toLowerCase());
+}
+
+function parseStringValue(value: string, attributeName: string): any {
+  // Handle boolean string values
+  if (value === "true") return true;
+  if (value === "false") return false;
+
+  // Handle numeric values for specific attributes that are typically numeric
+  if (isNumericAttribute(attributeName)) {
+    if (/^-?\d+$/.test(value)) {
+      return parseInt(value, 10);
+    }
+    if (/^-?\d*\.\d+$/.test(value)) {
+      return parseFloat(value);
+    }
+  }
+
+  // Return as string by default
+  return value;
+}
+
 function isNumericAttribute(attributeName: string): boolean {
-  // Attributes that are typically numeric in component schemas
   const numericAttributes = new Set([
     "max",
     "min",
@@ -357,47 +433,14 @@ function isNumericAttribute(attributeName: string): boolean {
     "rowspan",
     "width",
     "height",
+    "maxlength",
+    "minlength",
+    "value",
+    "defaultValue",
+    "initialValue",
+    "maximumValue",
+    "minimumValue",
   ]);
 
   return numericAttributes.has(attributeName.toLowerCase());
-}
-
-/**
- * Parses HTML attributes from a string
- * Optimized for LLM-generated component attributes
- */
-function parseAttributes(attributeString: string): Record<string, any> {
-  const props: Record<string, any> = {};
-
-  if (!attributeString.trim()) return props;
-
-  // Simple regex that handles quoted values with spaces properly
-  // Supports: key="value with spaces" or key='value' or key=value or just key
-  const attributeRegex =
-    /([a-zA-Z0-9-]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
-  let match;
-
-  while ((match = attributeRegex.exec(attributeString)) !== null) {
-    const name = match[1];
-    const value = match[2] || match[3] || match[4] || true;
-
-    // Convert string values to appropriate types
-    let parsedValue: any = value;
-    if (typeof value === "string") {
-      if (value === "true") parsedValue = true;
-      else if (value === "false") parsedValue = false;
-      // Only convert to numbers for specific numeric attributes
-      // Most HTML attributes should remain as strings (e.g., placeholder, label, etc.)
-      else if (isNumericAttribute(name) && /^\d+$/.test(value))
-        parsedValue = parseInt(value, 10);
-      else if (isNumericAttribute(name) && /^\d*\.\d+$/.test(value))
-        parsedValue = parseFloat(value);
-      // Keep as string otherwise
-      else parsedValue = value;
-    }
-
-    props[name] = parsedValue;
-  }
-
-  return props;
 }

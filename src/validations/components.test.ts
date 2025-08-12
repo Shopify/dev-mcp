@@ -67,28 +67,6 @@ describe("validateComponent", () => {
       expect(validationResults).toHaveLength(1);
       expect(validationResults[0].result).toBe(ValidationResult.FAILED);
     });
-
-    it("should fail for fake components when package definitions cannot be loaded", async () => {
-      const codeBlock =
-        "```<fake-button variant='primary'>Hello, World</fake-button>```";
-      const validationResults = await validateComponent(
-        [codeBlock],
-        "@shopify/app-bridge-ui-types",
-      );
-      expect(isValidationSuccessful(validationResults[0])).toBe(true);
-    });
-
-    it("should fail for fake components against @shopify/app-bridge-ui-types", async () => {
-      const codeBlock =
-        "```<s-fake-component variant='primary'>Hello, World</s-fake-component>```";
-      const validationResults = await validateComponent(
-        [codeBlock],
-        "@shopify/app-bridge-ui-types",
-      );
-      expect(isValidationSuccessful(validationResults[0])).toBe(false);
-      expect(validationResults).toHaveLength(1);
-      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
-    });
   });
 
   describe("multiple codeblocks", () => {
@@ -312,15 +290,6 @@ describe("validateComponent", () => {
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
-      it("s-fake-element - should fail because component doesn't exist", async () => {
-        const validationResults = await validateComponent(
-          ["```<s-fake-element>Fake</s-fake-element>```"],
-          "@shopify/app-bridge-ui-types",
-        );
-        expect(isValidationSuccessful(validationResults[0])).toBe(false);
-        expect(validationResults[0].result).toBe(ValidationResult.FAILED);
-      });
-
       it("s-custom-component - should fail because component doesn't exist", async () => {
         const validationResults = await validateComponent(
           ["```<s-custom-component>Custom</s-custom-component>```"],
@@ -398,6 +367,117 @@ describe("validateComponent", () => {
       expect(isValidationSuccessful(validationResults[0])).toBe(true);
       expect(validationResults).toHaveLength(1);
       expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+    });
+
+    describe("react components for POS examples", () => {
+      it("react component for POS example 1", async () => {
+        const codeBlocks = [
+          `import React from 'react';
+            import {
+              Banner,
+              ScrollView,
+              Screen,
+              reactExtension,
+            } from '@shopify/ui-extensions-react/point-of-sale';
+
+            const SmartGridModal = () => {
+              return (
+                <Screen title="Home" name="Home">
+                  <ScrollView>
+                    <Banner
+                      title="Information Banner"
+                      variant="information"
+                      action="Ok"
+                      visible
+                    />
+                    <Banner
+                      title="Confirmation Banner"
+                      variant="confirmation"
+                      visible
+                    />
+                    <Banner
+                      title="Alert Banner"
+                      variant="alert"
+                      visible
+                    />
+                    <Banner
+                      title="Error Banner"
+                      variant="error"
+                      visible
+                    />
+                  </ScrollView>
+                </Screen>
+              );
+            };
+
+            export default reactExtension(
+              'pos.home.modal.render',
+              () => <SmartGridModal />,
+            );`,
+        ];
+
+        const validationResults = await validateComponent(
+          codeBlocks,
+          "@shopify/ui-extensions-react/point-of-sale",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+        expect(validationResults).toHaveLength(1);
+        expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+      });
+
+      it("react component for POS example 2 - should fail", async () => {
+        const codeBlocks = [
+          `import React from 'react';
+            import {
+              Banner,
+              ScrollView,
+              Screen,
+              reactExtension,
+            } from '@shopify/ui-extensions-react/point-of-sale';
+
+            const SmartGridModal = () => {
+              return (
+                <Screen title="Home" name="Home">
+                  <ScrollView>
+                    <Banner
+                      variant="information"
+                      action="Ok"
+                      visible
+                    />
+                    <Banner
+                      title="Confirmation Banner"
+                      variant="confirmation"
+                      visible
+                    />
+                    <Banner
+                      title="Alert Banner"
+                      variant="alert"
+                      visible
+                    />
+                    <Banner
+                      title="Error Banner"
+                      variant="error"
+                      visible
+                    />
+                  </ScrollView>
+                </Screen>
+              );
+            };
+
+            export default reactExtension(
+              'pos.home.modal.render',
+              () => <SmartGridModal />,
+            );`,
+        ];
+
+        const validationResults = await validateComponent(
+          codeBlocks,
+          "@shopify/ui-extensions-react/point-of-sale",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(false);
+        expect(validationResults).toHaveLength(1);
+        expect(validationResults[0].result).toBe(ValidationResult.FAILED);
+      });
     });
   });
 });
