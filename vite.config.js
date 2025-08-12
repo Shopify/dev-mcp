@@ -18,7 +18,15 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     rollupOptions: {
-      external: [...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
+      external: [
+        ...builtinModules,
+        ...builtinModules.map((m) => `node:${m}`),
+        "@shopify/theme-check-node",
+        "@shopify/theme-check-common",
+      ],
+      output: {
+        interop: "auto",
+      },
     },
   },
   test: {
