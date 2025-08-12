@@ -4,28 +4,52 @@ prompts:
   - '{{ prompt }}'
 
 providers:
-  - id: 'file://./provider.cjs'
-    label: 'Dev Assistant Agent — GPT-4o mini'
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Cursor w/ GPT-5'
     config:
-      systemPrompt: "You are a very clever assistant."
-      model: "gpt-4o-mini"
+      systemPrompt: "file://./prompts/cursor.cjs"
+      model: "gpt-5"
 
-  - id: 'file://./provider.cjs'
-    label: 'Dev Assistant Agent — Claude Opus 4.1'
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Cursor w/ Claude Sonnet 4'
     config:
-      systemPrompt: "You are a very clever assistant."
+      systemPrompt: "file://./prompts/cursor.cjs"
+      model: "anthropic:claude-sonnet-4"
+
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Cursor w/ o3'
+    config:
+      systemPrompt: "file://./prompts/cursor.cjs"
+      model: "o3"
+
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Claude Code w/ Sonnet 4'
+    config:
+      systemPrompt: "file://./prompts/claude-code.cjs"
+      model: "anthropic:claude-sonnet-4"
+
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Claude Code w/ Opus 4.1'
+    config:
+      systemPrompt: "file://./prompts/claude-code.cjs"
       model: "anthropic:claude-opus-4-1"
 
-  - id: 'file://./provider.cjs'
-    label: 'Dev Assistant Agent — Gemini 2.5 Pro'
-    config:
-      systemPrompt: "You are a very clever assistant."
-      model: "google:gemini-2.5-pro"
-
 tests:
-  - description: polaris web components
+  - description: golden test
     vars:
-      prompt: How do I use Shopify Polaris Web Components??
+      prompt: How do I create a draft order with a custom price with the Shopify Admin API?
     assert:
-      - type: contains
-        value: 'Called tool get_started with arguments: {"api":"polaris"}'
+      - type: contains-all
+        value:
+          - 'Called tool learn_shopify_api with arguments: {"api":"admin"}'
+          - 'Called tool validate_graphql_codeblocks with arguments:'
+          - 'Called tool search_docs_chunks with arguments:'
+  - description: golden test
+    vars:
+      prompt: How do I fetch all the products tagged 'tee' and create a basic code discount for them returning the id with the Shopify Admin API?
+    assert:
+      - type: contains-all
+        value:
+          - 'Called tool learn_shopify_api with arguments: {"api":"admin"}'
+          - 'Called tool validate_graphql_codeblocks with arguments:'
+          - 'Called tool search_docs_chunks with arguments:'
