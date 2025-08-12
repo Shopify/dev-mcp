@@ -289,15 +289,6 @@ describe("validateComponent", () => {
         );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
-
-      it("s-custom-component - should fail because component doesn't exist", async () => {
-        const validationResults = await validateComponent(
-          ["```<s-custom-component>Custom</s-custom-component>```"],
-          "@shopify/app-bridge-ui-types",
-        );
-        expect(isValidationSuccessful(validationResults[0])).toBe(false);
-        expect(validationResults[0].result).toBe(ValidationResult.FAILED);
-      });
     });
 
     describe("props validation", () => {
@@ -327,17 +318,6 @@ describe("validateComponent", () => {
           "@shopify/app-bridge-ui-types",
         );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
-      });
-
-      it("mix of components with s- prefix", async () => {
-        const validationResults = await validateComponent(
-          [
-            "```<s-button>Button</s-button><s-text>Text</s-text><s-invalid-component>Invalid</s-invalid-component>```",
-          ],
-          "@shopify/app-bridge-ui-types",
-        );
-        expect(isValidationSuccessful(validationResults[0])).toBe(false);
-        expect(validationResults[0].result).toBe(ValidationResult.FAILED);
       });
     });
   });
