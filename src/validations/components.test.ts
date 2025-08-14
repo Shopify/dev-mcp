@@ -322,142 +322,232 @@ describe("validateComponent", () => {
     });
   });
 
-  describe("real life examples", () => {
-    it("tophat take 1 - validates components with s- prefix", async () => {
+  describe("react components for POS examples", () => {
+    it("parses and validates valid POS react components", async () => {
       const codeBlocks = [
-        "```<s-button variant='primary'>Save</s-button><s-button>Cancel</s-button>```",
+        `import React from 'react';
+          import {
+            Banner,
+            ScrollView,
+            Screen,
+            reactExtension,
+          } from '@shopify/ui-extensions-react/point-of-sale';
+
+          const SmartGridModal = () => {
+            return (
+              <Screen title="Home" name="Home">
+                <ScrollView>
+                  <Banner
+                    title="Information Banner"
+                    variant="information"
+                    action="Ok"
+                    visible
+                  />
+                  <Banner
+                    title="Confirmation Banner"
+                    variant="confirmation"
+                    visible
+                  />
+                  <Banner
+                    title="Alert Banner"
+                    variant="alert"
+                    visible
+                  />
+                  <Banner
+                    title="Error Banner"
+                    variant="error"
+                    visible
+                  />
+                </ScrollView>
+              </Screen>
+            );
+          };
+
+          export default reactExtension(
+            'pos.home.modal.render',
+            () => <SmartGridModal />,
+          );`,
       ];
+
       const validationResults = await validateComponent(
         codeBlocks,
-        "@shopify/app-bridge-ui-types",
+        "@shopify/ui-extensions-react/point-of-sale",
       );
       expect(isValidationSuccessful(validationResults[0])).toBe(true);
       expect(validationResults).toHaveLength(1);
       expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
     });
 
-    it("tophat take 2 - should pass for valid components", async () => {
+    it("parses and catches invalid due to missing props POS react components", async () => {
       const codeBlocks = [
-        "```<s-text>Hello world</s-text><s-button>Click me</s-button>```",
+        `import React from 'react';
+          import {
+            Banner,
+            ScrollView,
+            Screen,
+            reactExtension,
+          } from '@shopify/ui-extensions-react/point-of-sale';
+
+          const SmartGridModal = () => {
+            return (
+              <Screen title="Home" name="Home">
+                <ScrollView>
+                  <Banner
+                    variant="information"
+                    action="Ok"
+                    visible
+                  />
+                  <Banner
+                    title="Confirmation Banner"
+                    variant="confirmation"
+                    visible
+                  />
+                  <Banner
+                    title="Alert Banner"
+                    variant="alert"
+                    visible
+                  />
+                  <Banner
+                    title="Error Banner"
+                    variant="error"
+                    visible
+                  />
+                </ScrollView>
+              </Screen>
+            );
+          };
+
+          export default reactExtension(
+            'pos.home.modal.render',
+            () => <SmartGridModal />,
+          );`,
       ];
       const validationResults = await validateComponent(
         codeBlocks,
-        "@shopify/app-bridge-ui-types",
+        "@shopify/ui-extensions-react/point-of-sale",
       );
       expect(isValidationSuccessful(validationResults[0])).toBe(true);
       expect(validationResults).toHaveLength(1);
       expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
     });
+  });
+});
+describe("react component for POS TS", () => {
+  it("parses and validates valid POS TS components", async () => {
+    const codeBlocks = [
+      `import {
+extend,
+Navigator,
+Screen,
+ScrollView,
+Box,
+Image,
+} from '@shopify/ui-extensions/point-of-sale';
 
-    describe("react components for POS examples", () => {
-      it("react component for POS example 1", async () => {
-        const codeBlocks = [
-          `import React from 'react';
-            import {
-              Banner,
-              ScrollView,
-              Screen,
-              reactExtension,
-            } from '@shopify/ui-extensions-react/point-of-sale';
+export default extend(
+'pos.home.modal.render',
+(root) => {
+const navigator =
+  root.createComponent(Navigator);
 
-            const SmartGridModal = () => {
-              return (
-                <Screen title="Home" name="Home">
-                  <ScrollView>
-                    <Banner
-                      title="Information Banner"
-                      variant="information"
-                      action="Ok"
-                      visible
-                    />
-                    <Banner
-                      title="Confirmation Banner"
-                      variant="confirmation"
-                      visible
-                    />
-                    <Banner
-                      title="Alert Banner"
-                      variant="alert"
-                      visible
-                    />
-                    <Banner
-                      title="Error Banner"
-                      variant="error"
-                      visible
-                    />
-                  </ScrollView>
-                </Screen>
-              );
-            };
+const imageBoxScreen =
+  navigator.createComponent(Screen, {
+    name: 'ImageBox',
+    title: 'ImageBox',
+  });
 
-            export default reactExtension(
-              'pos.home.modal.render',
-              () => <SmartGridModal />,
-            );`,
-        ];
+const scrollView =
+  imageBoxScreen.createComponent(ScrollView);
 
-        const validationResults = await validateComponent(
-          codeBlocks,
-          "@shopify/ui-extensions-react/point-of-sale",
-        );
-        expect(isValidationSuccessful(validationResults[0])).toBe(true);
-        expect(validationResults).toHaveLength(1);
-        expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
-      });
+const box = scrollView.createComponent(Box, {
+  blockSize: '100px',
+  inlineSize: '100px',
+  paddingInlineStart: '100',
+  paddingInlineEnd: '100',
+  paddingBlockStart: '100',
+  paddingBlockEnd: '100',
+});
 
-      it("react component for POS example 2 - should fail", async () => {
-        const codeBlocks = [
-          `import React from 'react';
-            import {
-              Banner,
-              ScrollView,
-              Screen,
-              reactExtension,
-            } from '@shopify/ui-extensions-react/point-of-sale';
+const image = box.createComponent(Image, {
+  src: 'example.png',
+  size: 'contain',
+});
 
-            const SmartGridModal = () => {
-              return (
-                <Screen title="Home" name="Home">
-                  <ScrollView>
-                    <Banner
-                      variant="information"
-                      action="Ok"
-                      visible
-                    />
-                    <Banner
-                      title="Confirmation Banner"
-                      variant="confirmation"
-                      visible
-                    />
-                    <Banner
-                      title="Alert Banner"
-                      variant="alert"
-                      visible
-                    />
-                    <Banner
-                      title="Error Banner"
-                      variant="error"
-                      visible
-                    />
-                  </ScrollView>
-                </Screen>
-              );
-            };
+box.appendChild(image);
+scrollView.appendChild(box);
+imageBoxScreen.appendChild(scrollView);
+navigator.appendChild(imageBoxScreen);
 
-            export default reactExtension(
-              'pos.home.modal.render',
-              () => <SmartGridModal />,
-            );`,
-        ];
+root.appendChild(navigator);
+},
+);`,
+    ];
 
-        const validationResults = await validateComponent(
-          codeBlocks,
-          "@shopify/ui-extensions-react/point-of-sale",
-        );
-        expect(isValidationSuccessful(validationResults[0])).toBe(false);
-        expect(validationResults).toHaveLength(1);
-        expect(validationResults[0].result).toBe(ValidationResult.FAILED);
-      });
-    });
+    const validationResults = await validateComponent(
+      codeBlocks,
+      "@shopify/ui-extensions/point-of-sale",
+    );
+    expect(isValidationSuccessful(validationResults[0])).toBe(true);
+    expect(validationResults).toHaveLength(1);
+    expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+  });
+  it("parses and catches invalid due to invalid props", async () => {
+    const codeBlocks = [
+      `import {
+extend,
+Navigator,
+Screen,
+ScrollView,
+Box,
+Image,
+} from '@shopify/ui-extensions/point-of-sale';
+
+export default extend(
+'pos.home.modal.render',
+(root) => {
+const navigator =
+  root.createComponent(Navigator);
+
+const imageBoxScreen =
+  navigator.createComponent(Screen, {
+    name: 'ImageBox',
+    title: 'ImageBox',
+  });
+
+const scrollView =
+  imageBoxScreen.createComponent(ScrollView);
+
+const box = scrollView.createComponent(Box, {
+  title: 'lolz this shouldn't work',
+  blockSize: '100px',
+  inlineSize: '100px',
+  paddingInlineStart: '100',
+  paddingInlineEnd: '100',
+  paddingBlockStart: '100',
+  paddingBlockEnd: '100',
+});
+
+const image = box.createComponent(Image, {
+  src: 'example.png',
+  size: 'contain',
+});
+
+box.appendChild(image);
+scrollView.appendChild(box);
+imageBoxScreen.appendChild(scrollView);
+navigator.appendChild(imageBoxScreen);
+
+root.appendChild(navigator);
+},
+);`,
+    ];
+
+    const validationResults = await validateComponent(
+      codeBlocks,
+      "@shopify/ui-extensions/point-of-sale",
+    );
+    expect(isValidationSuccessful(validationResults[0])).toBe(false);
+    expect(validationResults).toHaveLength(1);
+    expect(validationResults[0].result).toBe(ValidationResult.FAILED);
   });
 });

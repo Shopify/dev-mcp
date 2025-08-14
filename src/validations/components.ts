@@ -29,14 +29,16 @@ export function validateComponentCodeBlock(
 
     const data = validationResult.data;
 
-    // Create a resolver that provides Zod schemas on-demand (no pre-built maps)
     const resolveSchema =
       "schemas" in data
         ? createExplicitSchemaResolver(data.schemas)
-        : createPackageSchemaResolver(data.packageName);
+        : createPackageSchemaResolver((data as any).packageName);
 
-    // Parse components from code and validate against schemas
-    return validateCodeBlock(data.code, resolveSchema);
+    return validateCodeBlock(
+      data.code,
+      resolveSchema,
+      (data as any).packageName as string | undefined,
+    );
   } catch (error) {
     return {
       result: ValidationResult.FAILED,
@@ -86,10 +88,10 @@ interface ComponentInfo {
 
 type SchemaResolver = (tagName: string) => z.ZodType<any> | null;
 
-// Back-compat: known packages
 const PACKAGE_SCHEMA_MAP = {
   "@shopify/app-bridge-ui-types": AppHomeSchemas,
   "@shopify/ui-extensions-react/point-of-sale": PosSchemas,
+  "@shopify/ui-extensions/point-of-sale": PosSchemas,
 } as const;
 
 type SupportedPackage = keyof typeof PACKAGE_SCHEMA_MAP;
@@ -108,19 +110,8 @@ function createPackageSchemaResolver(packageName: string): SchemaResolver {
     | Record<string, string>
     | undefined;
 
-  if (!tagMapping) {
-    throw new Error(
-      `Package ${packageName} does not expose TAG_TO_TYPE_MAPPING for component resolution`,
-    );
-  }
-
-  return (tagName: string) => {
-    const typeName = tagMapping[tagName];
-    if (!typeName) return null;
-    const schemaName = `${typeName}Schema`;
-    const schema = pkg[schemaName];
-    return schema instanceof z.ZodSchema ? (schema as z.ZodType<any>) : null;
-  };
+  if (tagMapping) return resolveByTagMapping(pkg, tagMapping);
+  return resolveByConventionalNames(pkg);
 }
 
 function createExplicitSchemaResolver(
@@ -137,9 +128,10 @@ function createExplicitSchemaResolver(
 function validateCodeBlock(
   codeblock: string,
   resolveSchema: SchemaResolver,
+  packageName?: string,
 ): ValidationResponse {
   try {
-    const components = parseComponents(codeblock, resolveSchema);
+    const components = parseComponents(codeblock, resolveSchema, packageName);
 
     if (components.length === 0) {
       return {
@@ -198,7 +190,9 @@ function validateSingleComponent(
   }
 
   try {
-    schema.parse(component.props);
+    const strictSchema =
+      schema instanceof z.ZodObject ? schema.strict() : schema;
+    strictSchema.parse(component.props);
     return {
       isValid: true,
       tagName: component.tagName,
@@ -232,6 +226,7 @@ function validateSingleComponent(
 function parseComponents(
   codeblock: string,
   resolveSchema: SchemaResolver,
+  packageName?: string,
 ): ComponentInfo[] {
   const components: ComponentInfo[] = [];
   const cleanedCode = extractTypeScriptCode(codeblock);
@@ -242,7 +237,6 @@ function parseComponents(
   );
 
   try {
-    // Parse full code with JSX/TS support
     const ast: any = ExtendedParser.parse(cleanedCode, {
       ecmaVersion: "latest",
       sourceType: "module",
@@ -251,35 +245,96 @@ function parseComponents(
       ranges: true,
     });
 
-    // Walk all nodes to find JSXOpeningElement
     walkFull(ast, (node: any) => {
-      if (node && node.type === "JSXOpeningElement") {
-        const nameNode = node.name;
-        const tagName = jsxNameToString(nameNode);
-        if (!tagName) return;
-
-        // Skip common HTML elements
-        if (isCommonHtmlElement(tagName)) return;
-
-        // Include only tags that have a resolvable Zod schema
-        const schema = resolveSchema(tagName);
-        if (!schema) return;
-
-        const props = extractJsxAttributes(node.attributes, cleanedCode);
-
-        components.push({
-          tagName,
-          props,
-          content: cleanedCode.slice(node.start, node.end),
-        });
-      }
+      addJsxComponentIfMatch(node, resolveSchema, cleanedCode, components);
+      addCreateComponentIfMatch(
+        node,
+        resolveSchema,
+        cleanedCode,
+        components,
+        packageName,
+      );
     });
   } catch (e) {
-    // Fallback: no components if parsing fails
     return components;
   }
 
   return components;
+}
+
+function resolveByConventionalNames(pkg: any): SchemaResolver {
+  return (tagName: string) => {
+    const candidateNames = [`${tagName}PropsSchema`, `${tagName}Schema`];
+    for (const schemaName of candidateNames) {
+      const schema = pkg[schemaName];
+      if (schema instanceof z.ZodSchema) return schema as z.ZodType<any>;
+    }
+    return null;
+  };
+}
+
+function resolveByTagMapping(
+  pkg: any,
+  tagMapping: Record<string, string>,
+): SchemaResolver {
+  return (tagName: string) => {
+    const typeName = tagMapping[tagName];
+    if (!typeName) return null;
+    const schemaName = `${typeName}Schema`;
+    const schema = pkg[schemaName];
+    return schema instanceof z.ZodSchema ? (schema as z.ZodType<any>) : null;
+  };
+}
+
+function addJsxComponentIfMatch(
+  node: any,
+  resolveSchema: SchemaResolver,
+  source: string,
+  out: ComponentInfo[],
+): void {
+  if (!node || node.type !== "JSXOpeningElement") return;
+  const nameNode = node.name;
+  const tagName = jsxNameToString(nameNode);
+  if (!tagName) return;
+  if (isCommonHtmlElement(tagName)) return;
+  const schema = resolveSchema(tagName);
+  if (!schema) return;
+  const props = extractJsxAttributes(node.attributes, source);
+  out.push({ tagName, props, content: source.slice(node.start, node.end) });
+}
+
+function addCreateComponentIfMatch(
+  node: any,
+  resolveSchema: SchemaResolver,
+  source: string,
+  out: ComponentInfo[],
+  packageName?: string,
+): void {
+  if (!node || node.type !== "CallExpression") return;
+  const callee = node.callee;
+  const isCreate =
+    callee &&
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.property &&
+    callee.property.type === "Identifier" &&
+    callee.property.name === "createComponent";
+  if (!isCreate) return;
+  if (packageName && packageName !== "@shopify/ui-extensions/point-of-sale")
+    return;
+  const callArgs = node.arguments ?? [];
+  const firstArg = callArgs[0];
+  const secondArg = callArgs[1];
+  const tagName =
+    firstArg && firstArg.type === "Identifier" ? firstArg.name : null;
+  if (!tagName) return;
+  const schema = resolveSchema(tagName);
+  if (!schema) return;
+  let props: Record<string, any> = {};
+  if (secondArg && secondArg.type === "ObjectExpression") {
+    props = extractObjectLiteralProps(secondArg, source);
+  }
+  out.push({ tagName, props, content: source.slice(node.start, node.end) });
 }
 
 function jsxNameToString(nameNode: any): string | null {
@@ -288,7 +343,6 @@ function jsxNameToString(nameNode: any): string | null {
     case "JSXIdentifier":
       return nameNode.name as string;
     case "JSXMemberExpression": {
-      // e.g., UI.Button -> take the rightmost identifier "Button"
       let current: any = nameNode;
       while (current.object && current.property) {
         if (current.property && current.property.type === "JSXIdentifier") {
@@ -299,7 +353,6 @@ function jsxNameToString(nameNode: any): string | null {
       return null;
     }
     case "JSXNamespacedName":
-      // e.g., svg:path -> take local name
       return nameNode.name?.name ?? nameNode.local?.name ?? null;
     default:
       return null;
@@ -318,7 +371,6 @@ function extractJsxAttributes(
       if (!key) continue;
 
       if (attr.value == null) {
-        // <Comp disabled />
         props[key] = true;
         continue;
       }
@@ -330,7 +382,6 @@ function extractJsxAttributes(
 
       if (attr.value.type === "JSXExpressionContainer") {
         const expr = attr.value.expression;
-        // Handle simple literal expressions
         if (expr.type === "Literal") {
           props[key] = expr.value;
           continue;
@@ -338,16 +389,68 @@ function extractJsxAttributes(
         if (expr.type === "Identifier") {
           if (expr.name === "true") props[key] = true;
           else if (expr.name === "false") props[key] = false;
-          else props[key] = expr.name; // keep identifier name as string placeholder
+          else props[key] = expr.name;
           continue;
         }
-        // Fallback: keep raw expression text as string
         props[key] = source.slice(expr.start, expr.end);
         continue;
       }
     } else if (attr.type === "JSXSpreadAttribute") {
-      // Skip spreads; cannot safely evaluate at validation time
       continue;
+    }
+  }
+
+  return props;
+}
+
+function extractObjectLiteralProps(
+  objExpr: any,
+  source: string,
+): Record<string, any> {
+  const props: Record<string, any> = {};
+  if (!objExpr || objExpr.type !== "ObjectExpression") return props;
+
+  for (const prop of objExpr.properties ?? []) {
+    if (prop.type === "SpreadElement") continue;
+    if (prop.type !== "Property") continue;
+
+    let key: string | null = null;
+    if (!prop.computed) {
+      if (prop.key.type === "Identifier") key = prop.key.name as string;
+      else if (prop.key.type === "Literal") key = String(prop.key.value);
+    }
+    if (!key) continue;
+
+    const valueNode = prop.value;
+    switch (valueNode.type) {
+      case "Literal":
+        props[key] = (valueNode as any).value;
+        break;
+      case "TemplateLiteral": {
+        const hasExpressions = (valueNode.expressions ?? []).length > 0;
+        if (!hasExpressions) {
+          const cooked = (valueNode.quasis ?? [])
+            .map((q: any) => q.value?.cooked ?? "")
+            .join("");
+          props[key] = cooked;
+        } else {
+          props[key] = source.slice(valueNode.start, valueNode.end);
+        }
+        break;
+      }
+      case "Identifier": {
+        if (valueNode.name === "true") props[key] = true;
+        else if (valueNode.name === "false") props[key] = false;
+        else props[key] = valueNode.name;
+        break;
+      }
+      case "ObjectExpression": {
+        props[key] = extractObjectLiteralProps(valueNode, source);
+        break;
+      }
+      default:
+        props[key] = source.slice(valueNode.start, valueNode.end);
+        break;
     }
   }
 
@@ -400,47 +503,4 @@ function isCommonHtmlElement(tagName: string): boolean {
   return commonElements.has(tagName.toLowerCase());
 }
 
-function parseStringValue(value: string, attributeName: string): any {
-  // Handle boolean string values
-  if (value === "true") return true;
-  if (value === "false") return false;
-
-  // Handle numeric values for specific attributes that are typically numeric
-  if (isNumericAttribute(attributeName)) {
-    if (/^-?\d+$/.test(value)) {
-      return parseInt(value, 10);
-    }
-    if (/^-?\d*\.\d+$/.test(value)) {
-      return parseFloat(value);
-    }
-  }
-
-  // Return as string by default
-  return value;
-}
-
-function isNumericAttribute(attributeName: string): boolean {
-  const numericAttributes = new Set([
-    "max",
-    "min",
-    "step",
-    "tabindex",
-    "size",
-    "rows",
-    "cols",
-    "span",
-    "colspan",
-    "rowspan",
-    "width",
-    "height",
-    "maxlength",
-    "minlength",
-    "value",
-    "defaultValue",
-    "initialValue",
-    "maximumValue",
-    "minimumValue",
-  ]);
-
-  return numericAttributes.has(attributeName.toLowerCase());
-}
+// Removed unused parseStringValue and isNumericAttribute helpers
