@@ -1,7 +1,7 @@
 import { Parser } from "acorn";
 import jsx from "acorn-jsx";
 import tsPlugin from "acorn-typescript";
-import { full as walkFull } from "acorn-walk";
+import { base as walkBase, full as walkFull } from "acorn-walk";
 import { z } from "zod";
 import * as AppHomeSchemas from "../data/typescriptSchemas/appHome.js";
 import * as PosSchemas from "../data/typescriptSchemas/pos.js";
@@ -132,11 +132,13 @@ function validateCodeBlock(
 ): ValidationResponse {
   try {
     const components = parseComponents(codeblock, resolveSchema, packageName);
+    console.log("Components:", components);
 
     if (components.length === 0) {
       return {
         result: ValidationResult.SUCCESS,
         resultDetail: "No components found to validate.",
+        components,
       };
     }
 
@@ -160,12 +162,14 @@ function validateCodeBlock(
       return {
         result: ValidationResult.SUCCESS,
         resultDetail: `All components validated successfully.${componentsList}`,
+        components,
       };
     }
 
     return {
       result: ValidationResult.FAILED,
       resultDetail: `Validation errors: ${errors.join("; ")}`,
+      components,
     };
   } catch (error) {
     return {
@@ -182,6 +186,7 @@ function validateSingleComponent(
   const schema = resolveSchema(component.tagName);
 
   if (!schema) {
+    console.log("Unknown component:", component.tagName);
     return {
       isValid: false,
       error: `Unknown component: ${component.tagName}`,
@@ -232,8 +237,8 @@ function parseComponents(
   const cleanedCode = extractTypeScriptCode(codeblock);
 
   const ExtendedParser = (Parser as any).extend(
-    (jsx as any)(),
     (tsPlugin as any)(),
+    (jsx as any)(),
   );
 
   try {
@@ -244,18 +249,43 @@ function parseComponents(
       locations: true,
       ranges: true,
     });
+    const jsxBase = {
+      ...walkBase,
+      JSXElement(node: any, st: any, c: any) {
+        c(node.openingElement, st);
+        for (const child of node.children) c(child, st);
+      },
+      JSXFragment(node: any, st: any, c: any) {
+        for (const child of node.children) c(child, st);
+      },
+      JSXOpeningElement(node: any, st: any, c: any) {
+        for (const attr of node.attributes) c(attr, st);
+      },
+      JSXAttribute(node: any, st: any, c: any) {
+        if (node.value) c(node.value, st);
+      },
+      JSXExpressionContainer(node: any, st: any, c: any) {
+        c(node.expression, st);
+      },
+      JSXText() {}, // ensure traversal doesn't error on text
+    };
 
-    walkFull(ast, (node: any) => {
-      addJsxComponentIfMatch(node, resolveSchema, cleanedCode, components);
-      addCreateComponentIfMatch(
-        node,
-        resolveSchema,
-        cleanedCode,
-        components,
-        packageName,
-      );
-    });
+    walkFull(
+      ast,
+      (node: any) => {
+        addJsxComponentIfMatch(node, resolveSchema, cleanedCode, components);
+        addCreateComponentIfMatch(
+          node,
+          resolveSchema,
+          cleanedCode,
+          components,
+          packageName,
+        );
+      },
+      jsxBase,
+    );
   } catch (e) {
+    console.log("Error parsing components:", e);
     return components;
   }
 
@@ -267,7 +297,7 @@ function resolveByConventionalNames(pkg: any): SchemaResolver {
     const candidateNames = [`${tagName}PropsSchema`, `${tagName}Schema`];
     for (const schemaName of candidateNames) {
       const schema = pkg[schemaName];
-      if (schema instanceof z.ZodSchema) return schema as z.ZodType<any>;
+      if (schema instanceof z.ZodType) return schema as z.ZodType<any>;
     }
     return null;
   };
@@ -297,8 +327,6 @@ function addJsxComponentIfMatch(
   const tagName = jsxNameToString(nameNode);
   if (!tagName) return;
   if (isCommonHtmlElement(tagName)) return;
-  const schema = resolveSchema(tagName);
-  if (!schema) return;
   const props = extractJsxAttributes(node.attributes, source);
   out.push({ tagName, props, content: source.slice(node.start, node.end) });
 }
@@ -328,8 +356,6 @@ function addCreateComponentIfMatch(
   const tagName =
     firstArg && firstArg.type === "Identifier" ? firstArg.name : null;
   if (!tagName) return;
-  const schema = resolveSchema(tagName);
-  if (!schema) return;
   let props: Record<string, any> = {};
   if (secondArg && secondArg.type === "ObjectExpression") {
     props = extractObjectLiteralProps(secondArg, source);

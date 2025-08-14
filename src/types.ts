@@ -15,6 +15,18 @@ export interface ValidationResponse {
    * For SUCCESS: Description of what validation was successfully performed
    */
   resultDetail: string;
+
+  /**
+   * Optional parsed components produced by component validation.
+   * Present only for component validation responses.
+   */
+  components?: ParsedComponent[];
 }
 
 export type ValidationToolResult = ValidationResponse[];
+
+export interface ParsedComponent {
+  tagName: string;
+  props: Record<string, any>;
+  content: string;
+}

@@ -80,6 +80,8 @@ describe("validateComponent", () => {
         "@shopify/app-bridge-ui-types",
       );
       expect(validationResults).toHaveLength(2);
+      expect(validationResults[0].components).toHaveLength(1);
+      expect(validationResults[1].components).toHaveLength(1);
       expect(isValidationSuccessful(validationResults[0])).toBe(true);
       expect(isValidationSuccessful(validationResults[1])).toBe(true);
       expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
@@ -97,6 +99,9 @@ describe("validateComponent", () => {
         "@shopify/app-bridge-ui-types",
       );
       expect(validationResults).toHaveLength(3);
+      expect(validationResults[0].components).toHaveLength(1);
+      expect(validationResults[1].components).toHaveLength(1);
+      expect(validationResults[2].components).toHaveLength(1);
       expect(isValidationSuccessful(validationResults[0])).toBe(true);
       expect(isValidationSuccessful(validationResults[1])).toBe(true);
       expect(isValidationSuccessful(validationResults[2])).toBe(true);
@@ -107,7 +112,7 @@ describe("validateComponent", () => {
 
     it("should validate all codeblocks with s- components", async () => {
       const codeBlocks = [
-        "```<s-button>Button</s-button><s-text>Text</s-text>```",
+        "```<><s-button>Button</s-button><s-text>Text</s-text></>```",
         "```<s-heading>Heading</s-heading>```",
       ];
       const validationResults = await validateComponent(
@@ -115,6 +120,8 @@ describe("validateComponent", () => {
         "@shopify/app-bridge-ui-types",
       );
       expect(validationResults).toHaveLength(2);
+      expect(validationResults[0].components).toHaveLength(2);
+      expect(validationResults[1].components).toHaveLength(1);
       expect(isValidationSuccessful(validationResults[0])).toBe(true);
       expect(isValidationSuccessful(validationResults[1])).toBe(true);
       expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
@@ -129,6 +136,7 @@ describe("validateComponent", () => {
           ["```<s-badge>Badge</s-badge>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -137,6 +145,7 @@ describe("validateComponent", () => {
           ["```<s-banner>Banner</s-banner>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -145,6 +154,7 @@ describe("validateComponent", () => {
           ["```<s-box>Box</s-box>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -153,6 +163,7 @@ describe("validateComponent", () => {
           ["```<s-button>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -161,6 +172,7 @@ describe("validateComponent", () => {
           ["```<s-checkbox>Checkbox</s-checkbox>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -169,6 +181,7 @@ describe("validateComponent", () => {
           ["```<s-text>Text</s-text>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -177,6 +190,7 @@ describe("validateComponent", () => {
           ["```<s-heading>Heading</s-heading>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -185,6 +199,7 @@ describe("validateComponent", () => {
           ["```<s-link>Link</s-link>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
     });
@@ -195,6 +210,10 @@ describe("validateComponent", () => {
           ["```<s-button variant='primary'>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "variant",
+        );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -202,6 +221,10 @@ describe("validateComponent", () => {
         const validationResults = await validateComponent(
           ["```<s-button disabled>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
+        );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "disabled",
         );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
@@ -211,6 +234,10 @@ describe("validateComponent", () => {
           ["```<s-badge tone='info'>Badge</s-badge>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "tone",
+        );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -218,6 +245,10 @@ describe("validateComponent", () => {
         const validationResults = await validateComponent(
           ["```<s-icon type='search'>Icon</s-icon>```"],
           "@shopify/app-bridge-ui-types",
+        );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "type",
         );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
@@ -229,6 +260,13 @@ describe("validateComponent", () => {
           ],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "label",
+        );
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "placeholder",
+        );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -238,6 +276,13 @@ describe("validateComponent", () => {
             "```<s-number-field label='Quantity' placeholder='10'></s-number-field>```",
           ],
           "@shopify/app-bridge-ui-types",
+        );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "label",
+        );
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "placeholder",
         );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
@@ -249,6 +294,13 @@ describe("validateComponent", () => {
           ],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "label",
+        );
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "placeholder",
+        );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -259,6 +311,13 @@ describe("validateComponent", () => {
           ],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "label",
+        );
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "placeholder",
+        );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -267,17 +326,48 @@ describe("validateComponent", () => {
           ["```<s-number-field label='Quantity'></s-number-field>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "label",
+        );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
       it("s-number-field with numeric attributes should convert correctly", async () => {
         const validationResults = await validateComponent(
           [
+            "```<s-number-field label='Quantity' min={0} max={100} step={1} placeholder='Enter quantity'></s-number-field>```",
+          ],
+          "@shopify/app-bridge-ui-types",
+        );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "label",
+        );
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "min",
+        );
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "max",
+        );
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "step",
+        );
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "placeholder",
+        );
+        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      });
+
+      it("s-number-field with numeric attributes should fail when not in curly braces", async () => {
+        const validationResults = await validateComponent(
+          [
             "```<s-number-field label='Quantity' min='0' max='100' step='1' placeholder='Enter quantity'></s-number-field>```",
           ],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(false);
+        expect(validationResults[0].result).toBe(ValidationResult.FAILED);
       });
     });
 
@@ -287,7 +377,8 @@ describe("validateComponent", () => {
           ["```<p-button>Button</p-button>```"],
           "@shopify/app-bridge-ui-types",
         );
-        expect(isValidationSuccessful(validationResults[0])).toBe(true);
+        expect(isValidationSuccessful(validationResults[0])).toBe(false);
+        expect(validationResults[0].result).toBe(ValidationResult.FAILED);
       });
     });
 
@@ -297,6 +388,10 @@ describe("validateComponent", () => {
           ["```<s-button variant='primary'>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
         );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "variant",
+        );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
 
@@ -304,6 +399,10 @@ describe("validateComponent", () => {
         const validationResults = await validateComponent(
           ["```<s-button icon='search'>Button</s-button>```"],
           "@shopify/app-bridge-ui-types",
+        );
+        expect(validationResults[0].components).toHaveLength(1);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "icon",
         );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
@@ -313,9 +412,19 @@ describe("validateComponent", () => {
       it("valid form with multiple field types", async () => {
         const validationResults = await validateComponent(
           [
-            "```<s-text-field label='Name' /><s-email-field label='Email' /><s-button variant='primary'>Submit</s-button>```",
+            "```<><s-text-field label='Name' /><s-email-field label='Email' /><s-button variant='primary'>Submit</s-button></>```",
           ],
           "@shopify/app-bridge-ui-types",
+        );
+        expect(validationResults[0].components).toHaveLength(3);
+        expect(validationResults[0].components![0].props).toHaveProperty(
+          "label",
+        );
+        expect(validationResults[0].components![1].props).toHaveProperty(
+          "label",
+        );
+        expect(validationResults[0].components![2].props).toHaveProperty(
+          "variant",
         );
         expect(isValidationSuccessful(validationResults[0])).toBe(true);
       });
@@ -323,7 +432,7 @@ describe("validateComponent", () => {
   });
 
   describe("react components for POS examples", () => {
-    it("parses and validates valid POS react components", async () => {
+    it("parses and validates valid POS react components. ScrollView is not a valid component", async () => {
       const codeBlocks = [
         `import React from 'react';
           import {
@@ -373,9 +482,9 @@ describe("validateComponent", () => {
         codeBlocks,
         "@shopify/ui-extensions-react/point-of-sale",
       );
-      expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      expect(isValidationSuccessful(validationResults[0])).toBe(false);
       expect(validationResults).toHaveLength(1);
-      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
     });
 
     it("parses and catches invalid due to missing props POS react components", async () => {
@@ -426,14 +535,14 @@ describe("validateComponent", () => {
         codeBlocks,
         "@shopify/ui-extensions-react/point-of-sale",
       );
-      expect(isValidationSuccessful(validationResults[0])).toBe(true);
+      expect(isValidationSuccessful(validationResults[0])).toBe(false);
       expect(validationResults).toHaveLength(1);
-      expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+      expect(validationResults[0].result).toBe(ValidationResult.FAILED);
     });
   });
 });
 describe("react component for POS TS", () => {
-  it("parses and validates valid POS TS components", async () => {
+  it("parses and validates valid POS TS components. ScrollView is not a valid component", async () => {
     const codeBlocks = [
       `import {
 extend,
@@ -487,9 +596,9 @@ root.appendChild(navigator);
       codeBlocks,
       "@shopify/ui-extensions/point-of-sale",
     );
-    expect(isValidationSuccessful(validationResults[0])).toBe(true);
+    expect(isValidationSuccessful(validationResults[0])).toBe(false);
     expect(validationResults).toHaveLength(1);
-    expect(validationResults[0].result).toBe(ValidationResult.SUCCESS);
+    expect(validationResults[0].result).toBe(ValidationResult.FAILED);
   });
   it("parses and catches invalid due to invalid props", async () => {
     const codeBlocks = [
@@ -518,7 +627,7 @@ const scrollView =
   imageBoxScreen.createComponent(ScrollView);
 
 const box = scrollView.createComponent(Box, {
-  title: 'lolz this shouldn't work',
+  title: 'lol this should not work',
   blockSize: '100px',
   inlineSize: '100px',
   paddingInlineStart: '100',
