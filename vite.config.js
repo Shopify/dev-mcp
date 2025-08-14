@@ -23,6 +23,7 @@ export default defineConfig({
         ...builtinModules.map((m) => `node:${m}`),
         "@shopify/theme-check-node",
         "@shopify/theme-check-common",
+        "@shopify/theme-check-docs-updater",
       ],
       output: {
         interop: "auto",
