@@ -29,6 +29,8 @@ Add the following configuration. For more information, read the [Cursor MCP docu
 }
 ```
 
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0In0%3D)
+
 On Windows, you might need to use this alternative configuration:
 
 ```json
@@ -41,6 +43,28 @@ On Windows, you might need to use this alternative configuration:
   }
 }
 ```
+
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoiY21kIC9rIG5weCAteSBAc2hvcGlmeS9kZXYtbWNwQGxhdGVzdCJ9)
+
+### Disable instrumentation
+
+In order to better understand how to improve the MCP server, this package makes instrumentation calls. In order to disable them you can set the `OPT_OUT_INSTRUMENTATION` environment variable. In Cursor or Claude Desktop the configuration would look like this:
+
+```json
+{
+  "mcpServers": {
+    "shopify-dev-mcp": {
+      "command": "npx",
+      "args": ["-y", "@shopify/dev-mcp@latest"],
+      "env": {
+        "OPT_OUT_INSTRUMENTATION": "true"
+      }
+    }
+  }
+}
+```
+
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0IiwiZW52Ijp7Ik9QVF9PVVRfSU5TVFJVTUVOVEFUSU9OIjoidHJ1ZSJ9fQ%3D%3D)
 
 ### Opt-in Polaris support (experimental)
 
@@ -60,16 +84,29 @@ If you want Cursor or Claude Desktop to surface Polaris Web Components documenta
 }
 ```
 
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=shopify-dev-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBzaG9waWZ5L2Rldi1tY3BAbGF0ZXN0IiwiZW52Ijp7IlBPTEFSSVNfVU5JRklFRCI6InRydWUifX0%3D)
+
 ## Available tools
 
 This MCP server provides the following tools:
 
-| Tool Name               | Description                                            |
-| ----------------------- | ------------------------------------------------------ |
-| search_dev_docs         | Search shopify.dev documentation                       |
-| introspect_admin_schema | Access and search Shopify Admin GraphQL schema         |
-| fetch_docs_by_path      | Retrieve documents from shopify.dev                    |
-| get_started             | Get started with Shopify APIs (Admin, Functions, etc.) |
+| Tool Name                   | Description                                                                                                                                                                                                                                                                                                           |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| learn_shopify_api           | **Start here first** - Teaches the LLM about supported Shopify APIs and how to use this MCP server's tools to generate valid code blocks for each API. This tool makes a request to shopify.dev to get the most up-to-date instruction for how to best work with the API the user would need to use for their prompt. |
+| search_docs_chunks          | Search across all shopify.dev documentation to find relevant chunks matching your query. Useful for getting content from many different documentation categories, but may have incomplete context due to chunking                                                                                                     |
+| fetch_full_docs             | Retrieve complete documentation for specific paths from shopify.dev. Provides full context without chunking loss, but requires knowing the exact path. Paths are provided via `learn_shopify_api`                                                                                                                     |
+| introspect_graphql_schema   | Explore and search Shopify GraphQL schemas to find specific types, queries, and mutations. Returns schema elements filtered by search terms, helping developers discover available fields, operations, and data structures for building GraphQL operations                                                            |
+| validate_graphql_codeblocks | Validate GraphQL code blocks against a specific GraphQL schema to ensure they don't contain hallucinated fields or operations                                                                                                                                                                                         |
+
+## Tool Usage Guidelines
+
+### When to use each documentation tool:
+
+- **`learn_shopify_api`**: Always call this first when working with Shopify APIs. It provides essential context about supported APIs and generates a conversation ID for tracking usage across tool calls.
+
+- **`search_docs_chunks`**: Use when you need to find relevant information across multiple documentation sections or when you don't know the specific path. This tool searches through chunked content which allows for better token matching within smaller content pieces, but may miss some context from individual pages.
+
+- **`fetch_full_docs`**: Use when you need complete documentation for a specific API resource and know the exact path (e.g., `/docs/api/admin-rest/resources/product`). This provides full context without any information loss from chunking.
 
 ## Available prompts
 

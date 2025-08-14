@@ -2,19 +2,11 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { shopifyTools } from "./tools/index.js";
 import { shopifyPrompts } from "./prompts/index.js";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, resolve } from "path";
+import { shopifyTools } from "./tools/index.js";
 
-// Get package.json version
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageJson = JSON.parse(
-  readFileSync(resolve(__dirname, "../package.json"), "utf8"),
-);
-const VERSION = packageJson.version;
+declare const __APP_VERSION__: string;
+const VERSION = __APP_VERSION__;
 
 async function main() {
   // Create server instance

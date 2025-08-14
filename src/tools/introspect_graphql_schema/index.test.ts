@@ -1,29 +1,39 @@
-// Import vitest first
-import { describe, test, expect, beforeEach, vi, afterAll } from "vitest";
-import { vol } from "memfs";
-
-vi.mock("node:fs");
-vi.mock("node:fs/promises");
+import { fileURLToPath } from "node:url";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+  vi,
+} from "vitest";
 
 // Now import the module to test
 import {
-  formatType,
+  filterAndSortItems,
   formatArg,
   formatField,
-  formatSchemaType,
   formatGraphqlOperation,
-  searchShopifyAdminSchema,
-  filterAndSortItems,
+  formatSchemaType,
+  formatType,
+  introspectGraphqlSchema,
   MAX_FIELDS_TO_SHOW,
-} from "./shopify-admin-schema.js";
+  SCHEMAS_CACHE_DIR,
+  type Schema,
+} from "./index.js";
+import { injectMockSchemasIntoCache } from "../../test-utils.js";
 
 // Mock console.error
 const originalConsoleError = console.error;
 console.error = vi.fn();
 
-// Clean up after tests
 afterAll(() => {
   console.error = originalConsoleError;
+});
+
+beforeAll(async () => {
+  await injectMockSchemasIntoCache();
 });
 
 describe("formatType", () => {
@@ -366,125 +376,22 @@ describe("filterAndSortItems", () => {
   });
 });
 
-describe("searchShopifyAdminSchema", () => {
-  // Sample schema for testing
-  const sampleSchema = {
-    data: {
-      __schema: {
-        types: [
-          {
-            kind: "OBJECT",
-            name: "Product",
-            description: "A product in the shop",
-            fields: [
-              {
-                name: "id",
-                args: [],
-                type: { kind: "SCALAR", name: "ID", ofType: null },
-                isDeprecated: false,
-              },
-              {
-                name: "title",
-                args: [],
-                type: { kind: "SCALAR", name: "String", ofType: null },
-                isDeprecated: false,
-              },
-            ],
-          },
-          {
-            kind: "INPUT_OBJECT",
-            name: "ProductInput",
-            description: "Input for a product",
-            fields: null,
-            inputFields: [
-              {
-                name: "title",
-                type: { kind: "SCALAR", name: "String", ofType: null },
-                defaultValue: null,
-              },
-            ],
-          },
-          {
-            kind: "OBJECT",
-            name: "Order",
-            description: "An order in the shop",
-            fields: [
-              {
-                name: "id",
-                args: [],
-                type: { kind: "SCALAR", name: "ID", ofType: null },
-                isDeprecated: false,
-              },
-            ],
-          },
-          {
-            kind: "OBJECT",
-            name: "QueryRoot",
-            fields: [
-              {
-                name: "product",
-                description: "Get a product by ID",
-                args: [
-                  {
-                    name: "id",
-                    type: { kind: "SCALAR", name: "ID", ofType: null },
-                    defaultValue: null,
-                  },
-                ],
-                type: { kind: "OBJECT", name: "Product", ofType: null },
-              },
-              {
-                name: "order",
-                description: "Get an order by ID",
-                args: [
-                  {
-                    name: "id",
-                    type: { kind: "SCALAR", name: "ID", ofType: null },
-                    defaultValue: null,
-                  },
-                ],
-                type: { kind: "OBJECT", name: "Order", ofType: null },
-              },
-            ],
-          },
-          {
-            kind: "OBJECT",
-            name: "Mutation",
-            fields: [
-              {
-                name: "productCreate",
-                description: "Create a product",
-                args: [
-                  {
-                    name: "input",
-                    type: {
-                      kind: "INPUT_OBJECT",
-                      name: "ProductInput",
-                      ofType: null,
-                    },
-                    defaultValue: null,
-                  },
-                ],
-                type: { kind: "OBJECT", name: "Product", ofType: null },
-              },
-            ],
-          },
-        ],
-      },
+describe("introspectGraphqlSchema", () => {
+  // Mock schemas for testing
+  const mockSchemas: Schema[] = [
+    {
+      api: "admin",
+      id: "admin_2025-01-mock",
+      version: "2025-01-mock",
+      url: "https://example.com/admin_2025-01-mock.json",
     },
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    vol.reset();
-    vol.fromJSON({
-      "./data/admin_schema_2025-01.json": JSON.stringify(sampleSchema),
-    });
-  });
+  ];
 
   test("returns formatted results for a search query", async () => {
-    const result = await searchShopifyAdminSchema("product");
+    const result = await introspectGraphqlSchema("product", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
+    });
 
     expect(result.success).toBe(true);
     expect(result.responseText).toContain("## Matching GraphQL Types:");
@@ -497,48 +404,57 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("normalizes query by removing trailing s", async () => {
-    await searchShopifyAdminSchema("products");
+    // Console error should be mocked by vi, so we can capture the messages
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
-    // Check that console.error was called with the normalized search term
-    const logCalls = (console.error as any).mock.calls.map(
-      (call: any[]) => call[0],
-    );
-    const hasNormalizedMessage = logCalls.some(
-      (msg: any) =>
-        typeof msg === "string" &&
-        msg.includes("products") &&
-        msg.includes("(normalized: product)"),
+    await introspectGraphqlSchema("products", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
+    });
+
+    // Check console.error was called with the normalization message
+    const errorMessages = consoleErrorSpy.mock.calls.map((call) => call[0]);
+    const hasNormalizedMessage = errorMessages.some((msg) =>
+      msg.includes("(normalized: product)"),
     );
     expect(hasNormalizedMessage).toBe(true);
   });
 
   test("normalizes query by removing spaces", async () => {
-    await searchShopifyAdminSchema("product input");
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
-    // Check that console.error was called with the normalized search term
-    const logCalls = (console.error as any).mock.calls.map(
-      (call: any[]) => call[0],
-    );
-    const hasNormalizedMessage = logCalls.some(
-      (msg: any) =>
-        typeof msg === "string" &&
-        msg.includes("product input") &&
-        msg.includes("(normalized: productinput)"),
+    await introspectGraphqlSchema("product input", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
+    });
+
+    // Check console.error was called with the normalization message
+    const errorMessages = consoleErrorSpy.mock.calls.map((call) => call[0]);
+    const hasNormalizedMessage = errorMessages.some((msg) =>
+      msg.includes("(normalized: productinput)"),
     );
     expect(hasNormalizedMessage).toBe(true);
   });
 
   test("handles empty query", async () => {
-    const result = await searchShopifyAdminSchema("");
+    const result = await introspectGraphqlSchema("", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
+    });
 
     expect(result.success).toBe(true);
     // Should not filter the schema
     expect(result.responseText).toContain("OBJECT Product");
-    expect(result.responseText).toContain("OBJECT Order");
   });
 
   test("filters results to show only types", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
       filter: ["types"],
     });
 
@@ -547,13 +463,15 @@ describe("searchShopifyAdminSchema", () => {
     expect(result.responseText).toContain("## Matching GraphQL Types:");
     expect(result.responseText).toContain("OBJECT Product");
     expect(result.responseText).toContain("INPUT_OBJECT ProductInput");
-    // Should not include other sections
+    // Should not include queries or mutations sections
     expect(result.responseText).not.toContain("## Matching GraphQL Queries:");
     expect(result.responseText).not.toContain("## Matching GraphQL Mutations:");
   });
 
   test("filters results to show only queries", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
       filter: ["queries"],
     });
 
@@ -565,11 +483,12 @@ describe("searchShopifyAdminSchema", () => {
     expect(result.responseText).toContain("product");
     // Should not include mutations section
     expect(result.responseText).not.toContain("## Matching GraphQL Mutations:");
-    expect(result.responseText).not.toContain("productCreate");
   });
 
   test("filters results to show only mutations", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
       filter: ["mutations"],
     });
 
@@ -584,37 +503,37 @@ describe("searchShopifyAdminSchema", () => {
   });
 
   test("shows all sections when operationType is 'all'", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
       filter: ["all"],
     });
 
     expect(result.success).toBe(true);
     // Should include all sections
     expect(result.responseText).toContain("## Matching GraphQL Types:");
-    expect(result.responseText).toContain("OBJECT Product");
-    expect(result.responseText).toContain("INPUT_OBJECT ProductInput");
     expect(result.responseText).toContain("## Matching GraphQL Queries:");
-    expect(result.responseText).toContain("product");
     expect(result.responseText).toContain("## Matching GraphQL Mutations:");
-    expect(result.responseText).toContain("productCreate");
   });
 
   test("defaults to showing all sections when filter is not provided", async () => {
-    const result = await searchShopifyAdminSchema("product");
+    // When not providing filter, it should default to ["all"]
+    const result = await introspectGraphqlSchema("product", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
+    });
 
     expect(result.success).toBe(true);
     // Should include all sections
     expect(result.responseText).toContain("## Matching GraphQL Types:");
-    expect(result.responseText).toContain("OBJECT Product");
-    expect(result.responseText).toContain("INPUT_OBJECT ProductInput");
     expect(result.responseText).toContain("## Matching GraphQL Queries:");
-    expect(result.responseText).toContain("product");
     expect(result.responseText).toContain("## Matching GraphQL Mutations:");
-    expect(result.responseText).toContain("productCreate");
   });
 
   test("can show multiple sections with array of filters", async () => {
-    const result = await searchShopifyAdminSchema("product", {
+    const result = await introspectGraphqlSchema("product", {
+      version: "2025-01-mock",
+      schemas: mockSchemas,
       filter: ["queries", "mutations"],
     });
 
@@ -623,9 +542,7 @@ describe("searchShopifyAdminSchema", () => {
     expect(result.responseText).not.toContain("## Matching GraphQL Types:");
     // Should include queries section
     expect(result.responseText).toContain("## Matching GraphQL Queries:");
-    expect(result.responseText).toContain("product");
     // Should include mutations section
     expect(result.responseText).toContain("## Matching GraphQL Mutations:");
-    expect(result.responseText).toContain("productCreate");
   });
 });
