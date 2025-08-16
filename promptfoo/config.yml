@@ -1,0 +1,55 @@
+description: Evals for the MCP server
+
+prompts:
+  - '{{ prompt }}'
+
+providers:
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Cursor w/ GPT-5'
+    config:
+      systemPrompt: "file://./prompts/cursor.cjs"
+      model: "gpt-5"
+
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Cursor w/ Claude Sonnet 4'
+    config:
+      systemPrompt: "file://./prompts/cursor.cjs"
+      model: "anthropic:claude-sonnet-4"
+
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Cursor w/ o3'
+    config:
+      systemPrompt: "file://./prompts/cursor.cjs"
+      model: "o3"
+
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Claude Code w/ Sonnet 4'
+    config:
+      systemPrompt: "file://./prompts/claude-code.cjs"
+      model: "anthropic:claude-sonnet-4"
+
+  - id: 'file://./dev-mcp-provider.cjs'
+    label: 'Dev Assistant Agent — Claude Code w/ Opus 4.1'
+    config:
+      systemPrompt: "file://./prompts/claude-code.cjs"
+      model: "anthropic:claude-opus-4-1"
+
+tests:
+  - description: golden test
+    vars:
+      prompt: How do I create a draft order with a custom price with the Shopify Admin API?
+    assert:
+      - type: contains-all
+        value:
+          - 'Called tool learn_shopify_api with arguments: {"api":"admin"}'
+          - 'Called tool validate_graphql_codeblocks with arguments:'
+          - 'Called tool search_docs_chunks with arguments:'
+  - description: golden test
+    vars:
+      prompt: How do I fetch all the products tagged 'tee' and create a basic code discount for them returning the id with the Shopify Admin API?
+    assert:
+      - type: contains-all
+        value:
+          - 'Called tool learn_shopify_api with arguments: {"api":"admin"}'
+          - 'Called tool validate_graphql_codeblocks with arguments:'
+          - 'Called tool search_docs_chunks with arguments:'
